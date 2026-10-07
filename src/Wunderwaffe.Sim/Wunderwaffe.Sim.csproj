@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pure simulation library. Must never reference Godot: keeps it fast, deterministic and unit-testable. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Wunderwaffe.Sim</RootNamespace>
+  </PropertyGroup>
+
+</Project>

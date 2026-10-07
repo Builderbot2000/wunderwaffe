@@ -1,0 +1,30 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://render/TileView.cs" id="1_view"]
+[ext_resource type="Script" path="res://input/BuildTool.cs" id="2_build"]
+[ext_resource type="Script" path="res://input/CameraController.cs" id="3_cam"]
+[ext_resource type="Script" path="res://scenes/DebugHud.cs" id="4_hud"]
+
+[node name="Main" type="Node2D"]
+
+[node name="TileView" type="Node2D" parent="."]
+script = ExtResource("1_view")
+
+[node name="BuildTool" type="Node2D" parent="."]
+script = ExtResource("2_build")
+
+[node name="Camera" type="Camera2D" parent="."]
+position = Vector2(768, 768)
+script = ExtResource("3_cam")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="DebugHud" type="Label" parent="Hud" node_paths=PackedStringArray("BuildTool")]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 616.0
+offset_bottom = 816.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+script = ExtResource("4_hud")
+BuildTool = NodePath("../../BuildTool")

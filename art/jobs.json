@@ -1,0 +1,10 @@
+[
+ {"name":"core","size":48,"description":"command core building seen from directly above, flat top-down roof filling the whole image, armored metal hub with panel seams and rivets, four corner pylons, glowing yellow reactor in center, no ground, detailed factory game sprite","init_image":"blockouts/core.png","init_image_strength":100,"color_image":"palette.png","no_background":false},
+ {"name":"steel_mill","size":48,"description":"steel mill building seen from directly above, flat top-down roof filling the whole image, chimney stacks, two glowing molten furnace vents, loading bay, metal roof, no ground, detailed factory game sprite","init_image":"blockouts/steel_mill.png","init_image_strength":125,"no_background":false},
+ {"name":"smelter","size":32,"description":"smelter building seen from directly above, flat top-down roof filling the whole image, metal roof panels with rivets, copper pipes, exhaust stacks, round glowing furnace vent in center, no ground, detailed factory game sprite","init_image":"blockouts/smelter.png","init_image_strength":125,"no_background":false},
+ {"name":"drill","size":32,"description":"mining drill seen from directly above, flat top-down, square metal frame with cross braces, large round copper drill head in center, no ground, detailed factory game sprite","init_image":"blockouts/drill.png","init_image_strength":115,"color_image":"palette.png","no_background":false},
+ {"name":"conveyor","size":32,"description":"conveyor belt tile, top-down, dark grey belt with metal rails on both sides, arrow pointing right","no_background":false},
+ {"name":"copper_ore","size":32,"description":"copper ore chunk icon, orange-brown rock with copper flecks"},
+ {"name":"iron_plate","size":32,"description":"iron plate icon, flat grey metal ingot plate"},
+ {"name":"ground","size":32,"description":"seamless dark grey-brown dirt ground texture, top-down, low contrast, scattered small pebbles and cracks, tileable","init_image":"blockouts/ground.png","init_image_strength":130,"no_background":false}
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "id": "steelworks",
+    "name": "Steelworks",
+    "condition": { "type": "produce", "item": "iron_plate", "amount": 100 },
+    "unlocks": [ "steel_mill", "make_steel" ]
+  }
+]

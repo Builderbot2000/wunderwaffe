@@ -1,0 +1,18 @@
+# Godot
+.godot/
+/android/
+*.translation
+mono_crash.*
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Office lock files
+~$*
+
+# Secrets
+.env
