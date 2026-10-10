@@ -1,6 +1,4 @@
-using System.Linq;
 using Godot;
-using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game.Screens;

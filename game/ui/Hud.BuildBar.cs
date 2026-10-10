@@ -5,7 +5,6 @@ using Godot;
 using Wunderwaffe.Game.Input;
 using Wunderwaffe.Game.Render;
 using Wunderwaffe.Sim;
-using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game.Screens;
