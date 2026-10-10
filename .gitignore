@@ -16,3 +16,6 @@ TestResults/
 
 # Secrets
 .env
+
+# Agent worktrees
+.claude/worktrees/
