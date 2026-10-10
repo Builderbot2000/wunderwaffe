@@ -60,6 +60,12 @@ public partial class SimHost : Node
 
     int _viewedTileId;
 
+    /// <summary>
+    /// How many times the view has switched between the world map and a tile this match. The world map refreshes its
+    /// pictures of the tiles every <see cref="GameSettings.SnapshotEvery"/> switches.
+    /// </summary>
+    public int ToggleCount { get; private set; }
+
     /// <summary>Raised after <see cref="View"/> or <see cref="ViewedTile"/> changes.</summary>
     public event System.Action? ViewChanged;
 
@@ -74,6 +80,8 @@ public partial class SimHost : Node
 
     public void ShowWorld()
     {
+        if (View != ViewMode.World)
+            ToggleCount++;
         View = ViewMode.World;
         ViewChanged?.Invoke();
     }
@@ -84,6 +92,8 @@ public partial class SimHost : Node
         if (Sim.TryGetTile(tileId) is not { } tile || tile.Owner != LocalPlayer)
             return false;
         _viewedTileId = tile.Id;
+        if (View != ViewMode.Tile)
+            ToggleCount++;
         View = ViewMode.Tile;
         ViewChanged?.Invoke();
         return true;
@@ -175,6 +185,7 @@ public partial class SimHost : Node
         StepMs = 0;
         var home = sim.Tiles.FirstOrDefault(t => t.Owner == LocalPlayer) ?? sim.Tiles[0];
         _viewedTileId = home.Id;
+        ToggleCount = 0;
         View = view;
         GetTree().Paused = false;
     }
@@ -313,6 +324,6 @@ public partial class SimHost : Node
     static ContentDb LoadContent()
     {
         static string Read(string name) => FileAccess.GetFileAsString($"res://data/{name}");
-        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("tech.json"), Read("goals.json"));
+        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("tech.json"), Read("goals.json"), Read("terrain.json"));
     }
 }

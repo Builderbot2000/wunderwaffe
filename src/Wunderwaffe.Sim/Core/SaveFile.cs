@@ -13,7 +13,8 @@ public sealed class SaveException(string message) : Exception(message);
 /// <param name="Label">Free text for the load menu, such as progress at save time.</param>
 public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Hash, string Label, List<LoggedCommand> Commands)
 {
-    public const int CurrentVersion = 1;
+    /// <summary>2: irregular tiles cut from one generated world map; version 1 saves describe a square grid.</summary>
+    public const int CurrentVersion = 2;
 
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 

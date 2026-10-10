@@ -274,18 +274,20 @@ public partial class Hud : Control
     static string HelpText() => string.Join("\n", [
         "World map",
         "    Click selects a tile · double-click or Enter opens one of yours · C claims the selected tile",
-        "    Tab goes back to the tile you were on",
+        "    Tab toggles between the world map and the last tile you viewed",
+        "    The map is a blurred picture of each tile, refreshed every few toggles (Settings)",
         "",
         "Tile",
         "    1-9, 0 or the build bar picks a building · R rotates · Esc drops it",
         "    Left-click / drag places · right-click / drag removes (full refund)",
         "    Drills sit on ore. Belts carry items the way they face; machines push output into anything next to them.",
-        "    Ports sit in the shaded strip by the edge they face. An export port feeds the import port in the same",
-        "    lane on the neighbouring tile's facing edge.",
+        "    Ports go in the I/O zones along the tile's borders: one zone per neighbour, on the side facing it.",
+        "    An export port sends to the import ports in the neighbour's zone facing back; items flow both ways.",
+        "    Water and peaks can't be built on.",
         "",
         "Units",
         "    Lay frame (0) under a unit core and thrusters, hover the core with no building picked and press G",
-        "    Left-click / drag selects units · right-click moves them · past the edge goes to the next tile",
+        "    Left-click / drag selects units · right-click moves them · past the border goes to the next tile",
         "    G with units selected lands them",
         "",
         "Camera: WASD or arrows pan · wheel zooms · middle-drag pans",
@@ -334,7 +336,7 @@ public partial class Hud : Control
         if (_host.View == ViewMode.Tile)
         {
             var t = _host.ViewedTile;
-            _title.Text = $"Tile ({t.X},{t.Y})";
+            _title.Text = TileName(t);
             RefreshTileSide();
             RefreshHover();
             _hints.Text = BuildTool is { HasTool: true }
@@ -558,11 +560,12 @@ public partial class Hud : Control
             _ => $"Player {tile.Owner}",
         };
         var head = Ui.Row();
-        var name = Ui.Label($"Tile ({tile.X},{tile.Y})", 20);
+        var name = Ui.Label(TileName(tile), 20);
         name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         head.AddChild(name);
         head.AddChild(Ui.Label(owner, Ui.FontSize, mine ? Ui.Good : tile.Owner == TileState.Unowned ? Ui.Muted : Ui.Bad));
         _sideInfo.AddChild(head);
+        AddProfile(tile);
 
         _sideInfo.AddChild(Ui.Heading("Deposits"));
         foreach (var (item, cells) in tile.Grid.DepositCounts())
@@ -596,7 +599,7 @@ public partial class Hud : Control
             _sideInfo.AddChild(cost);
             _sideInfo.AddChild(Ui.Label(claim switch
             {
-                ClaimResult.Ok => $"Paid from tile ({payer!.X},{payer.Y}).",
+                ClaimResult.Ok => $"Paid from {TileName(payer!)}.",
                 ClaimResult.CannotAfford => "A neighbouring tile of yours needs this much in its core.",
                 ClaimResult.NotAdjacent => "Only tiles next to one of yours can be claimed.",
                 ClaimResult.Contested => "Contested tiles can't be claimed.",
@@ -605,17 +608,53 @@ public partial class Hud : Control
         }
     }
 
+    /// <summary>The tile's fixed attributes as label/value rows: what its name leaves out.</summary>
+    void AddProfile(TileState tile)
+    {
+        _sideInfo.AddChild(Ui.Heading("Profile"));
+        var grid = tile.Grid;
+        Stat("Terrain", BiomeName(tile));
+        Stat("Size", $"{grid.Area} cells");
+        Stat("Buildable", $"{grid.BuildableCount * 100 / Mathf.Max(1, grid.Area)}%");
+        Stat("Neighbours", tile.Neighbors.Count.ToString());
+
+        var counts = new int[Content.TerrainList.Count];
+        for (int y = 0; y < grid.Height; y++)
+        {
+            for (int x = 0; x < grid.Width; x++)
+            {
+                if (grid.InBounds(x, y))
+                    counts[grid.TerrainAt(x, y)]++;
+            }
+        }
+        var mix = counts.Select((n, i) => (n, i)).Where(c => c.n * 100 >= grid.Area * 5).OrderByDescending(c => c.n)
+            .Select(c => $"{Content.TerrainList[c.i].Name} {c.n * 100 / Mathf.Max(1, grid.Area)}%");
+        Stat("Ground", string.Join(", ", mix));
+
+        void Stat(string label, string value)
+        {
+            var row = Ui.Row(6);
+            var key = Ui.Label(label, Ui.SmallFont, Ui.Muted);
+            key.CustomMinimumSize = new Vector2(96, 0);
+            row.AddChild(key);
+            var text = Ui.Label(value, Ui.SmallFont, Ui.Text, SideWidth - 130);
+            text.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            row.AddChild(text);
+            _sideInfo.AddChild(row);
+        }
+    }
+
+    /// <summary>One line per I/O zone that has ports: the neighbour it links to and its ports each way.</summary>
     void AddPorts(TileState tile)
     {
         var lines = new List<string>();
-        foreach (var side in Directions.All)
+        foreach (int n in tile.Neighbors)
         {
-            int exports = tile.Grid.ExportPorts.Count(p => PortRules.SideOf(p.Rotation) == side);
-            int imports = tile.Grid.ImportPorts.Count(p => PortRules.SideOf(p.Rotation) == side);
+            int exports = tile.Grid.ExportPorts.Count(p => PortRules.PartnerOf(tile.Grid, p) == n);
+            int imports = tile.Grid.ImportPorts.Count(p => PortRules.PartnerOf(tile.Grid, p) == n);
             if (exports + imports == 0)
                 continue;
-            string to = Sim.Neighbor(tile, side) is { } n ? $"tile ({n.X},{n.Y})" : "the world's edge";
-            lines.Add($"{side} to {to}: {exports} out, {imports} in");
+            lines.Add($"To {TileName(Sim.Tiles[n])}: {exports} out, {imports} in");
         }
         if (lines.Count == 0)
             return;
@@ -647,9 +686,9 @@ public partial class Hud : Control
             return;
         }
         _placePanel.Visible = true;
-        string facing = BuildTool.SelectedIsPortTool()
-            ? $"faces {PortRules.SideOf(BuildTool.Rotation)}"
-            : $"facing {"→↓←↑"[BuildTool.Rotation]}";
+        string facing = $"facing {"→↓←↑"[BuildTool.Rotation]}";
+        if (BuildTool.SelectedIsPortTool())
+            facing = BuildTool.HoveredZone >= 0 ? $"links to {TileName(Sim.Tiles[BuildTool.HoveredZone])}" : "outside any I/O zone";
         var result = BuildTool.Preview;
         _placeLine.Text = $"{picked.Label} · {facing} · {PlaceMessage(picked, result)}";
         _placeLine.AddThemeColorOverride("font_color", result == PlaceResult.Ok ? Ui.Text : Ui.Bad);
@@ -706,7 +745,9 @@ public partial class Hud : Control
             case PlaceResult.OutOfBounds:
                 return "off the edge of the tile";
             case PlaceResult.NotInPortZone:
-                return $"ports go within {PortRules.ZoneDepth} cells of the edge they face";
+                return "ports go in an I/O zone along the border with a neighbour";
+            case PlaceResult.BadTerrain:
+                return $"can't build on {TerrainName(tile, BuildTool!.HoveredCell())}";
             case PlaceResult.NotOwner:
                 return "not your tile";
             default:
@@ -773,8 +814,8 @@ public partial class Hud : Control
                 Line($"{b.Export!.InFlight.Count} items in transit.");
                 break;
             case BuildingKind.ImportPort:
-                var from = Sim.Neighbor(tile, PortRules.SideOf(b.Rotation));
-                Line(from == null ? "Faces the edge of the world: nothing can arrive." : $"Receives from tile ({from.X},{from.Y}), lane {PortRules.Lane(b)}.");
+                var from = Sim.TryGetTile(PortRules.PartnerOf(tile.Grid, b));
+                Line(from == null ? "Not in an I/O zone: nothing can arrive." : $"Receives from {TileName(from)}.");
                 Line($"Holding {b.Machine!.OutputCount} items for the belt next to it.");
                 break;
             case BuildingKind.UnitCore:
@@ -812,14 +853,12 @@ public partial class Hud : Control
 
     string? ExportProblem(TileState tile, PlacedBuilding port)
     {
-        var side = PortRules.SideOf(port.Rotation);
-        if (Sim.Neighbor(tile, side) is not { } n)
-            return "Faces the edge of the world: nowhere to send items.";
+        if (Sim.TryGetTile(PortRules.PartnerOf(tile.Grid, port)) is not { } n)
+            return "Not in an I/O zone: nowhere to send items.";
         if (n.Owner != tile.Owner)
-            return $"Tile ({n.X},{n.Y}) isn't yours. Claim it to send items there.";
-        int lane = PortRules.Lane(port);
-        if (!n.Grid.ImportPorts.Any(p => PortRules.SideOf(p.Rotation) == side.Opposite() && PortRules.Lane(p) == lane))
-            return $"No import port on tile ({n.X},{n.Y})'s {side.Opposite()} edge in lane {lane}. Items wait here until there is.";
+            return $"{TileName(n)} isn't yours. Claim it to send items there.";
+        if (!n.Grid.ImportPorts.Any(p => PortRules.PartnerOf(n.Grid, p) == tile.Id))
+            return $"No import port in {TileName(n)}'s zone facing this tile. Items wait here until there is.";
         return null;
     }
 
@@ -827,7 +866,12 @@ public partial class Hud : Control
     {
         if (ExportProblem(tile, port) is { } problem)
             return problem;
-        var n = Sim.Neighbor(tile, PortRules.SideOf(port.Rotation))!;
-        return $"Linked to tile ({n.X},{n.Y}), lane {PortRules.Lane(port)}.";
+        return $"Paired with {TileName(Sim.Tiles[PortRules.PartnerOf(tile.Grid, port)])}'s zone facing this tile.";
     }
+
+    static string TileName(TileState tile) => tile.Name;
+
+    string BiomeName(TileState tile) => Content.TerrainList.FirstOrDefault(t => t.Id == tile.Biome)?.Name ?? tile.Biome;
+
+    string TerrainName(TileState tile, Vector2I cell) => Content.TerrainList[tile.Grid.TerrainAt(cell.X, cell.Y)].Name.ToLowerInvariant();
 }

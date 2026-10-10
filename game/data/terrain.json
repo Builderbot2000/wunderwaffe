@@ -1,0 +1,24 @@
+// Terrain kinds (WM-002, FB-002). A generated cell gets the first entry, in this order, whose elevation and moisture
+// bands (inclusive, 0-1000) contain it. Sea level is elevation 400. "river" marks the terrain used for river cells.
+// "deposits" weights where each minable item's patches are centred; 0 or absent means never.
+// "unitPassable" is not used yet: passability will come with locomotion types (UD-004).
+[
+  { "id": "river",         "name": "River",         "color": "#4f86b8", "river": true, "water": true, "buildable": true },
+  { "id": "deep_water",    "name": "Deep Water",    "color": "#1d3a5c", "water": true, "buildable": false, "elevation": [0, 299] },
+  { "id": "shallow_water", "name": "Shallow Water", "color": "#2f5f8a", "water": true, "buildable": false, "elevation": [300, 399] },
+  { "id": "beach",         "name": "Beach",         "color": "#c9b77d", "elevation": [400, 403],
+    "deposits": { "copper_ore": 1 } },
+  { "id": "peak",          "name": "Peak",          "color": "#e8e8ec", "buildable": false, "elevation": [900, 1000] },
+  { "id": "mountain",      "name": "Mountain",      "color": "#7b7468", "elevation": [780, 899],
+    "deposits": { "iron_ore": 5, "copper_ore": 3 } },
+  { "id": "hills",         "name": "Hills",         "color": "#7d8a55", "elevation": [620, 779],
+    "deposits": { "iron_ore": 4, "copper_ore": 4, "coal": 1 } },
+  { "id": "desert",        "name": "Desert",        "color": "#c2a35f", "moisture": [0, 249],
+    "deposits": { "copper_ore": 3, "iron_ore": 1 } },
+  { "id": "forest",        "name": "Forest",        "color": "#3c6b3a", "moisture": [650, 1000],
+    "deposits": { "coal": 4, "iron_ore": 1, "copper_ore": 1 } },
+  { "id": "grassland",     "name": "Grassland",     "color": "#6f9a4c", "moisture": [450, 649],
+    "deposits": { "coal": 2, "iron_ore": 2, "copper_ore": 2 } },
+  { "id": "plains",        "name": "Plains",        "color": "#9aa65a",
+    "deposits": { "coal": 2, "iron_ore": 2, "copper_ore": 2 } }
+]

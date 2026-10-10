@@ -8,25 +8,43 @@ public class WorldTests
     const int Me = 0;
     const int Them = 1;
 
-    /// <summary>A 3x3 world of small tiles with the player settled on the middle one.</summary>
+    const int Size = 20;
+
+    /// <summary>The hand-built tile at grid position (x, y).</summary>
+    static TileState At(Simulation sim, int x, int y) => sim.TileAtCell(x * Size, y * Size)!;
+
+    /// <summary>A 3x3 grid of small hand-built tiles with the player settled on the middle one.</summary>
     static (Simulation Sim, TileState Home) NewWorld()
     {
         var sim = new Simulation(TestContent.Load());
-        sim.GenerateWorld(3, 3, seed: 7, tileSize: 20);
-        var home = sim.TileAt(1, 1)!;
+        for (int y = 0; y < 3; y++)
+        {
+            for (int x = 0; x < 3; x++)
+                sim.AddTile(x, y, size: Size);
+        }
+        var home = At(sim, 1, 1);
         sim.SettleStartingTile(home, Me);
         return (sim, home);
     }
 
     [Fact]
-    public void WorldHasOneTilePerCoordinateWithUniqueIds()
+    public void EveryCellMapsToItsTileWithUniqueIds()
     {
         var (sim, _) = NewWorld();
         Assert.Equal(9, sim.Tiles.Count);
         Assert.Equal(9, sim.Tiles.Select(t => t.Id).Distinct().Count());
-        Assert.All(sim.Tiles, t => Assert.Same(t, sim.TileAt(t.X, t.Y)));
-        Assert.Null(sim.TileAt(3, 0));
-        Assert.Null(sim.TileAt(-1, 0));
+        Assert.All(sim.Tiles, t => Assert.Same(t, sim.TileAtCell(t.OriginX + Size - 1, t.OriginY + Size - 1)));
+        Assert.Null(sim.TileAtCell(3 * Size, 0));
+        Assert.Null(sim.TileAtCell(-1, 0));
+    }
+
+    [Fact]
+    public void ResolveCellMapsLocalCellsPastTheEdgeOntoTheNeighbour()
+    {
+        var (sim, home) = NewWorld();
+        Assert.Equal((At(sim, 2, 1), 0, 5), sim.ResolveCell(home, Size, 5));
+        Assert.Equal((At(sim, 0, 0), Size - 1, Size - 1), sim.ResolveCell(home, -1, -1));
+        Assert.Null(sim.ResolveCell(At(sim, 0, 0), -1, 0));
     }
 
     [Fact]
@@ -40,17 +58,9 @@ public class WorldTests
     public void AdjacencyIsEdgeSharingOnly()
     {
         var (sim, _) = NewWorld();
-        Assert.Equal([(1, 0), (2, 1), (1, 2), (0, 1)], sim.Neighbors(sim.TileAt(1, 1)!).Select(t => (t.X, t.Y)));
-        Assert.Equal([(1, 0), (0, 1)], sim.Neighbors(sim.TileAt(0, 0)!).Select(t => (t.X, t.Y)));
-    }
-
-    [Fact]
-    public void TilesHaveDifferingDeposits()
-    {
-        var (sim, _) = NewWorld();
-        Assert.All(sim.Tiles, t => Assert.NotEmpty(t.Grid.DepositCounts()));
-        var layouts = sim.Tiles.Select(t => string.Join(",", t.Grid.DepositCounts().Select(kv => $"{kv.Key}{kv.Value}")));
-        Assert.True(layouts.Distinct().Count() > 1);
+        static (int, int) Pos(TileState t) => (t.OriginX / Size, t.OriginY / Size);
+        Assert.Equal([(1, 0), (0, 1), (2, 1), (1, 2)], sim.Neighbors(At(sim, 1, 1)).Select(Pos));
+        Assert.Equal([(1, 0), (0, 1)], sim.Neighbors(At(sim, 0, 0)).Select(Pos));
     }
 
     [Fact]
@@ -58,7 +68,7 @@ public class WorldTests
     {
         var (sim, home) = NewWorld();
         Assert.Equal(TileOwnership.Owned, home.Ownership);
-        Assert.Equal(TileOwnership.Unclaimed, sim.TileAt(0, 0)!.Ownership);
+        Assert.Equal(TileOwnership.Unclaimed, At(sim, 0, 0).Ownership);
         home.Contested = true;
         Assert.Equal(TileOwnership.Contested, home.Ownership);
     }
@@ -74,7 +84,7 @@ public class WorldTests
     public void ClaimsAnAdjacentTileAndPaysFromTheNeighbour()
     {
         var (sim, home) = NewWorld();
-        var target = sim.TileAt(2, 1)!;
+        var target = At(sim, 2, 1);
         long copper = home.Inventory.Get("copper_ore"), iron = home.Inventory.Get("iron_ore");
 
         sim.Enqueue(new ClaimTileCommand(Me, target.Id));
@@ -91,7 +101,7 @@ public class WorldTests
     public void ClaimedTileCanBeBuiltOn()
     {
         var (sim, _) = NewWorld();
-        var target = sim.TileAt(2, 1)!;
+        var target = At(sim, 2, 1);
         sim.Enqueue(new ClaimTileCommand(Me, target.Id));
         sim.Step();
 
@@ -102,7 +112,7 @@ public class WorldTests
     public void CannotClaimDiagonalOrDistantTiles()
     {
         var (sim, _) = NewWorld();
-        Assert.Equal(ClaimResult.NotAdjacent, Expansion.Check(sim, Me, sim.TileAt(0, 0)!.Id, out _));
+        Assert.Equal(ClaimResult.NotAdjacent, Expansion.Check(sim, Me, At(sim, 0, 0).Id, out _));
 
         // An id past the end of the world is not a tile.
         Assert.Equal(ClaimResult.NoSuchTile, Expansion.Check(sim, Me, 99, out _));
@@ -114,8 +124,8 @@ public class WorldTests
         var (sim, home) = NewWorld();
         home.Inventory.Add("copper_ore", 1000);
         home.Inventory.Add("iron_ore", 1000);
-        var east = sim.TileAt(2, 1)!;
-        var corner = sim.TileAt(2, 0)!;
+        var east = At(sim, 2, 1);
+        var corner = At(sim, 2, 0);
         Assert.Equal(ClaimResult.NotAdjacent, Expansion.Check(sim, Me, corner.Id, out _));
 
         sim.Enqueue(new ClaimTileCommand(Me, east.Id));
@@ -133,7 +143,7 @@ public class WorldTests
     public void RefusesClaimsWhenOwnedContestedOrUnaffordable()
     {
         var (sim, home) = NewWorld();
-        var target = sim.TileAt(1, 0)!;
+        var target = At(sim, 1, 0);
 
         Assert.Equal(ClaimResult.AlreadyOwned, Expansion.Check(sim, Me, home.Id, out _));
         Assert.Equal(ClaimResult.AlreadyOwned, Expansion.Check(sim, Them, home.Id, out _));
@@ -157,8 +167,8 @@ public class WorldTests
         ulong Run()
         {
             var (sim, _) = NewWorld();
-            sim.Enqueue(new ClaimTileCommand(Me, sim.TileAt(1, 0)!.Id));
-            sim.Enqueue(new ClaimTileCommand(Me, sim.TileAt(0, 1)!.Id));
+            sim.Enqueue(new ClaimTileCommand(Me, At(sim, 1, 0).Id));
+            sim.Enqueue(new ClaimTileCommand(Me, At(sim, 0, 1).Id));
             for (int i = 0; i < 120; i++)
                 sim.Step();
             return sim.StateHash();
@@ -172,7 +182,7 @@ public class WorldTests
         var (a, _) = NewWorld();
         var (b, _) = NewWorld();
         Assert.Equal(a.StateHash(), b.StateHash());
-        b.TileAt(0, 0)!.Contested = true;
+        At(b, 0, 0).Contested = true;
         Assert.NotEqual(a.StateHash(), b.StateHash());
     }
 }

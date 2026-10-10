@@ -33,6 +33,24 @@ static class Harness
         return tile;
     }
 
+    /// <summary>
+    /// Top-left of the first w x h block of free, buildable cells, row by row. For generated tiles, whose shape and
+    /// terrain depend on the seed.
+    /// </summary>
+    public static (int X, int Y) Open(TileState tile, int w, int h)
+    {
+        var g = tile.Grid;
+        for (int y = 0; y < g.Height; y++)
+        {
+            for (int x = 0; x < g.Width; x++)
+            {
+                if (g.InBounds(x, y, w, h) && g.Buildable(x, y, w, h) && g.IsFree(x, y, w, h))
+                    return (x, y);
+            }
+        }
+        throw new InvalidOperationException($"no open {w}x{h} block on tile {tile.Id}");
+    }
+
     public static void Place(Simulation sim, TileState tile, string building, int x, int y, int rotation = 0, string? recipe = null) =>
         sim.Enqueue(new PlaceBuildingCommand(Me, tile.Id, building, x, y, rotation, recipe));
 

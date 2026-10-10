@@ -34,7 +34,7 @@ public enum DeployResult
     NotOwner,
     NoSuchUnit,
 
-    /// <summary>Some cells it would land on are off the tile, built on, or already framed.</summary>
+    /// <summary>Some cells it would land on are off the tile, unbuildable, built on, or already framed.</summary>
     Blocked,
 }
 
@@ -60,6 +60,8 @@ public static class UnitAssembly
             return PlaceResult.OutOfBounds;
         if (tile.Grid.HasFrame(x, y))
             return PlaceResult.Blocked;
+        if (!tile.Grid.Buildable(x, y))
+            return PlaceResult.BadTerrain;
         return tile.Inventory.Has(FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
     }
 
@@ -167,7 +169,8 @@ public static class UnitAssembly
         }
 
         var body = cells.Select(c => (c.X - core.X, c.Y - core.Y, mass[c])).ToList();
-        int px = core.X * Unit.CellScale + Unit.CellScale / 2, py = core.Y * Unit.CellScale + Unit.CellScale / 2;
+        var (gx, gy) = tile.ToGlobal(core.X, core.Y);
+        int px = gx * Unit.CellScale + Unit.CellScale / 2, py = gy * Unit.CellScale + Unit.CellScale / 2;
         sim.SpawnUnit(player, tile.Id, px, py, blocks, body, 0, 0);
         sim.Player(player).Launched++;
 
@@ -196,7 +199,8 @@ public static class UnitAssembly
 
         int q = ((unit.Angle + Trig.Quarter / 2) / Trig.Quarter) & 3;
         var (rx, ry) = Trig.Rotate(unit.CoreOffX, unit.CoreOffY, unit.Angle);
-        int coreX = (int)FloorDiv(unit.X + rx, Unit.CellScale), coreY = (int)FloorDiv(unit.Y + ry, Unit.CellScale);
+        int coreX = (int)FloorDiv(unit.X + rx, Unit.CellScale) - tile.OriginX;
+        int coreY = (int)FloorDiv(unit.Y + ry, Unit.CellScale) - tile.OriginY;
 
         var grid = tile.Grid;
         var cells = new List<(int X, int Y)>();
@@ -204,7 +208,7 @@ public static class UnitAssembly
         {
             var (dx, dy) = Turn(c.GX - unit.CoreGX, c.GY - unit.CoreGY, q);
             int cx = coreX + dx, cy = coreY + dy;
-            if (!grid.InBounds(cx, cy) || grid.BuildingAt(cx, cy) != null || grid.HasFrame(cx, cy))
+            if (!grid.Buildable(cx, cy) || grid.BuildingAt(cx, cy) != null || grid.HasFrame(cx, cy))
                 return DeployResult.Blocked;
             cells.Add((cx, cy));
         }

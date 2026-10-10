@@ -29,10 +29,10 @@ public enum BuildingKind
     /// <summary>Carries items one cell in the direction it faces (FB-004).</summary>
     Conveyor,
 
-    /// <summary>Takes items from a belt and sends them to the neighbouring tile across the edge it faces (IO-002).</summary>
+    /// <summary>Takes items from a belt and sends them to the neighbouring tile whose I/O zone it stands in (IO-002).</summary>
     ExportPort,
 
-    /// <summary>Receives items from the neighbouring tile across the edge it faces and puts them on adjacent belts.</summary>
+    /// <summary>Receives items from the neighbouring tile whose I/O zone it stands in and puts them on adjacent belts.</summary>
     ImportPort,
 
     /// <summary>Marks a unit: triggering it turns the framed blocks around it into a mobile unit.</summary>
@@ -77,3 +77,34 @@ public sealed record TechDef(string Id, string Name, UnlockCondition Condition, 
 
 /// <summary>One step of the guided objective chain. Goals complete in file order.</summary>
 public sealed record GoalDef(string Id, string Name, string Description, UnlockCondition Condition);
+
+/// <summary>
+/// A kind of ground (WM-002, FB-002). World generation classifies each cell into the first terrain, in file order,
+/// whose <see cref="Elevation"/> and <see cref="Moisture"/> bands (inclusive, 0-1000) contain it. Elevations below
+/// <c>TerrainGen.SeaLevel</c> are under water.
+/// </summary>
+/// <param name="Color">Map colour, <c>#rrggbb</c>.</param>
+/// <param name="Buildable">Whether buildings and frame may stand on it.</param>
+/// <param name="UnitPassable">Not used yet: passability will depend on locomotion (UD-004).</param>
+/// <param name="Water">Counts as water for coasts, moisture and a tile's land share.</param>
+/// <param name="River">Used for river cells instead of the bands. At most one terrain should set it.</param>
+/// <param name="Deposits">Relative chance, per minable item, that a deposit patch of it is centred on this terrain.</param>
+public sealed record TerrainDef(
+    string Id,
+    string Name,
+    string Color,
+    bool Buildable = true,
+    bool UnitPassable = true,
+    bool Water = false,
+    bool River = false,
+    int[]? Elevation = null,
+    int[]? Moisture = null,
+    Dictionary<string, int>? Deposits = null)
+{
+    public bool Contains(int elevation, int moisture) =>
+        !River && InBand(Elevation, elevation) && InBand(Moisture, moisture);
+
+    static bool InBand(int[]? band, int v) => band == null || (v >= band[0] && v <= band[1]);
+
+    public int DepositWeight(string item) => Deposits?.GetValueOrDefault(item) ?? 0;
+}

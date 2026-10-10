@@ -2,7 +2,8 @@ namespace Wunderwaffe.Sim;
 
 /// <summary>
 /// Everything needed to build a match's starting state (MP-005). With the command log, it is all a save holds:
-/// the same setup and commands replay to the same state (NF-002, NF-004).
+/// the same setup and commands replay to the same state (NF-002, NF-004). <see cref="Width"/> and <see cref="Height"/>
+/// are the world's size in nominal tiles; the generated tiles are irregular, so their count is only about Width x Height.
 /// </summary>
 public sealed record GameSetup(int Width, int Height, ulong Seed)
 {
@@ -10,9 +11,6 @@ public sealed record GameSetup(int Width, int Height, ulong Seed)
     public const int MaxSize = 15;
 
     public static readonly GameSetup Default = new(5, 5, 3037);
-
-    /// <summary>The local player's first tile: the middle of the map.</summary>
-    public (int X, int Y) StartTile => (Width / 2, Height / 2);
 
     /// <summary>A seed typed by the player: a number is used as is, any other text is hashed.</summary>
     public static ulong ParseSeed(string text)

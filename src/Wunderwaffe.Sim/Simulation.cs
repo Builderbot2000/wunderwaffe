@@ -2,6 +2,7 @@ using System.Text;
 using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
+using Wunderwaffe.Sim.World.Gen;
 
 namespace Wunderwaffe.Sim;
 
@@ -13,8 +14,17 @@ public sealed class Simulation(ContentDb content)
 {
     public const int TicksPerSecond = 60;
 
-    /// <summary>Local map size in cells. Placeholder until OQ-2 (tile size) is decided.</summary>
+    /// <summary>
+    /// Nominal tile size in cells: hand-built tiles are this square, and generated tiles average about this area.
+    /// Placeholder until OQ-2 (tile size) is decided.
+    /// </summary>
     public const int DefaultTileSize = 96;
+
+    /// <summary>A generated starting tile has at least this share of buildable ground, in percent.</summary>
+    const int StartLandPercent = 60;
+
+    /// <summary>A neighbour counts as land, for the start and for regional deposits, with this share of buildable ground.</summary>
+    const int LandPercent = 30;
 
     /// <summary>Share of a building's cost returned on removal (FB-002).</summary>
     public const int RefundPercent = 100;
@@ -45,7 +55,9 @@ public sealed class Simulation(ContentDb content)
     public const int RegionalChancePercent = 35;
 
     readonly List<TileState> _tiles = [];
-    readonly Dictionary<(int X, int Y), TileState> _byCoord = [];
+    WorldMap _map = new(0, 0);
+    /// <summary>Replaced with a seeded one by <see cref="GenerateWorld"/>; hand-built tiles use this default.</summary>
+    TileNames _names = new(0);
     readonly List<Command> _pending = [];
     readonly List<Unit> _units = [];
     readonly Dictionary<int, Unit> _unitsById = [];
@@ -56,6 +68,12 @@ public sealed class Simulation(ContentDb content)
     public ContentDb Content { get; } = content;
     public long Tick { get; private set; }
     public IReadOnlyList<TileState> Tiles => _tiles;
+
+    /// <summary>The global cell map every tile is cut from. Units move in its coordinates.</summary>
+    public WorldMap Map => _map;
+
+    /// <summary>The tile <see cref="GenerateWorld"/> picked for the first player, or -1.</summary>
+    public int StartTileId { get; private set; } = -1;
 
     /// <summary>What the match was built from, if it came from <see cref="NewGame"/>. Saves need it.</summary>
     public GameSetup? Setup { get; private set; }
@@ -84,9 +102,8 @@ public sealed class Simulation(ContentDb content)
     public static Simulation NewGame(ContentDb content, GameSetup setup, int player = 0)
     {
         var sim = new Simulation(content) { Setup = setup };
-        var start = setup.StartTile;
-        sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, start: start);
-        sim.SettleStartingTile(sim.TileAt(start.X, start.Y)!, player);
+        sim.GenerateWorld(setup.Width, setup.Height, setup.Seed);
+        sim.SettleStartingTile(sim.Tiles[sim.StartTileId], player);
         return sim;
     }
 
@@ -121,92 +138,183 @@ public sealed class Simulation(ContentDb content)
     }
 
     /// <summary>
-    /// Maps a cell that may lie past the edge of <paramref name="tile"/> onto the tile it falls in, walking across
-    /// neighbours. Null if it falls outside the world.
+    /// Maps a cell in <paramref name="tile"/>'s local coordinates, possibly outside the tile, onto the tile it falls in.
+    /// Null if no tile covers it.
     /// </summary>
     public (TileState Tile, int X, int Y)? ResolveCell(TileState tile, int x, int y)
     {
-        while (true)
-        {
-            var side = x < 0 ? Direction.West : x >= tile.Grid.Width ? Direction.East
-                : y < 0 ? Direction.North : y >= tile.Grid.Height ? Direction.South : (Direction?)null;
-            if (side is not { } s)
-                return (tile, x, y);
-            if (Neighbor(tile, s) is not { } next)
-                return null;
-            switch (s)
-            {
-                case Direction.West: x += next.Grid.Width; break;
-                case Direction.East: x -= tile.Grid.Width; break;
-                case Direction.North: y += next.Grid.Height; break;
-                default: y -= tile.Grid.Height; break;
-            }
-            tile = next;
-        }
+        var (gx, gy) = tile.ToGlobal(x, y);
+        if (TileAtCell(gx, gy) is not { } t)
+            return null;
+        return (t, gx - t.OriginX, gy - t.OriginY);
     }
 
+    /// <summary>The tile covering a world cell, or null.</summary>
+    public TileState? TileAtCell(int gx, int gy) => _map.TileAtCell(gx, gy) is int id and >= 0 ? _tiles[id] : null;
+
+    /// <summary>
+    /// Adds a hand-built square tile, for tests and debugging: <paramref name="size"/> cells a side at world cell
+    /// (x * size, y * size), on the default terrain. Neighbours and port zones are recomputed for every tile.
+    /// </summary>
     public TileState AddTile(int x, int y, int owner = TileState.Unowned, int size = DefaultTileSize)
     {
-        if (_byCoord.ContainsKey((x, y)))
-            throw new InvalidOperationException($"a tile already exists at ({x},{y})");
-        var tile = new TileState(_tiles.Count, x, y, size, size) { Owner = owner };
+        if (x < 0 || y < 0)
+            throw new ArgumentOutOfRangeException(nameof(x), "hand-built tiles go at non-negative coordinates");
+        int ox = x * size, oy = y * size;
+        _map.Grow(ox + size, oy + size, (byte)Content.DefaultTerrain);
+        for (int cy = oy; cy < oy + size; cy++)
+        {
+            for (int cx = ox; cx < ox + size; cx++)
+            {
+                if (_map.TileAtCell(cx, cy) >= 0)
+                    throw new InvalidOperationException($"a tile already exists at ({x},{y})");
+            }
+        }
+        for (int cy = oy; cy < oy + size; cy++)
+        {
+            for (int cx = ox; cx < ox + size; cx++)
+                _map.SetTile(cx, cy, _tiles.Count);
+        }
+
+        var tile = CreateTile(ox, oy, size, size);
+        tile.Owner = owner;
         if (owner != TileState.Unowned)
             Player(owner);
-        _tiles.Add(tile);
-        _byCoord.Add((x, y), tile);
+        RebuildTopology();
         return tile;
     }
 
-    public TileState? TileAt(int x, int y) => _byCoord.GetValueOrDefault((x, y));
+    /// <summary>A tile for the cells of the map already marked with the next id, inside the given box.</summary>
+    TileState CreateTile(int ox, int oy, int w, int h)
+    {
+        int id = _tiles.Count;
+        var mask = new bool[w * h];
+        var buildable = new bool[w * h];
+        var terrain = new byte[w * h];
+        var counts = new int[Content.TerrainList.Count];
+        long sx = 0, sy = 0, area = 0;
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x, t = _map.TerrainAt(ox + x, oy + y);
+                terrain[i] = (byte)t;
+                if (_map.TileAtCell(ox + x, oy + y) != id)
+                    continue;
+                mask[i] = true;
+                buildable[i] = Content.TerrainList[t].Buildable;
+                counts[t]++;
+                sx += x;
+                sy += y;
+                area++;
+            }
+        }
 
-    /// <summary>The tile across the <paramref name="side"/> edge, or null at the edge of the world (WM-003).</summary>
-    public TileState? Neighbor(TileState tile, Direction side) => TileAt(tile.X + side.Dx(), tile.Y + side.Dy());
+        var tile = new TileState(id, ox, oy, new TileGrid(w, h, mask, buildable, terrain))
+        {
+            CenterX = ox + (int)(sx / Math.Max(1, area)),
+            CenterY = oy + (int)(sy / Math.Max(1, area)),
+            Biome = Content.TerrainList[Array.IndexOf(counts, counts.Max())].Id,
+            Name = _names.Next(),
+        };
+        _tiles.Add(tile);
+        return tile;
+    }
 
-    /// <summary>
-    /// Tiles sharing an edge with <paramref name="tile"/> on a square grid (OQ-1), in <see cref="Direction"/> order.
-    /// </summary>
+    /// <summary>Recomputes which tiles neighbour each other and every tile's port zones.</summary>
+    void RebuildTopology()
+    {
+        _map.RebuildAdjacency(_tiles.Count);
+        foreach (var t in _tiles)
+            t.Neighbors = _map.NeighborsOf(t.Id);
+        // Each tile's zones depend only on the map, so tiles can be done in parallel.
+        var zones = new int[_tiles.Count][];
+        Parallel.For(0, _tiles.Count, i =>
+        {
+            var t = _tiles[i];
+            zones[i] = Zones.Compute(_map, t.Id, t.OriginX, t.OriginY, t.Grid.Width, t.Grid.Height);
+        });
+        foreach (var t in _tiles)
+            t.Grid.SetZones(zones[t.Id]);
+    }
+
+    /// <summary>Tiles sharing a border with <paramref name="tile"/> (WM-003), in id order.</summary>
     public IEnumerable<TileState> Neighbors(TileState tile)
     {
-        foreach (var side in Directions.All)
-        {
-            if (Neighbor(tile, side) is { } n)
-                yield return n;
-        }
+        foreach (int id in tile.Neighbors)
+            yield return _tiles[id];
     }
 
     /// <summary>
-    /// Fills a width x height world with unowned tiles, each with its own seeded deposits (WM-001, WM-002).
-    /// Tile ids run row by row. Regional items appear on <see cref="RegionalChancePercent"/> of tiles, never on
-    /// <paramref name="start"/>, and always on at least one of its neighbours (RS-003).
+    /// Generates the world (WM-001, WM-002, WM-009): terrain over (width x height) nominal tiles, cut into irregular
+    /// tiles of varying size and neighbour count, each with deposits that follow its terrain. Picks
+    /// <see cref="StartTileId"/>. Regional items appear on <see cref="RegionalChancePercent"/> of tiles, never on the
+    /// start, and always on at least one of its land neighbours (RS-003).
     /// </summary>
-    public void GenerateWorld(int width, int height, ulong seed, int tileSize = DefaultTileSize, (int X, int Y)? start = null)
+    public void GenerateWorld(int width, int height, ulong seed, int tileSize = DefaultTileSize)
     {
-        var tiles = new List<TileState>();
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
-                tiles.Add(AddTile(x, y, size: tileSize));
-        }
+        if (_tiles.Count > 0)
+            throw new InvalidOperationException("the world already has tiles");
+        int w = width * tileSize, h = height * tileSize;
+        var (terrain, elevation) = TerrainGen.Generate(Content, w, h, tileSize, seed);
+        var tileOf = Partition.Generate(Content, terrain, elevation, w, h, tileSize, seed);
+        _map = new WorldMap(w, h, terrain, elevation, tileOf);
+        _names = new TileNames(seed);
 
-        var startTile = start is { } s ? TileAt(s.X, s.Y) : null;
-        var missing = tiles.ToDictionary(t => t.Id, _ => new HashSet<string>(StringComparer.Ordinal));
+        int count = tileOf.Max() + 1;
+        var box = Enumerable.Repeat((X0: int.MaxValue, Y0: int.MaxValue, X1: -1, Y1: -1), count).ToArray();
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                ref var b = ref box[tileOf[y * w + x]];
+                b = (Math.Min(b.X0, x), Math.Min(b.Y0, y), Math.Max(b.X1, x), Math.Max(b.Y1, y));
+            }
+        }
+        foreach (var b in box)
+            CreateTile(b.X0, b.Y0, b.X1 - b.X0 + 1, b.Y1 - b.Y0 + 1);
+        RebuildTopology();
+
+        StartTileId = ChooseStart(w, h);
+        var startTile = _tiles[StartTileId];
+        var missing = _tiles.ToDictionary(t => t.Id, _ => new HashSet<string>(StringComparer.Ordinal));
         var rng = new Rng(seed ^ 0xD1B54A32D192ED03UL);
         foreach (var item in RegionalItems())
         {
-            foreach (var t in tiles)
+            foreach (var t in _tiles)
             {
                 if (t == startTile || rng.Range(0, 100) >= RegionalChancePercent)
                     missing[t.Id].Add(item);
             }
-            if (startTile == null)
-                continue;
-            var near = Neighbors(startTile).ToList();
+            var near = Neighbors(startTile).Where(n => IsLand(n, LandPercent)).ToList();
+            if (near.Count == 0)
+                near = Neighbors(startTile).ToList();
             if (near.Count > 0 && near.All(n => missing[n.Id].Contains(item)))
                 missing[near[rng.Range(0, near.Count)].Id].Remove(item);
         }
 
-        foreach (var t in tiles)
+        foreach (var t in _tiles)
             TileGenerator.GenerateDeposits(t.Grid, Content, new Rng(seed ^ (ulong)(t.Id + 1) * 0x9E3779B97F4A7C15UL), missing[t.Id]);
+    }
+
+    static bool IsLand(TileState t, int percent) => t.Grid.BuildableCount * 100L >= (long)t.Grid.Area * percent;
+
+    /// <summary>
+    /// The land tile nearest the middle of the world with room for a core and at least two land neighbours to expand
+    /// into; failing that, the tile with most buildable ground.
+    /// </summary>
+    int ChooseStart(int w, int h)
+    {
+        var fits = _tiles.Where(t => CoreSpot(t) != null).ToList();
+        if (fits.Count == 0)
+            throw new InvalidOperationException("no tile has room for a core");
+        var good = fits.Where(t => IsLand(t, StartLandPercent) && Neighbors(t).Count(n => IsLand(n, LandPercent)) >= 2).ToList();
+        if (good.Count == 0)
+            return fits.MaxBy(t => t.Grid.BuildableCount)!.Id;
+        return good
+            .OrderBy(t => (long)(t.CenterX - w / 2) * (t.CenterX - w / 2) + (long)(t.CenterY - h / 2) * (t.CenterY - h / 2))
+            .ThenBy(t => t.Id)
+            .First().Id;
     }
 
     IEnumerable<string> RegionalItems() =>
@@ -238,13 +346,61 @@ public sealed class Simulation(ContentDb content)
         return tile;
     }
 
-    void PlaceCore(TileState tile)
+    BuildingDef CoreDef => Content.Buildings.TryGetValue(CoreBuildingId, out var core)
+        ? core
+        : throw new InvalidOperationException($"content has no '{CoreBuildingId}' building");
+
+    /// <summary>
+    /// Where a core fits nearest the tile's centre: on free buildable ground, searched in growing squares. Null if the
+    /// tile has no room, as an all-water tile might not.
+    /// </summary>
+    (int X, int Y)? CoreSpot(TileState tile)
     {
-        if (!Content.Buildings.TryGetValue(CoreBuildingId, out var core))
-            throw new InvalidOperationException($"content has no '{CoreBuildingId}' building");
-        int cx = (tile.Grid.Width - core.Width) / 2;
-        int cy = (tile.Grid.Height - core.Height) / 2;
-        tile.Grid.Add(core, cx, cy, core.Width, core.Height, 0, null);
+        var core = CoreDef;
+        var grid = tile.Grid;
+        if (grid.BuildableCount < core.Width * core.Height)
+            return null;
+        int sx = tile.CenterX - tile.OriginX - core.Width / 2, sy = tile.CenterY - tile.OriginY - core.Height / 2;
+        int reach = Math.Max(grid.Width, grid.Height);
+        for (int r = 0; r <= reach; r++)
+        {
+            (int X, int Y)? best = null;
+            long bestD = long.MaxValue;
+            void Try(int x, int y)
+            {
+                if (!grid.InBounds(x, y, core.Width, core.Height) || !grid.Buildable(x, y, core.Width, core.Height)
+                    || !grid.IsFree(x, y, core.Width, core.Height))
+                    return;
+                long d = (long)(x - sx) * (x - sx) + (long)(y - sy) * (y - sy);
+                if (d < bestD || (d == bestD && (y < best!.Value.Y || (y == best.Value.Y && x < best.Value.X))))
+                    (best, bestD) = ((x, y), d);
+            }
+            // Only the ring at distance r; the inside was searched already.
+            for (int x = sx - r; x <= sx + r; x++)
+            {
+                Try(x, sy - r);
+                if (r > 0)
+                    Try(x, sy + r);
+            }
+            for (int y = sy - r + 1; y <= sy + r - 1; y++)
+            {
+                Try(sx - r, y);
+                Try(sx + r, y);
+            }
+            if (best != null)
+                return best;
+        }
+        return null;
+    }
+
+    /// <summary>Puts a core on the tile if there is room for one. Returns false if there isn't.</summary>
+    bool PlaceCore(TileState tile)
+    {
+        var core = CoreDef;
+        if (CoreSpot(tile) is not { } spot)
+            return false;
+        tile.Grid.Add(core, spot.X, spot.Y, core.Width, core.Height, 0, null);
+        return true;
     }
 
     public TileState? TryGetTile(int id) => id >= 0 && id < _tiles.Count ? _tiles[id] : null;
@@ -380,8 +536,8 @@ public sealed class Simulation(ContentDb content)
         foreach (var t in _tiles)
         {
             Mix(t.Id);
-            Mix(t.X);
-            Mix(t.Y);
+            Mix(t.OriginX);
+            Mix(t.OriginY);
             Mix(t.Owner);
             Mix(t.Contested ? 1 : 0);
             Mix(t.Grid.FrameCount);

@@ -5,8 +5,9 @@ namespace Wunderwaffe.Sim.World;
 /// <summary>
 /// Unit flight, one tick at a time. A controller steers toward the order's next waypoint: it picks the velocity it
 /// wants, turns the strongest engine toward the acceleration it needs, and fires each engine in proportion to how well
-/// it lines up. Then drag and integration, tile crossing, and collisions with buildings and other units. Everything is
-/// integer, and units are visited in id order.
+/// it lines up. Then drag and integration, finding the tile under the unit, and collisions with buildings and other
+/// units. Positions are in world sub-cells, so crossing a border is just flying over it. Everything is integer, and
+/// units are visited in id order.
 /// </summary>
 internal static class UnitPhysics
 {
@@ -33,8 +34,9 @@ internal static class UnitPhysics
     {
         foreach (var u in sim.Units)
         {
+            int px = u.X, py = u.Y;
             Control(sim, u);
-            Wrap(sim, u);
+            UpdateTile(sim, u, px, py);
             CollideBuildings(sim, u);
         }
         CollideUnits(sim);
@@ -48,22 +50,16 @@ internal static class UnitPhysics
         if (u.Route != null && u.MaxSpeed > 0)
         {
             var tile = sim.Tiles[u.TileId];
-            long w = (long)tile.Grid.Width * S, h = (long)tile.Grid.Height * S;
             bool crossing = u.RouteIndex < u.Route.Length;
+            var next = crossing ? sim.Tiles[u.Route[u.RouteIndex]] : null;
             long tx = u.DestX, ty = u.DestY;
-            var side = crossing ? SideTo(tile, sim.Tiles[u.Route[u.RouteIndex]]) : default;
-            bool through = FollowPath(u, tile, crossing, side, ref tx, ref ty);
-            if (crossing && !through)
+            if (next != null)
             {
-                // Aim a cell past the edge so the unit is still flying when it crosses.
-                (tx, ty) = side switch
-                {
-                    Direction.East => (w + S, (long)u.Y),
-                    Direction.West => (-(long)S, (long)u.Y),
-                    Direction.South => ((long)u.X, h + S),
-                    _ => ((long)u.X, -(long)S),
-                };
+                // A cell of the next tile, just past the border, so the unit is still flying when it crosses.
+                var (cx, cy) = Portal(sim, u, tile, next);
+                (tx, ty) = ((long)cx * S + S / 2, (long)cy * S + S / 2);
             }
+            bool through = FollowPath(sim, u, tile, next, ref tx, ref ty);
 
             long dx = tx - u.X, dy = ty - u.Y;
             long dist = ISqrt(dx * dx + dy * dy);
@@ -97,41 +93,51 @@ internal static class UnitPhysics
     }
 
     /// <summary>
-    /// Keeps the unit on a path around buildings. Plans one across the tile to where it is heading (the dest cell, or the
-    /// edge cell it will cross at) and, while waypoints remain, sets the target to the next one and returns true so the
-    /// controller flies through it without braking. With no path to follow it leaves the target alone, and the unit
-    /// heads straight and slides along whatever is in the way.
+    /// Where the unit crosses from <paramref name="tile"/> into <paramref name="next"/>: the cell of the next tile, along
+    /// their shared border, that makes the shortest trip from the unit to its destination. Chosen once per border.
     /// </summary>
-    static bool FollowPath(Unit u, TileState tile, bool crossing, Direction side, ref long tx, ref long ty)
+    static (int X, int Y) Portal(Simulation sim, Unit u, TileState tile, TileState next)
     {
-        var grid = tile.Grid;
-        int goalX, goalY;
-        if (crossing)
-        {
-            // The edge cell on the unit's own lane, so the crossing is as straight as the buildings allow.
-            int lx = Math.Clamp(u.X / S, 0, grid.Width - 1), ly = Math.Clamp(u.Y / S, 0, grid.Height - 1);
-            (goalX, goalY) = side switch
-            {
-                Direction.East => (grid.Width - 1, ly),
-                Direction.West => (0, ly),
-                Direction.South => (lx, grid.Height - 1),
-                _ => (lx, 0),
-            };
-        }
-        else
-        {
-            goalX = Math.Clamp(u.DestX / S, 0, grid.Width - 1);
-            goalY = Math.Clamp(u.DestY / S, 0, grid.Height - 1);
-        }
+        if (u.Portal is { } p && p.Tile == tile.Id && p.Next == next.Id)
+            return (p.X, p.Y);
 
-        var key = (tile.Id, grid.Revision, goalX, goalY);
+        var cells = sim.Map.BorderCells(next.Id, tile.Id);
+        (int X, int Y) best = (next.CenterX, next.CenterY);
+        long bestD = long.MaxValue;
+        foreach (var (cx, cy) in cells)
+        {
+            long mx = (long)cx * S + S / 2, my = (long)cy * S + S / 2;
+            long a = ISqrt((mx - u.X) * (mx - u.X) + (my - u.Y) * (my - u.Y));
+            long b = ISqrt((u.DestX - mx) * (u.DestX - mx) + (u.DestY - my) * (u.DestY - my));
+            if (a + b < bestD)
+                (best, bestD) = ((cx, cy), a + b);
+        }
+        u.Portal = (tile.Id, next.Id, best.X, best.Y);
+        return best;
+    }
+
+    /// <summary>
+    /// Keeps the unit on a path around buildings. Plans one over the tile, and the next tile when crossing, to the
+    /// target cell and, while waypoints remain, sets the target to the next one and returns true so the controller flies
+    /// through it without braking. With no path to follow it leaves the target alone, and the unit heads straight and
+    /// slides along whatever is in the way.
+    /// </summary>
+    static bool FollowPath(Simulation sim, Unit u, TileState tile, TileState? next, ref long tx, ref long ty)
+    {
+        var win = UnitPath.Window(tile, next);
+        int goalX = Math.Clamp((int)(tx / S), win.X, win.X + win.W - 1);
+        int goalY = Math.Clamp((int)(ty / S), win.Y, win.Y + win.H - 1);
+
+        long revision = tile.Grid.Revision + (next?.Grid.Revision ?? 0);
+        var key = (tile.Id, next?.Id ?? -1, revision, goalX, goalY);
         if (u.PathKey != key)
         {
             u.PathKey = key;
             u.PathIndex = 0;
-            var blocked = UnitPath.Blocked(grid, UnitPath.Clearance(u));
-            var start = (Math.Clamp(u.X / S, 0, grid.Width - 1), Math.Clamp(u.Y / S, 0, grid.Height - 1));
-            u.Path = UnitPath.Find(grid, blocked, start, (goalX, goalY));
+            var blocked = UnitPath.Blocked(sim, win, tile, next, UnitPath.Clearance(u));
+            var start = (Math.Clamp(u.X / S, win.X, win.X + win.W - 1) - win.X, Math.Clamp(u.Y / S, win.Y, win.Y + win.H - 1) - win.Y);
+            u.Path = UnitPath.Find(win.W, win.H, blocked, start, (goalX - win.X, goalY - win.Y))
+                ?.Select(c => (c.X + win.X, c.Y + win.Y)).ToArray();
         }
         if (u.Path is not { } path)
             return false;
@@ -146,7 +152,7 @@ internal static class UnitPhysics
 
         // Last waypoint: it was a free cell near the goal. Head for its centre if the goal itself was in the way.
         var last = path[^1];
-        if (!crossing && (last.X != goalX || last.Y != goalY))
+        if (next == null && (last.X != goalX || last.Y != goalY))
             (tx, ty) = ((long)last.X * S + S / 2, (long)last.Y * S + S / 2);
         return false;
     }
@@ -195,69 +201,67 @@ internal static class UnitPhysics
     }
 
     /// <summary>
-    /// Moves a unit onto the neighbour tile when its centre crosses an edge, keeping its order on course. At the edge
-    /// of the world it stops against the border instead.
+    /// The unit's tile is the tile of the cell under its centre. When that changes, the order moves on to the next
+    /// tile of its route, or plans a new route if the unit drifted somewhere unplanned. At the edge of the world, or of
+    /// a gap between hand-built tiles, it stops against the border instead.
     /// </summary>
-    static void Wrap(Simulation sim, Unit u)
+    static void UpdateTile(Simulation sim, Unit u, int prevX, int prevY)
     {
-        for (int pass = 0; pass < 2; pass++)
+        var map = sim.Map;
+        long w = (long)map.Width * S, h = (long)map.Height * S;
+        int rx = (int)Math.Min(u.Radius, w / 2), ry = (int)Math.Min(u.Radius, h / 2);
+        if (u.X < 0 || u.X >= w)
         {
-            var tile = sim.Tiles[u.TileId];
-            long w = (long)tile.Grid.Width * S, h = (long)tile.Grid.Height * S;
-            Direction side;
-            if (u.X < 0) side = Direction.West;
-            else if (u.X >= w) side = Direction.East;
-            else if (u.Y < 0) side = Direction.North;
-            else if (u.Y >= h) side = Direction.South;
-            else return;
+            u.X = u.X < 0 ? rx : (int)w - rx;
+            u.VX = 0;
+        }
+        if (u.Y < 0 || u.Y >= h)
+        {
+            u.Y = u.Y < 0 ? ry : (int)h - ry;
+            u.VY = 0;
+        }
 
-            if (sim.Neighbor(tile, side) is not { } next)
+        int id = map.TileAtCell(u.X / S, u.Y / S);
+        if (id < 0)
+        {
+            if (map.TileAtCell(prevX / S, u.Y / S) >= 0)
             {
-                int rx = (int)Math.Min(u.Radius, w / 2), ry = (int)Math.Min(u.Radius, h / 2);
-                if (side is Direction.West or Direction.East)
-                {
-                    u.X = side == Direction.West ? rx : (int)w - rx;
-                    u.VX = 0;
-                }
-                else
-                {
-                    u.Y = side == Direction.North ? ry : (int)h - ry;
-                    u.VY = 0;
-                }
-                continue;
+                u.X = prevX;
+                u.VX = 0;
             }
-
-            long nw = (long)next.Grid.Width * S, nh = (long)next.Grid.Height * S;
-            switch (side)
+            else if (map.TileAtCell(u.X / S, prevY / S) >= 0)
             {
-                case Direction.East: u.X -= (int)w; break;
-                case Direction.West: u.X += (int)nw; break;
-                case Direction.South: u.Y -= (int)h; break;
-                default: u.Y += (int)nh; break;
-            }
-            u.X = (int)Math.Clamp(u.X, 0, nw - 1);
-            u.Y = (int)Math.Clamp(u.Y, 0, nh - 1);
-            u.TileId = next.Id;
-
-            if (u.Route == null)
-                continue;
-            if (u.RouteIndex < u.Route.Length && u.Route[u.RouteIndex] == next.Id)
-            {
-                u.RouteIndex++;
+                u.Y = prevY;
+                u.VY = 0;
             }
             else
             {
-                // Drifted somewhere the order didn't plan: plan again from here.
-                u.Route = UnitSim.FindRoute(sim, next, sim.Tiles[u.DestTileId]);
-                u.RouteIndex = 0;
+                (u.X, u.Y, u.VX, u.VY) = (prevX, prevY, 0, 0);
             }
+            id = map.TileAtCell(u.X / S, u.Y / S);
+        }
+        if (id < 0 || id == u.TileId)
+            return;
+
+        u.TileId = id;
+        u.Portal = null;
+        if (u.Route == null)
+            return;
+        if (u.RouteIndex < u.Route.Length && u.Route[u.RouteIndex] == id)
+        {
+            u.RouteIndex++;
+        }
+        else
+        {
+            // Drifted somewhere the order didn't plan: plan again from here.
+            u.Route = UnitSim.FindRoute(sim, sim.Tiles[id], sim.Tiles[u.DestTileId]);
+            u.RouteIndex = 0;
         }
     }
 
-    /// <summary>Pushes a unit out of any solid building its cells overlap and cancels the velocity into it.</summary>
+    /// <summary>Pushes a unit out of any solid building its cells overlap, on any tile, and cancels the velocity into it.</summary>
     static void CollideBuildings(Simulation sim, Unit u)
     {
-        var grid = sim.Tiles[u.TileId].Grid;
         foreach (var cell in u.Cells)
         {
             var (cx0, cy0) = u.CellWorld(cell);
@@ -266,7 +270,9 @@ internal static class UnitPhysics
             {
                 for (long nx = gx - 1; nx <= gx + 1; nx++)
                 {
-                    if (!grid.InBounds((int)nx, (int)ny) || grid.BuildingAt((int)nx, (int)ny) is not { } b || b.Kind == BuildingKind.Conveyor)
+                    if (sim.TileAtCell((int)nx, (int)ny) is not { } t
+                        || t.Grid.BuildingAt((int)nx - t.OriginX, (int)ny - t.OriginY) is not { } b
+                        || b.Kind == BuildingKind.Conveyor)
                         continue;
 
                     var (cx, cy) = u.CellWorld(cell);
@@ -280,9 +286,9 @@ internal static class UnitPhysics
                     if (d2 == 0)
                     {
                         // Centre inside the cell: leave by the nearest side.
-                        long l = cx - minX, r = minX + S - cx, t = cy - minY, bt = minY + S - cy;
-                        long m = Math.Min(Math.Min(l, r), Math.Min(t, bt));
-                        (nxn, nyn) = m == l ? (-One, 0) : m == r ? (One, 0) : m == t ? (0, -One) : (0, One);
+                        long l = cx - minX, r = minX + S - cx, t2 = cy - minY, bt = minY + S - cy;
+                        long m = Math.Min(Math.Min(l, r), Math.Min(t2, bt));
+                        (nxn, nyn) = m == l ? (-One, 0) : m == r ? (One, 0) : m == t2 ? (0, -One) : (0, One);
                         pen = m + CellRadius;
                     }
                     else
@@ -308,7 +314,10 @@ internal static class UnitPhysics
         u.VY -= (int)(ny * vn / One);
     }
 
-    /// <summary>Pushes overlapping units on a tile apart, in proportion to mass, and makes the collision inelastic.</summary>
+    /// <summary>
+    /// Pushes overlapping units apart, in proportion to mass, and makes the collision inelastic. Positions are global,
+    /// so units on either side of a border collide too.
+    /// </summary>
     static void CollideUnits(Simulation sim)
     {
         var units = sim.Units;
@@ -317,8 +326,6 @@ internal static class UnitPhysics
             for (int j = i + 1; j < units.Count; j++)
             {
                 Unit a = units[i], b = units[j];
-                if (a.TileId != b.TileId)
-                    continue;
                 long far = (long)a.Radius + b.Radius;
                 long ddx = a.X - (long)b.X, ddy = a.Y - (long)b.Y;
                 if (ddx * ddx + ddy * ddy >= far * far)
@@ -365,16 +372,6 @@ internal static class UnitPhysics
         a.VY += (int)(ny * ka / One);
         b.VX -= (int)(nx * kb / One);
         b.VY -= (int)(ny * kb / One);
-    }
-
-    static Direction SideTo(TileState from, TileState to)
-    {
-        foreach (var d in Directions.All)
-        {
-            if (from.X + d.Dx() == to.X && from.Y + d.Dy() == to.Y)
-                return d;
-        }
-        throw new InvalidOperationException($"tiles {from.Id} and {to.Id} are not adjacent");
     }
 
     static long FloorDiv(long a, long b) => a >= 0 ? a / b : -((-a + b - 1) / b);

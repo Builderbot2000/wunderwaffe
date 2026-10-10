@@ -22,6 +22,9 @@ public partial class UiTour : Node
     readonly List<(int Frames, string Name, Action Do)> _steps = [];
     int _step, _wait = 30;
     long _pausedTick, _untilTick = -1;
+
+    // Where Build put the smelter. Tiles are irregular, so it goes on the first open ground near the middle.
+    (int X, int Y) _smelter = (44, 40);
     HashSet<string> _savesBefore = [];
 
     public static void Attach(SimHost host, string dir)
@@ -48,6 +51,8 @@ public partial class UiTour : Node
         Step(1, "built", () => Shot("05_building"));
         Step(1, "hover machine", HoverSmelter);
         Step(10, "hover shot", () => Shot("05b_hover"));
+        Step(1, "port zones", ShowPortZones);
+        Step(10, "port zones shot", () => { Shot("05c_port_zones"); Key(Godot.Key.Escape); });
         Step(1, "tech", () => Key(Godot.Key.T));
         Step(10, "tech shot", () => { Shot("06_tech"); Key(Godot.Key.T); });
         Step(5, "world again", () => { Key(Godot.Key.Tab); });
@@ -123,12 +128,24 @@ public partial class UiTour : Node
         var home = _host.ViewedTile;
         var coal = _host.Sim.Neighbors(home).First(n => n.Grid.DepositCounts().ContainsKey("coal"));
         map.SelectedTileId = coal.Id;
-        Log($"selected coal tile ({coal.X},{coal.Y})");
+        Log($"selected coal tile {coal.Id}");
+    }
+
+    /// <summary>Picks the export port, which shows the tile's I/O zones, and hovers the first zone's label.</summary>
+    void ShowPortZones()
+    {
+        var tool = GetTree().Root.FindChild("BuildTool", true, false) as BuildTool ?? throw new InvalidOperationException("no BuildTool");
+        int index = tool.Tools.ToList().FindIndex(t => t.BuildingId == "export_port");
+        tool.Select(index);
+        var zones = TileShapes.Zones(_host.ViewedTile);
+        Log($"{zones.Count} I/O zones: {string.Join(", ", zones.Select(z => $"tile {z.Neighbor} ({z.Cells} cells)"))}");
+        if (zones.Count > 0)
+            GetViewport().WarpMouse(GetViewport().GetCanvasTransform() * (zones[0].Label * Palette.CellPx));
     }
 
     void HoverSmelter()
     {
-        var at = GetViewport().GetCanvasTransform() * (new Vector2(45, 41) * Palette.CellPx);
+        var at = GetViewport().GetCanvasTransform() * (new Vector2(_smelter.X + 1, _smelter.Y + 1) * Palette.CellPx);
         GetViewport().WarpMouse(at);
         Key(Godot.Key.Escape); // Drop the drill so the hover panel shows what's under the cursor.
     }
@@ -174,22 +191,36 @@ public partial class UiTour : Node
         var sim = _host.Sim;
         var tile = _host.ViewedTile;
         int me = _host.LocalPlayer;
+        // Ore nearest the middle of the tile (tiles are irregular, so search all of it).
         var spots = new List<(int X, int Y)>();
-        for (int y = 30; y < 66 && spots.Count < 2; y++)
+        int mx = tile.CenterX - tile.OriginX, my = tile.CenterY - tile.OriginY;
+        var cells = Enumerable.Range(0, tile.Grid.Width * tile.Grid.Height)
+            .Select(i => (X: i % tile.Grid.Width, Y: i / tile.Grid.Width))
+            .OrderBy(c => Math.Abs(c.X - mx) + Math.Abs(c.Y - my));
+        foreach (var (x, y) in cells)
         {
-            for (int x = 20; x < 76 && spots.Count < 2; x++)
-            {
-                if (Placement.Check(sim, tile, me, "drill", x, y, 0, null, out _) == PlaceResult.Ok
-                    && spots.All(s => Math.Abs(s.X - x) > 4 || Math.Abs(s.Y - y) > 4))
-                    spots.Add((x, y));
-            }
+            if (spots.Count == 2)
+                break;
+            if (Placement.Check(sim, tile, me, "drill", x, y, 0, null, out _) == PlaceResult.Ok
+                && spots.All(s => Math.Abs(s.X - x) > 4 || Math.Abs(s.Y - y) > 4))
+                spots.Add((x, y));
         }
         if (spots.Count < 2)
             throw new InvalidOperationException("no ore near the middle of the tile");
         sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "drill", spots[0].X, spots[0].Y));
-        sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "smelter", 44, 40, RecipeId: "smelt_iron"));
-        for (int x = 40; x < 47; x++)
-            sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "conveyor", x, 44, 0));
+        // A 7x5 block of open ground nearest the middle: the smelter on top, a belt along the bottom.
+        var g = tile.Grid;
+        int cx = tile.CenterX - tile.OriginX, cy = tile.CenterY - tile.OriginY;
+        var open = Enumerable.Range(0, g.Width * g.Height)
+            .Select(i => (X: i % g.Width, Y: i / g.Width))
+            .Where(p => g.InBounds(p.X, p.Y, 7, 5) && g.Buildable(p.X, p.Y, 7, 5) && g.IsFree(p.X, p.Y, 7, 5)
+                && spots.All(s => s.X + 2 <= p.X || s.X >= p.X + 7 || s.Y + 2 <= p.Y || s.Y >= p.Y + 5))
+            .OrderBy(p => Math.Abs(p.X - cx) + Math.Abs(p.Y - cy))
+            .First();
+        _smelter = (open.X + 4, open.Y);
+        sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "smelter", _smelter.X, _smelter.Y, RecipeId: "smelt_iron"));
+        for (int x = open.X; x < open.X + 7; x++)
+            sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "conveyor", x, open.Y + 4, 0));
         Log($"placed a drill at {spots[0]}, a smelter and a belt");
 
         var tool = GetTree().Root.FindChild("BuildTool", true, false) as BuildTool ?? throw new InvalidOperationException("no BuildTool");

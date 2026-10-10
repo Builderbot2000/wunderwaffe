@@ -101,4 +101,28 @@ public class PlacementTests
         sim.Step();
         Assert.Equal(1, tile.Grid.BuildingCount);
     }
+
+    [Fact]
+    public void RejectsCellsOfOtherTilesAndUnbuildableTerrain()
+    {
+        // On a generated world a tile's box overlaps its neighbours, and some of its ground is water or peaks.
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default, Player);
+        Harness.UnlockAll(sim, Player);
+        foreach (var tile in sim.Tiles)
+            tile.Owner = Player;
+        var coast = sim.Tiles.First(t => t.Grid.BuildableCount > 0 && t.Grid.BuildableCount < t.Grid.Area);
+        coast.Inventory.Add("copper_ore", 1000);
+        coast.Inventory.Add("iron_ore", 1000);
+
+        var cells = Enumerable.Range(0, coast.Grid.Width * coast.Grid.Height)
+            .Select(i => (X: i % coast.Grid.Width, Y: i / coast.Grid.Width)).ToList();
+        var foreign = cells.First(c => !coast.Grid.InBounds(c.X, c.Y));
+        var wet = cells.First(c => coast.Grid.InBounds(c.X, c.Y) && !coast.Grid.Buildable(c.X, c.Y));
+        var dry = cells.First(c => coast.Grid.Buildable(c.X, c.Y) && coast.Grid.BuildingAt(c.X, c.Y) == null);
+
+        Assert.Equal(PlaceResult.OutOfBounds, Check(sim, coast, "conveyor", foreign.X, foreign.Y));
+        Assert.Equal(PlaceResult.BadTerrain, Check(sim, coast, "conveyor", wet.X, wet.Y));
+        Assert.Equal(PlaceResult.Ok, Check(sim, coast, "conveyor", dry.X, dry.Y));
+        Assert.Equal(PlaceResult.BadTerrain, UnitAssembly.CheckFrame(coast, Player, wet.X, wet.Y));
+    }
 }

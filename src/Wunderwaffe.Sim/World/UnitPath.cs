@@ -2,9 +2,13 @@ using Wunderwaffe.Sim.Content;
 
 namespace Wunderwaffe.Sim.World;
 
+/// <summary>A rectangle of world cells that a unit plans its path in.</summary>
+internal readonly record struct PathWindow(int X, int Y, int W, int H);
+
 /// <summary>
-/// Path-finding inside one tile for units. Buildings (except conveyors) are obstacles, grown by the unit's size so the
-/// path keeps its whole body clear. A* over the cell grid, then the path is straightened wherever there is a clear line,
+/// Path-finding for units over the tile they are on, plus the next tile when crossing into it. Buildings (except
+/// conveyors) are obstacles, grown by the unit's size so the path keeps its whole body clear; cells of other tiles are
+/// out of bounds. A* over the cell grid, then the path is straightened wherever there is a clear line,
 /// so units fly in long straight runs instead of hugging cell corners. Integer costs and a fixed tie-break make it
 /// deterministic (NF-004).
 /// </summary>
@@ -18,21 +22,51 @@ internal static class UnitPath
     /// <summary>How many cells out from a building the unit's centre must stay: its radius, less the half cell its own cell centre sits in.</summary>
     public static int Clearance(Unit u) => Math.Max(0, (u.Radius + Unit.CellScale / 2 + Unit.CellScale - 1) / Unit.CellScale - 1);
 
-    /// <summary>Cells a unit with the given clearance can't put its centre in.</summary>
-    public static bool[] Blocked(TileGrid grid, int clearance)
+    /// <summary>The bounding box of <paramref name="tile"/> and, if given, <paramref name="next"/>.</summary>
+    public static PathWindow Window(TileState tile, TileState? next)
     {
-        int w = grid.Width, h = grid.Height;
-        var blocked = new bool[w * h];
-        foreach (var b in grid.Buildings)
+        int x0 = tile.OriginX, y0 = tile.OriginY, x1 = x0 + tile.Grid.Width, y1 = y0 + tile.Grid.Height;
+        if (next != null)
         {
-            if (b.Kind == BuildingKind.Conveyor)
-                continue;
-            int x0 = Math.Max(0, b.X - clearance), x1 = Math.Min(w - 1, b.X + b.Width - 1 + clearance);
-            int y0 = Math.Max(0, b.Y - clearance), y1 = Math.Min(h - 1, b.Y + b.Height - 1 + clearance);
-            for (int y = y0; y <= y1; y++)
+            x0 = Math.Min(x0, next.OriginX);
+            y0 = Math.Min(y0, next.OriginY);
+            x1 = Math.Max(x1, next.OriginX + next.Grid.Width);
+            y1 = Math.Max(y1, next.OriginY + next.Grid.Height);
+        }
+        return new PathWindow(x0, y0, x1 - x0, y1 - y0);
+    }
+
+    /// <summary>
+    /// Cells of the window a unit with the given clearance can't put its centre in: those of other tiles, and those
+    /// within reach of a building on <paramref name="tile"/> or <paramref name="next"/>. Indexed from the window's corner.
+    /// </summary>
+    public static bool[] Blocked(Simulation sim, PathWindow win, TileState tile, TileState? next, int clearance)
+    {
+        int w = win.W, h = win.H;
+        int nextId = next?.Id ?? -1;
+        var blocked = new bool[w * h];
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
             {
-                for (int x = x0; x <= x1; x++)
-                    blocked[y * w + x] = true;
+                int id = sim.Map.TileAtCell(win.X + x, win.Y + y);
+                blocked[y * w + x] = id != tile.Id && id != nextId;
+            }
+        }
+        foreach (var t in next == null ? new[] { tile } : new[] { tile, next })
+        {
+            foreach (var b in t.Grid.Buildings)
+            {
+                if (b.Kind == BuildingKind.Conveyor)
+                    continue;
+                int bx = t.OriginX + b.X - win.X, by = t.OriginY + b.Y - win.Y;
+                int x0 = Math.Max(0, bx - clearance), x1 = Math.Min(w - 1, bx + b.Width - 1 + clearance);
+                int y0 = Math.Max(0, by - clearance), y1 = Math.Min(h - 1, by + b.Height - 1 + clearance);
+                for (int y = y0; y <= y1; y++)
+                {
+                    for (int x = x0; x <= x1; x++)
+                        blocked[y * w + x] = true;
+                }
             }
         }
         return blocked;
@@ -42,10 +76,9 @@ internal static class UnitPath
     /// Waypoints from <paramref name="start"/> (not included) to <paramref name="goal"/>, or null if there is no way.
     /// A goal inside an obstacle is replaced by the nearest free cell.
     /// </summary>
-    public static (int X, int Y)[]? Find(TileGrid grid, bool[] blocked, (int X, int Y) start, (int X, int Y) goal)
+    public static (int X, int Y)[]? Find(int w, int h, bool[] blocked, (int X, int Y) start, (int X, int Y) goal)
     {
-        int w = grid.Width, h = grid.Height;
-        if (blocked[goal.Y * w + goal.X] && NearestFree(grid, blocked, goal) is { } free)
+        if (blocked[goal.Y * w + goal.X] && NearestFree(w, h, blocked, goal) is { } free)
             goal = free;
         else if (blocked[goal.Y * w + goal.X])
             return null;
@@ -109,7 +142,7 @@ internal static class UnitPath
     }
 
     /// <summary>The free cell nearest <paramref name="cell"/>, scanning outward ring by ring, or null.</summary>
-    static (int X, int Y)? NearestFree(TileGrid grid, bool[] blocked, (int X, int Y) cell)
+    static (int X, int Y)? NearestFree(int w, int h, bool[] blocked, (int X, int Y) cell)
     {
         for (int r = 1; r <= GoalSearch; r++)
         {
@@ -119,7 +152,7 @@ internal static class UnitPath
             {
                 for (int x = cell.X - r; x <= cell.X + r; x++)
                 {
-                    if (Math.Max(Math.Abs(x - cell.X), Math.Abs(y - cell.Y)) != r || !grid.InBounds(x, y) || blocked[y * grid.Width + x])
+                    if (Math.Max(Math.Abs(x - cell.X), Math.Abs(y - cell.Y)) != r || x < 0 || y < 0 || x >= w || y >= h || blocked[y * w + x])
                         continue;
                     long d = (long)(x - cell.X) * (x - cell.X) + (long)(y - cell.Y) * (y - cell.Y);
                     if (d < bestD)

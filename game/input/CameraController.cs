@@ -16,6 +16,7 @@ public partial class CameraController : Camera2D
     SimHost _host = null!;
     ViewMode _mode;
     (Vector2 Position, Vector2 Zoom)? _tileCamera, _worldCamera;
+    int _tileCameraFor = -1;
 
     public override void _Ready()
     {
@@ -23,9 +24,14 @@ public partial class CameraController : Camera2D
         _mode = _host.View;
         _host.ViewChanged += OnViewChanged;
         if (_mode == ViewMode.World)
+        {
             FitWorld();
+        }
         else
+        {
             CenterOnTile();
+            _tileCameraFor = _host.ViewedTile.Id;
+        }
     }
 
     void FitWorld()
@@ -40,14 +46,17 @@ public partial class CameraController : Camera2D
     /// <summary>The middle of the tile, where its core is, at 1:1.</summary>
     void CenterOnTile()
     {
-        var grid = _host.ViewedTile.Grid;
-        Position = new Vector2(grid.Width, grid.Height) * Palette.CellPx / 2;
+        var tile = _host.ViewedTile;
+        Position = new Vector2(tile.CenterX - tile.OriginX + 0.5f, tile.CenterY - tile.OriginY + 0.5f) * Palette.CellPx;
         Zoom = Vector2.One;
     }
 
     public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
 
-    /// <summary>Each layer keeps its own camera, so returning to a layer lands where you left it.</summary>
+    /// <summary>
+    /// Each layer keeps its own zoom. The tile view returns to where you left the same tile; the world map centres on
+    /// the tile you just left, so Tab shows where you are in the world.
+    /// </summary>
     void OnViewChanged()
     {
         if (_host.View == _mode)
@@ -61,14 +70,16 @@ public partial class CameraController : Camera2D
 
         if (_mode == ViewMode.Tile)
         {
-            if (_tileCamera is { } t)
+            if (_tileCamera is { } t && _tileCameraFor == _host.ViewedTile.Id)
                 (Position, Zoom) = t;
             else
                 CenterOnTile();
+            _tileCameraFor = _host.ViewedTile.Id;
         }
         else if (_worldCamera is { } w)
         {
-            (Position, Zoom) = w;
+            Zoom = w.Zoom;
+            Position = WorldMapView.Center(_host.ViewedTile);
         }
         else
         {
