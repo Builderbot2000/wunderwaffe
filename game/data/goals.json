@@ -1,0 +1,38 @@
+[
+  {
+    "id": "mine",
+    "name": "Start mining",
+    "description": "Pick the drill (1), place it on copper ore and run conveyors (2) from it into your core. Belts face the way you rotate them (R).",
+    "condition": { "type": "produce", "item": "copper_ore", "amount": 50 }
+  },
+  {
+    "id": "smelt",
+    "name": "Smelt iron",
+    "description": "Belt iron ore into a Smelter: Iron Plate (4) and its plates on to the core. 100 iron plates unlocks the Steel Mill.",
+    "condition": { "type": "produce", "item": "iron_plate", "amount": 100 }
+  },
+  {
+    "id": "expand",
+    "name": "Find coal",
+    "description": "Steel needs coal, and your home tile has none. Open the world map (Tab), select a neighbouring tile with coal and claim it (C).",
+    "condition": { "type": "claim", "amount": 2 }
+  },
+  {
+    "id": "link",
+    "name": "Link your tiles",
+    "description": "On the new tile, mine coal and belt it into an export port (6) facing home. On your home tile, put an import port (7) on the matching edge, in the same lane.",
+    "condition": { "type": "ship", "amount": 30 }
+  },
+  {
+    "id": "steel",
+    "name": "Make steel",
+    "description": "A Steel Mill (5) costs copper plates too: smelt some with a Smelter: Copper Plate (3). Feed the mill iron plates and coal. 20 steel unlocks propulsion: the unit core and thruster.",
+    "condition": { "type": "produce", "item": "steel", "amount": 20 }
+  },
+  {
+    "id": "launch",
+    "name": "Lift off",
+    "description": "Lay unit frame (0), put a unit core (8) and thrusters (9) on it, then hover the core with no building picked and press G.",
+    "condition": { "type": "launch", "amount": 1 }
+  }
+]

@@ -13,35 +13,131 @@ public partial class TileView : Node2D
 {
     const float BuildingInset = 0.12f;
 
+    /// <summary>Item squares on belts, as a fraction of a cell.</summary>
+    const float ItemSize = 0.34f;
+
+    /// <summary>Item sprites on belts. Larger than the squares because the icons have transparent margins.</summary>
+    const float ItemSpriteSize = 0.45f;
+
     SimHost _host = null!;
     MultiMeshInstance2D _ground = null!;
     MultiMeshInstance2D _deposits = null!;
+    MultiMeshInstance2D _frames = null!;
     MultiMeshInstance2D _buildings = null!;
     Node2D _depositIcons = null!;
     Node2D _buildingSprites = null!;
+    MultiMeshInstance2D _items = null!;
+    Node2D _itemSprites = null!;
+    readonly Dictionary<string, int> _itemCounts = [];
     readonly Dictionary<string, MultiMeshInstance2D> _spriteLayers = [];
     int _drawnRevision = -1;
+    int _drawnTileId = -1;
 
     public override void _Ready()
     {
         _host = GetNode<SimHost>("/root/SimHost");
-        Palette.Init(_host.Sim.Content);
+        _host.ViewChanged += OnViewChanged;
+        OnViewChanged();
         _ground = AddLayer(this, "Ground", Sprites.Get(Sprites.Ground));
         _deposits = AddLayer(this, "Deposits", null);
         _depositIcons = AddGroup("DepositIcons");
+        _frames = AddLayer(this, "Frames", Sprites.Get(Sprites.Frame));
         _buildings = AddLayer(this, "Buildings", null);
         _buildingSprites = AddGroup("BuildingSprites");
+        _items = AddLayer(this, "Items", null);
+        _itemSprites = AddGroup("ItemSprites");
+    }
+
+    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
+
+    void OnViewChanged()
+    {
+        bool shown = _host.View == ViewMode.Tile;
+        Visible = shown;
+        ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
     }
 
     public override void _Process(double delta)
     {
-        TileGrid grid = _host.ViewedTile.Grid;
-        if (grid.Revision == _drawnRevision)
-            return;
-        _drawnRevision = grid.Revision;
-        DrawGround(grid);
-        DrawDeposits(grid);
-        DrawBuildings(grid);
+        var tile = _host.ViewedTile;
+        TileGrid grid = tile.Grid;
+        // Grids of different tiles can share a revision number, so the tile id is part of "what's drawn".
+        if (grid.Revision != _drawnRevision || tile.Id != _drawnTileId)
+        {
+            _drawnRevision = grid.Revision;
+            _drawnTileId = tile.Id;
+            DrawGround(grid);
+            DrawDeposits(grid);
+            DrawFrames(grid);
+            DrawBuildings(grid);
+        }
+        DrawItems(grid);
+    }
+
+    /// <summary>
+    /// Items riding on belts, one layer per item sprite plus a flat-colour layer for items without one. They move
+    /// every tick, so unlike the layers above these are rewritten each frame. Instance buffers only grow;
+    /// <c>VisibleInstanceCount</c> says how much of each is in use.
+    /// </summary>
+    void DrawItems(TileGrid grid)
+    {
+        _itemCounts.Clear();
+        int plain = 0;
+        foreach (var b in grid.Belts)
+        {
+            var belt = b.Belt!;
+            for (int k = 0; k < belt.Count; k++)
+            {
+                string item = belt.Items[k]!;
+                if (Sprites.Get(item) == null)
+                    plain++;
+                else
+                    _itemCounts[item] = _itemCounts.GetValueOrDefault(item) + 1;
+            }
+        }
+
+        foreach (var child in _itemSprites.GetChildren())
+            ((MultiMeshInstance2D)child).Multimesh.VisibleInstanceCount = 0;
+        Reserve(_items.Multimesh, plain);
+        foreach (var (item, count) in _itemCounts)
+            Reserve(SpriteLayer(_itemSprites, item)!.Multimesh, count);
+
+        float px = Palette.CellPx;
+        float size = px * ItemSize, spriteSize = px * ItemSpriteSize;
+        int iPlain = 0;
+        _itemCounts.Clear();
+        foreach (var b in grid.Belts)
+        {
+            var belt = b.Belt!;
+            var ahead = Directions.FromRotation(b.Rotation);
+            var cell = new Vector2((b.X + 0.5f) * px, (b.Y + 0.5f) * px);
+            var step = new Vector2(ahead.Dx(), ahead.Dy()) * px;
+            for (int k = 0; k < belt.Count; k++)
+            {
+                string item = belt.Items[k]!;
+                var at = cell + step * ((float)belt.Positions[k] / BeltState.CellLength - 0.5f);
+                if (SpriteLayer(_itemSprites, item) is { } layer)
+                {
+                    int i = _itemCounts.GetValueOrDefault(item);
+                    _itemCounts[item] = i + 1;
+                    // Negative y scale: QuadMesh UVs are laid out for 3D (see Rect).
+                    layer.Multimesh.SetInstanceTransform2D(i, new Transform2D(0f, new Vector2(spriteSize, -spriteSize), 0f, at));
+                    layer.Multimesh.SetInstanceColor(i, Colors.White);
+                }
+                else
+                {
+                    _items.Multimesh.SetInstanceTransform2D(iPlain, new Transform2D(0f, new Vector2(size, size), 0f, at));
+                    _items.Multimesh.SetInstanceColor(iPlain++, Palette.Deposit(item));
+                }
+            }
+        }
+    }
+
+    static void Reserve(MultiMesh mm, int count)
+    {
+        if (count > mm.InstanceCount)
+            mm.InstanceCount = Mathf.Max(count, mm.InstanceCount * 2);
+        mm.VisibleInstanceCount = count;
     }
 
     Node2D AddGroup(string name)
@@ -153,6 +249,29 @@ public partial class TileView : Node2D
                 imm.SetInstanceTransform2D(i, Rect(list[i].X, list[i].Y, 1, 1, 0.25f, 0));
                 imm.SetInstanceColor(i, Colors.White);
             }
+        }
+    }
+
+    /// <summary>Unit frames: a floor under the buildings, so what stands on it still shows.</summary>
+    void DrawFrames(TileGrid grid)
+    {
+        var cells = new List<(int X, int Y)>();
+        for (int y = 0; grid.FrameCount > 0 && y < grid.Height; y++)
+        {
+            for (int x = 0; x < grid.Width; x++)
+            {
+                if (grid.HasFrame(x, y))
+                    cells.Add((x, y));
+            }
+        }
+        // With a sprite the frame tiles edge to edge; the flat fallback is inset so cells read apart.
+        bool sprite = _frames.Texture != null;
+        var mm = _frames.Multimesh;
+        mm.InstanceCount = cells.Count;
+        for (int i = 0; i < cells.Count; i++)
+        {
+            mm.SetInstanceTransform2D(i, Rect(cells[i].X, cells[i].Y, 1, 1, sprite ? 0 : 0.06f, 0));
+            mm.SetInstanceColor(i, sprite ? Colors.White : Palette.Frame);
         }
     }
 

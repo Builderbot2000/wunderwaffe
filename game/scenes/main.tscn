@@ -1,30 +1,56 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://render/TileView.cs" id="1_view"]
 [ext_resource type="Script" path="res://input/BuildTool.cs" id="2_build"]
 [ext_resource type="Script" path="res://input/CameraController.cs" id="3_cam"]
-[ext_resource type="Script" path="res://scenes/DebugHud.cs" id="4_hud"]
+[ext_resource type="Script" path="res://ui/Hud.cs" id="4_hud"]
+[ext_resource type="Script" path="res://render/WorldMapView.cs" id="5_world"]
+[ext_resource type="Script" path="res://render/UnitView.cs" id="6_units"]
+[ext_resource type="Script" path="res://input/UnitTool.cs" id="7_unittool"]
+[ext_resource type="Script" path="res://render/MachineStatusView.cs" id="8_status"]
+[ext_resource type="Script" path="res://ui/PauseMenu.cs" id="9_pause"]
 
 [node name="Main" type="Node2D"]
+
+[node name="PauseMenu" type="CanvasLayer" parent="."]
+script = ExtResource("9_pause")
 
 [node name="TileView" type="Node2D" parent="."]
 script = ExtResource("1_view")
 
+[node name="MachineStatus" type="Node2D" parent="."]
+script = ExtResource("8_status")
+
+[node name="WorldMapView" type="Node2D" parent="."]
+script = ExtResource("5_world")
+
+[node name="UnitView" type="Node2D" parent="."]
+script = ExtResource("6_units")
+
 [node name="BuildTool" type="Node2D" parent="."]
 script = ExtResource("2_build")
 
-[node name="Camera" type="Camera2D" parent="."]
+[node name="UnitTool" type="Node2D" parent="." node_paths=PackedStringArray("BuildTool")]
+script = ExtResource("7_unittool")
+BuildTool = NodePath("../BuildTool")
+
+[node name="Camera" type="Camera2D" parent="." node_paths=PackedStringArray("WorldMap")]
 position = Vector2(768, 768)
 script = ExtResource("3_cam")
+WorldMap = NodePath("../WorldMapView")
 
 [node name="Hud" type="CanvasLayer" parent="."]
 
-[node name="DebugHud" type="Label" parent="Hud" node_paths=PackedStringArray("BuildTool")]
-offset_left = 16.0
-offset_top = 16.0
-offset_right = 616.0
-offset_bottom = 816.0
-theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 4
+[node name="Hud" type="Control" parent="Hud" node_paths=PackedStringArray("BuildTool", "WorldMap", "UnitTool", "PauseMenu")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("4_hud")
 BuildTool = NodePath("../../BuildTool")
+WorldMap = NodePath("../../WorldMapView")
+UnitTool = NodePath("../../UnitTool")
+PauseMenu = NodePath("../../PauseMenu")

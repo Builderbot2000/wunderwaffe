@@ -4,5 +4,11 @@
     "name": "Steelworks",
     "condition": { "type": "produce", "item": "iron_plate", "amount": 100 },
     "unlocks": [ "steel_mill", "make_steel" ]
+  },
+  {
+    "id": "propulsion",
+    "name": "Propulsion",
+    "condition": { "type": "produce", "item": "steel", "amount": 20 },
+    "unlocks": [ "unit_core", "thruster" ]
   }
 ]

@@ -10,12 +10,14 @@ public static class TileGenerator
     const int MinRadius = 3;
     const int MaxRadius = 7;
 
-    public static void GenerateDeposits(TileGrid grid, ContentDb content, Rng rng)
+    /// <param name="exclude">Minable items this tile has no deposits of (RS-003).</param>
+    public static void GenerateDeposits(TileGrid grid, ContentDb content, Rng rng, IReadOnlySet<string>? exclude = null)
     {
         // Anything some building can extract is a deposit. Sorted so the same seed gives the same map.
         var minable = content.Recipes.Values
             .Where(r => r.Inputs.Count == 0)
             .SelectMany(r => r.Outputs.Keys)
+            .Where(item => exclude == null || !exclude.Contains(item))
             .Distinct()
             .Order(StringComparer.Ordinal)
             .ToList();

@@ -1,4 +1,5 @@
 using Godot;
+using Wunderwaffe.Game.Render;
 
 namespace Wunderwaffe.Game.Input;
 
@@ -9,6 +10,71 @@ public partial class CameraController : Camera2D
     [Export] public float MinZoom = 0.25f;
     [Export] public float MaxZoom = 4f;
     [Export] public float ZoomStep = 1.15f;
+
+    [Export] public WorldMapView? WorldMap;
+
+    SimHost _host = null!;
+    ViewMode _mode;
+    (Vector2 Position, Vector2 Zoom)? _tileCamera, _worldCamera;
+
+    public override void _Ready()
+    {
+        _host = GetNode<SimHost>("/root/SimHost");
+        _mode = _host.View;
+        _host.ViewChanged += OnViewChanged;
+        if (_mode == ViewMode.World)
+            FitWorld();
+        else
+            CenterOnTile();
+    }
+
+    void FitWorld()
+    {
+        if (WorldMap == null)
+            return;
+        var (center, zoom) = WorldMap.Fit(GetViewportRect().Size);
+        Position = center;
+        Zoom = new Vector2(zoom, zoom);
+    }
+
+    /// <summary>The middle of the tile, where its core is, at 1:1.</summary>
+    void CenterOnTile()
+    {
+        var grid = _host.ViewedTile.Grid;
+        Position = new Vector2(grid.Width, grid.Height) * Palette.CellPx / 2;
+        Zoom = Vector2.One;
+    }
+
+    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
+
+    /// <summary>Each layer keeps its own camera, so returning to a layer lands where you left it.</summary>
+    void OnViewChanged()
+    {
+        if (_host.View == _mode)
+            return;
+        var here = (Position, Zoom);
+        if (_mode == ViewMode.Tile)
+            _tileCamera = here;
+        else
+            _worldCamera = here;
+        _mode = _host.View;
+
+        if (_mode == ViewMode.Tile)
+        {
+            if (_tileCamera is { } t)
+                (Position, Zoom) = t;
+            else
+                CenterOnTile();
+        }
+        else if (_worldCamera is { } w)
+        {
+            (Position, Zoom) = w;
+        }
+        else
+        {
+            FitWorld();
+        }
+    }
 
     public override void _Process(double delta)
     {

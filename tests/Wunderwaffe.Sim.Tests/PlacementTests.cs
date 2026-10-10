@@ -18,7 +18,7 @@ public class PlacementTests
     }
 
     static PlaceResult Check(Simulation sim, TileState tile, string building, int x, int y, int rot = 0, string? recipe = null, int player = Player) =>
-        Placement.Check(sim.Content, tile, player, building, x, y, rot, recipe, out _);
+        Placement.Check(sim, tile, player, building, x, y, rot, recipe, out _);
 
     [Fact]
     public void RejectsOutOfBoundsAndOverlap()
@@ -61,10 +61,10 @@ public class PlacementTests
         var sim = new Simulation(content);
         var tile = sim.AddTile(0, 0, Player, size: 10);
 
-        Placement.Check(sim.Content, tile, Player, "wall", 0, 0, 1, null, out var plan);
+        Placement.Check(sim, tile, Player, "wall", 0, 0, 1, null, out var plan);
         Assert.Equal((3, 1), (plan.Width, plan.Height));
-        Assert.Equal(PlaceResult.OutOfBounds, Placement.Check(sim.Content, tile, Player, "wall", 8, 0, 1, null, out _));
-        Assert.Equal(PlaceResult.Ok, Placement.Check(sim.Content, tile, Player, "wall", 9, 0, 0, null, out _));
+        Assert.Equal(PlaceResult.OutOfBounds, Placement.Check(sim, tile, Player, "wall", 8, 0, 1, null, out _));
+        Assert.Equal(PlaceResult.Ok, Placement.Check(sim, tile, Player, "wall", 9, 0, 0, null, out _));
     }
 
     [Fact]
@@ -74,13 +74,12 @@ public class PlacementTests
         sim.Enqueue(new PlaceBuildingCommand(Player, 0, "smelter", 4, 4, RecipeId: "smelt_iron"));
         sim.Step();
         Assert.Equal(1000 - 20, tile.Inventory.Get("copper_ore"));
-        Assert.Equal(1, tile.Lines["smelt_iron"].Machines);
+        Assert.Equal("smelt_iron", tile.Grid.BuildingAt(5, 5)!.RecipeId);
 
         sim.Enqueue(new RemoveBuildingCommand(Player, 0, 5, 5));
         sim.Step();
         Assert.Equal(1000, tile.Inventory.Get("copper_ore"));
         Assert.Equal(0, tile.Grid.BuildingCount);
-        Assert.False(tile.Lines.ContainsKey("smelt_iron"));
     }
 
     [Fact]
@@ -88,6 +87,7 @@ public class PlacementTests
     {
         var (sim, tile) = NewSim();
         Assert.Equal(PlaceResult.NotOwner, Check(sim, tile, "conveyor", 5, 5, player: 1));
+        sim.GrantTech(Player, "steelworks");
         Assert.Equal(PlaceResult.CannotAfford, Check(sim, tile, "steel_mill", 5, 5));
     }
 

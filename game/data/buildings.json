@@ -1,7 +1,11 @@
 [
-  { "id": "core",       "name": "Core",       "width": 3, "height": 3, "power": 0,  "cost": {} },
-  { "id": "drill",      "name": "Drill",      "width": 2, "height": 2, "power": 0,  "cost": { "copper_ore": 10 } },
-  { "id": "conveyor",   "name": "Conveyor",   "width": 1, "height": 1, "power": 0,  "cost": { "copper_ore": 1 } },
-  { "id": "smelter",    "name": "Smelter",    "width": 2, "height": 2, "power": 0,  "cost": { "copper_ore": 20, "iron_ore": 10 } },
-  { "id": "steel_mill", "name": "Steel Mill", "width": 3, "height": 3, "power": 30, "cost": { "iron_plate": 40, "copper_plate": 20 } }
+  { "id": "core",        "name": "Core",        "kind": "core",        "width": 3, "height": 3, "power": 0,  "cost": {} },
+  { "id": "drill",       "name": "Drill",       "width": 2, "height": 2, "power": 0,  "cost": { "copper_ore": 10 } },
+  { "id": "conveyor",    "name": "Conveyor",    "kind": "conveyor",    "speed": 4, "width": 1, "height": 1, "power": 0,  "cost": { "copper_ore": 1 } },
+  { "id": "smelter",     "name": "Smelter",     "width": 2, "height": 2, "power": 0,  "cost": { "copper_ore": 20, "iron_ore": 10 } },
+  { "id": "steel_mill",  "name": "Steel Mill",  "width": 3, "height": 3, "power": 30, "cost": { "iron_plate": 40, "copper_plate": 20 } },
+  { "id": "export_port", "name": "Export Port", "kind": "export_port", "width": 1, "height": 1, "power": 0,  "cost": { "copper_ore": 5 } },
+  { "id": "import_port", "name": "Import Port", "kind": "import_port", "width": 1, "height": 1, "power": 0,  "cost": { "copper_ore": 5 } },
+  { "id": "unit_core", "name": "Unit Core", "kind": "unit_core", "width": 1, "height": 1, "power": 0, "cost": { "copper_plate": 10, "steel": 5 } },
+  { "id": "thruster", "name": "Thruster", "kind": "thruster", "thrust": 60, "width": 1, "height": 1, "power": 0, "cost": { "iron_plate": 10, "steel": 5 } }
 ]

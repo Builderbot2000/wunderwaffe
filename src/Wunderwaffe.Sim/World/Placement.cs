@@ -12,6 +12,12 @@ public enum PlaceResult
     NeedsDeposit,
     InvalidRecipe,
     CannotAfford,
+
+    /// <summary>Ports only fit within <see cref="PortRules.ZoneDepth"/> cells of the edge they face.</summary>
+    NotInPortZone,
+
+    /// <summary>The building or its recipe needs a tech node the player hasn't completed (TT-004).</summary>
+    Locked,
 }
 
 /// <summary>A placement that passed every check, ready to apply.</summary>
@@ -24,14 +30,17 @@ public readonly record struct PlacementPlan(BuildingDef Def, int X, int Y, int W
 public static class Placement
 {
     public static PlaceResult Check(
-        ContentDb content, TileState tile, int player, string buildingId, int x, int y, int rotation,
+        Simulation sim, TileState tile, int player, string buildingId, int x, int y, int rotation,
         string? recipeId, out PlacementPlan plan)
     {
         plan = default;
+        var content = sim.Content;
         if (tile.Owner != player)
             return PlaceResult.NotOwner;
         if (!content.Buildings.TryGetValue(buildingId, out var def))
             return PlaceResult.NoSuchBuilding;
+        if (!Progression.IsUnlocked(sim, player, buildingId))
+            return PlaceResult.Locked;
 
         rotation &= 3;
         bool turned = (rotation & 1) == 1;
@@ -44,7 +53,10 @@ public static class Placement
         if (!grid.IsFree(x, y, w, h))
             return PlaceResult.Blocked;
 
-        var resolved = ResolveRecipe(content, grid, def, x, y, w, h, recipeId);
+        if (def.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && !PortRules.InZone(grid, rotation, x, y, w, h))
+            return PlaceResult.NotInPortZone;
+
+        var resolved = ResolveRecipe(sim, player, grid, def, x, y, w, h, recipeId);
         if (resolved.Error != PlaceResult.Ok)
             return resolved.Error;
 
@@ -57,20 +69,23 @@ public static class Placement
 
     readonly record struct Resolved(PlaceResult Error, string? RecipeId);
 
-    static Resolved ResolveRecipe(ContentDb content, TileGrid grid, BuildingDef def, int x, int y, int w, int h, string? recipeId)
+    static Resolved ResolveRecipe(Simulation sim, int player, TileGrid grid, BuildingDef def, int x, int y, int w, int h, string? recipeId)
     {
-        var recipes = content.RecipesByBuilding.GetValueOrDefault(def.Id) ?? [];
+        var all = sim.Content.RecipesByBuilding.GetValueOrDefault(def.Id) ?? [];
 
         if (recipeId != null)
         {
-            var recipe = recipes.FirstOrDefault(r => r.Id == recipeId);
+            var recipe = all.FirstOrDefault(r => r.Id == recipeId);
             if (recipe == null)
                 return new(PlaceResult.InvalidRecipe, null);
+            if (!Progression.IsUnlocked(sim, player, recipe.Id))
+                return new(PlaceResult.Locked, null);
             if (recipe.Inputs.Count == 0 && CountDeposits(grid, x, y, w, h, recipe.Outputs.Keys.First()) == 0)
                 return new(PlaceResult.NeedsDeposit, null);
             return new(PlaceResult.Ok, recipe.Id);
         }
 
+        var recipes = all.Where(r => Progression.IsUnlocked(sim, player, r.Id)).ToList();
         var extraction = recipes.Where(r => r.Inputs.Count == 0).ToList();
         if (extraction.Count > 0)
         {
@@ -91,6 +106,7 @@ public static class Placement
 
         return recipes.Count switch
         {
+            0 when all.Count > 0 => new(PlaceResult.Locked, null),
             0 => new(PlaceResult.Ok, null),
             1 => new(PlaceResult.Ok, recipes[0].Id),
             _ => new(PlaceResult.InvalidRecipe, null),

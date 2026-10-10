@@ -12,6 +12,7 @@ public static class Sprites
     const string Dir = "res://assets/sprites/";
 
     public const string Ground = "ground";
+    public const string Frame = "frame";
 
     static readonly Dictionary<string, Texture2D?> Cache = [];
 

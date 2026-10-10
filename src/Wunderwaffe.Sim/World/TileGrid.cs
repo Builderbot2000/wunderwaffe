@@ -1,9 +1,12 @@
+using Wunderwaffe.Sim.Content;
+
 namespace Wunderwaffe.Sim.World;
 
-public sealed class PlacedBuilding(int id, string defId, int x, int y, int width, int height, int rotation, string? recipeId)
+public sealed class PlacedBuilding(int id, BuildingDef def, int x, int y, int width, int height, int rotation, RecipeDef? recipe)
 {
     public int Id { get; } = id;
-    public string DefId { get; } = defId;
+    public string DefId { get; } = def.Id;
+    public BuildingKind Kind { get; } = def.Kind;
     public int X { get; } = x;
     public int Y { get; } = y;
 
@@ -11,11 +14,17 @@ public sealed class PlacedBuilding(int id, string defId, int x, int y, int width
     public int Width { get; } = width;
     public int Height { get; } = height;
 
-    /// <summary>0-3, quarter turns clockwise.</summary>
+    /// <summary>0-3, quarter turns clockwise from east.</summary>
     public int Rotation { get; } = rotation;
 
-    /// <summary>Recipe this building runs, or null for buildings that don't produce (core, conveyor).</summary>
-    public string? RecipeId { get; } = recipeId;
+    /// <summary>Recipe this building runs, or null for buildings that don't produce (core, conveyor, ports).</summary>
+    public string? RecipeId { get; } = recipe?.Id;
+
+    // Runtime state for the tile's entity simulation. Exactly the one matching Kind is set.
+    public BeltState? Belt { get; } = def.Kind == BuildingKind.Conveyor ? new BeltState(def.Speed) : null;
+    public MachineState? Machine { get; } =
+        def.Kind is BuildingKind.Machine or BuildingKind.ImportPort ? new MachineState(recipe) : null;
+    public ExportState? Export { get; } = def.Kind == BuildingKind.ExportPort ? new ExportState() : null;
 }
 
 /// <summary>
@@ -30,17 +39,36 @@ public sealed class TileGrid
     // which keeps ids and iteration order deterministic.
     readonly List<PlacedBuilding?> _buildings = [null];
 
+    // Buildings by behaviour, each in id order, so the entity sim visits them in a deterministic order.
+    readonly List<PlacedBuilding> _belts = [];
+    readonly List<PlacedBuilding> _machines = [];
+    readonly List<PlacedBuilding> _exportPorts = [];
+    readonly List<PlacedBuilding> _importPorts = [];
+    readonly bool[] _frames;
+
     public TileGrid(int width, int height)
     {
         Width = width;
         Height = height;
         _cells = new int[width * height];
         _deposits = new string?[width * height];
+        _frames = new bool[width * height];
     }
 
     public int Width { get; }
     public int Height { get; }
     public int BuildingCount { get; private set; }
+
+    public IReadOnlyList<PlacedBuilding> Belts => _belts;
+
+    /// <summary>Machines that run recipes. Import ports are separate; see <see cref="ImportPorts"/>.</summary>
+    public IReadOnlyList<PlacedBuilding> Machines => _machines;
+
+    public IReadOnlyList<PlacedBuilding> ExportPorts => _exportPorts;
+    public IReadOnlyList<PlacedBuilding> ImportPorts => _importPorts;
+
+    /// <summary>Cells carrying a unit frame (the floor a unit is built on).</summary>
+    public int FrameCount { get; private set; }
 
     /// <summary>Increments on every change so views know when to redraw.</summary>
     public int Revision { get; private set; }
@@ -59,12 +87,35 @@ public sealed class TileGrid
 
     public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
+    public bool HasFrame(int x, int y) => InBounds(x, y) && _frames[y * Width + x];
+
+    internal void SetFrame(int x, int y, bool on)
+    {
+        if (_frames[y * Width + x] == on)
+            return;
+        _frames[y * Width + x] = on;
+        FrameCount += on ? 1 : -1;
+        Revision++;
+    }
+
     public string? DepositAt(int x, int y) => _deposits[y * Width + x];
 
     public void SetDeposit(int x, int y, string? itemId)
     {
         _deposits[y * Width + x] = itemId;
         Revision++;
+    }
+
+    /// <summary>Cells per deposit item, for showing what a tile holds (WM-002).</summary>
+    public SortedDictionary<string, int> DepositCounts()
+    {
+        var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        foreach (var item in _deposits)
+        {
+            if (item != null)
+                counts[item] = counts.GetValueOrDefault(item) + 1;
+        }
+        return counts;
     }
 
     public PlacedBuilding? BuildingAt(int x, int y) =>
@@ -85,10 +136,11 @@ public sealed class TileGrid
         return true;
     }
 
-    internal PlacedBuilding Add(string defId, int x, int y, int w, int h, int rotation, string? recipeId)
+    internal PlacedBuilding Add(BuildingDef def, int x, int y, int w, int h, int rotation, RecipeDef? recipe)
     {
-        var b = new PlacedBuilding(_buildings.Count, defId, x, y, w, h, rotation, recipeId);
+        var b = new PlacedBuilding(_buildings.Count, def, x, y, w, h, rotation, recipe);
         _buildings.Add(b);
+        KindList(b.Kind)?.Add(b);
         Fill(b, b.Id);
         BuildingCount++;
         Revision++;
@@ -99,9 +151,19 @@ public sealed class TileGrid
     {
         Fill(b, 0);
         _buildings[b.Id] = null;
+        KindList(b.Kind)?.Remove(b);
         BuildingCount--;
         Revision++;
     }
+
+    List<PlacedBuilding>? KindList(BuildingKind kind) => kind switch
+    {
+        BuildingKind.Conveyor => _belts,
+        BuildingKind.Machine => _machines,
+        BuildingKind.ExportPort => _exportPorts,
+        BuildingKind.ImportPort => _importPorts,
+        _ => null,
+    };
 
     void Fill(PlacedBuilding b, int value)
     {

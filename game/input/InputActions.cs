@@ -13,10 +13,20 @@ public static class InputActions
     public const string CamUp = "cam_up";
     public const string CamDown = "cam_down";
     public const string Rotate = "build_rotate";
+    /// <summary>Esc: drops the picked building, then clears the unit selection, then opens the pause menu.</summary>
     public const string Cancel = "build_cancel";
     public const string Stress = "debug_stress";
-    public const int Slots = 9;
+    public const string DebugCheat = "debug_cheat";
+    public const string DebugStats = "debug_stats";
+    public const string Help = "ui_help";
+    public const string TechTree = "ui_tech";
+    public const string WorldToggle = "world_toggle";
+    public const string WorldEnter = "world_enter";
+    public const string WorldClaim = "world_claim";
+    public const string UnitToggle = "unit_toggle";
+    public const int Slots = 10;
 
+    /// <summary>Slots 1-9 are the number keys; the tenth is 0.</summary>
     public static string Slot(int i) => $"build_slot_{i + 1}";
 
     public static void Register()
@@ -28,8 +38,16 @@ public static class InputActions
         Add(Rotate, Key.R);
         Add(Cancel, Key.Escape);
         Add(Stress, Key.F3);
+        Add(DebugCheat, Key.F4);
+        Add(DebugStats, Key.F2);
+        Add(Help, Key.F1);
+        Add(TechTree, Key.T);
+        Add(WorldToggle, Key.Tab);
+        Add(WorldEnter, Key.Enter, Key.KpEnter);
+        Add(WorldClaim, Key.C);
+        Add(UnitToggle, Key.G);
         for (int i = 0; i < Slots; i++)
-            Add(Slot(i), Key.Key1 + i);
+            Add(Slot(i), i == 9 ? Key.Key0 : Key.Key1 + i);
     }
 
     static void Add(string action, params Key[] keys)
