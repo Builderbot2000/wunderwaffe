@@ -5,8 +5,9 @@ using Wunderwaffe.Sim.World;
 namespace Wunderwaffe.Game.Render;
 
 /// <summary>
-/// Draws the units on the viewed tile as the blocks they are made of, turned to the unit's heading, with a ring on
-/// selected ones and a line to the destination of any selected unit that is moving. Units are few next to buildings,
+/// Draws the units over the viewed tile's map (its own and any over the land around it) as the blocks they are made
+/// of, turned to the unit's heading, with a ring on selected ones and a line to the destination of any selected unit
+/// that is moving. Unit positions are world coordinates, drawn relative to the viewed tile's origin. Units are few next to buildings,
 /// so this is a plain redraw each frame rather than a MultiMesh.
 /// </summary>
 public partial class UnitView : Node2D
@@ -34,28 +35,36 @@ public partial class UnitView : Node2D
 
     public override void _Process(double delta) => QueueRedraw();
 
-    /// <summary>Screen position of a point on the viewed tile, in pixels.</summary>
-    public static Vector2 PixelPos(int x, int y) => new Vector2(x, y) / Unit.CellScale * Palette.CellPx;
+    /// <summary>Position on the viewed tile's map, in pixels, of a point in world sub-cells.</summary>
+    public static Vector2 PixelPos(TileState viewed, long x, long y) =>
+        (new Vector2(x, y) / Unit.CellScale - new Vector2(viewed.OriginX, viewed.OriginY)) * Palette.CellPx;
+
+    /// <summary>True if the unit is over the viewed tile's bounding box, give or take its size.</summary>
+    public static bool InView(TileState viewed, Unit u)
+    {
+        var p = PixelPos(viewed, u.X, u.Y) / Palette.CellPx;
+        float r = u.Radius / (float)Unit.CellScale;
+        return p.X > -r && p.Y > -r && p.X < viewed.Grid.Width + r && p.Y < viewed.Grid.Height + r;
+    }
 
     public override void _Draw()
     {
         var tile = _host.ViewedTile;
         foreach (var u in _host.Sim.Units)
         {
-            if (u.TileId != tile.Id)
-                continue;
-            DrawUnit(u);
+            if (InView(tile, u))
+                DrawUnit(tile, u);
         }
     }
 
-    void DrawUnit(Unit u)
+    void DrawUnit(TileState viewed, Unit u)
     {
         float px = Palette.CellPx;
-        var pos = PixelPos(u.X, u.Y);
+        var pos = PixelPos(viewed, u.X, u.Y);
         bool selected = _host.Selected.Contains(u.Id);
-        if (selected && u.Moving && u.DestTileId == _host.ViewedTile.Id)
+        if (selected && u.Moving)
         {
-            var dest = PixelPos(u.DestX, u.DestY);
+            var dest = PixelPos(viewed, u.DestX, u.DestY);
             DrawLine(pos, dest, Colors.White with { A = 0.4f }, 1);
             DrawCircle(dest, 2.5f, Colors.White with { A = 0.7f });
         }

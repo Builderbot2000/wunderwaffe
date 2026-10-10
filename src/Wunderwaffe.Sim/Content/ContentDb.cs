@@ -34,6 +34,21 @@ public sealed class ContentDb
     /// <summary>The guided objective chain, in the order goals must be completed.</summary>
     public IReadOnlyList<GoalDef> Goals { get; }
 
+    /// <summary>Terrains in file order, which is classification order. A cell stores its terrain's index here.</summary>
+    public IReadOnlyList<TerrainDef> TerrainList { get; }
+
+    /// <summary>
+    /// Index of the terrain hand-built tiles are laid on: the first buildable land terrain with no bands (the catch-all),
+    /// or else the first buildable land terrain.
+    /// </summary>
+    public int DefaultTerrain { get; }
+
+    /// <summary>Index of the terrain rivers use, or -1 if no terrain is marked as river.</summary>
+    public int RiverTerrain { get; }
+
+    /// <summary>Used when no terrain file is given: one buildable terrain everywhere.</summary>
+    static readonly TerrainDef FallbackTerrain = new("plains", "Plains", "#6b8f47");
+
     /// <summary>The tech node that unlocks each building or recipe id. Ids not in here are starter content (TT-004).</summary>
     public IReadOnlyDictionary<string, string> UnlockedBy { get; }
 
@@ -47,7 +62,8 @@ public sealed class ContentDb
         Dictionary<string, BuildingDef> buildings,
         List<TechDef> techList,
         Dictionary<string, TechDef> tech,
-        List<GoalDef> goals)
+        List<GoalDef> goals,
+        List<TerrainDef> terrain)
     {
         Items = items;
         Recipes = recipes;
@@ -56,6 +72,11 @@ public sealed class ContentDb
         Tech = tech;
         TechList = techList;
         Goals = goals;
+        TerrainList = terrain;
+        static bool Land(TerrainDef t) => t.Buildable && !t.Water && !t.River;
+        int catchAll = terrain.FindIndex(t => Land(t) && t.Elevation == null && t.Moisture == null);
+        DefaultTerrain = catchAll >= 0 ? catchAll : Math.Max(0, terrain.FindIndex(Land));
+        RiverTerrain = terrain.FindIndex(t => t.River);
         var unlockedBy = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var t in TechList)
         {
@@ -71,13 +92,16 @@ public sealed class ContentDb
     }
 
     /// <param name="goals">The objective chain; null for none.</param>
-    public static ContentDb FromJson(string items, string recipes, string buildings, string tech, string? goals = null)
+    /// <param name="terrain">Terrain kinds for world generation; null for a single buildable terrain.</param>
+    public static ContentDb FromJson(string items, string recipes, string buildings, string tech, string? goals = null, string? terrain = null)
     {
         var errors = new List<string>();
         var buildingList = Parse<BuildingDef>(buildings, "buildings");
         var techList = Parse<TechDef>(tech, "tech");
         var goalList = goals == null ? [] : Parse<GoalDef>(goals, "goals");
         Index(goalList, x => x.Id, "goal", errors);
+        var terrainList = terrain == null ? [FallbackTerrain] : Parse<TerrainDef>(terrain, "terrain");
+        Index(terrainList, x => x.Id, "terrain", errors);
         var db = new ContentDb(
             Index(Parse<ItemDef>(items, "items"), x => x.Id, "item", errors),
             Index(Parse<RecipeDef>(recipes, "recipes"), x => x.Id, "recipe", errors),
@@ -85,7 +109,8 @@ public sealed class ContentDb
             Index(buildingList, x => x.Id, "building", errors),
             techList,
             Index(techList, x => x.Id, "tech", errors),
-            goalList);
+            goalList,
+            terrainList);
         db.Validate(errors);
         if (errors.Count > 0)
             throw new ContentException(errors);
@@ -161,7 +186,66 @@ public sealed class ContentDb
 
         foreach (var g in Goals)
             ValidateCondition(g.Condition, $"goal '{g.Id}'", errors);
+
+        ValidateTerrain(errors);
     }
+
+    void ValidateTerrain(List<string> errors)
+    {
+        if (TerrainList.Count == 0)
+            errors.Add("terrain: at least one terrain is needed");
+        if (TerrainList.Count > 255)
+            errors.Add("terrain: at most 255 terrains");
+        if (!TerrainList.Any(t => t.Buildable && !t.Water && !t.River))
+            errors.Add("terrain: no buildable land terrain");
+        if (TerrainList.Count(t => t.River) > 1)
+            errors.Add("terrain: more than one river terrain");
+
+        var minable = Recipes.Values.Where(r => r.Inputs.Count == 0).SelectMany(r => r.Outputs.Keys).ToHashSet();
+        foreach (var t in TerrainList)
+        {
+            if (t.Color.Length != 7 || t.Color[0] != '#' || !t.Color.Skip(1).All(Uri.IsHexDigit))
+                errors.Add($"terrain '{t.Id}': colour must be #rrggbb");
+            foreach (var band in new[] { t.Elevation, t.Moisture })
+            {
+                if (band != null && (band.Length != 2 || band[0] > band[1]))
+                    errors.Add($"terrain '{t.Id}': a band is [min, max]");
+            }
+            foreach (var (item, w) in t.Deposits ?? [])
+            {
+                if (!minable.Contains(item))
+                    errors.Add($"terrain '{t.Id}': deposit '{item}' is not a minable item");
+                if (w < 0)
+                    errors.Add($"terrain '{t.Id}': deposit weight must be >= 0");
+            }
+        }
+
+        // Every elevation and moisture must classify, or generation would leave holes.
+        for (int e = 0; e <= 1000; e += 5)
+        {
+            for (int m = 0; m <= 1000; m += 5)
+            {
+                if (ClassifyOrNull(e, m) == null)
+                {
+                    errors.Add($"terrain: nothing covers elevation {e}, moisture {m}");
+                    return;
+                }
+            }
+        }
+    }
+
+    int? ClassifyOrNull(int elevation, int moisture)
+    {
+        for (int i = 0; i < TerrainList.Count; i++)
+        {
+            if (TerrainList[i].Contains(elevation, moisture))
+                return i;
+        }
+        return null;
+    }
+
+    /// <summary>The terrain index for a cell: the first terrain whose bands contain it.</summary>
+    public int Classify(int elevation, int moisture) => ClassifyOrNull(elevation, moisture) ?? DefaultTerrain;
 
     void ValidateCondition(UnlockCondition c, string owner, List<string> errors)
     {

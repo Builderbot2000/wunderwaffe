@@ -52,15 +52,18 @@ internal static class UnitSim
             }
 
             // A grid centred on the target, so a lone unit lands exactly on it.
-            long x = (long)cellX * Unit.CellScale + Unit.CellScale / 2 + (slot % columns * 2 - (columns - 1)) * (long)FormationSpacing / 2;
-            long y = (long)cellY * Unit.CellScale + Unit.CellScale / 2 + (slot / columns * 2 - (rows - 1)) * (long)FormationSpacing / 2;
+            var (gx, gy) = dest.ToGlobal(cellX, cellY);
+            long x = (long)gx * Unit.CellScale + Unit.CellScale / 2 + (slot % columns * 2 - (columns - 1)) * (long)FormationSpacing / 2;
+            long y = (long)gy * Unit.CellScale + Unit.CellScale / 2 + (slot / columns * 2 - (rows - 1)) * (long)FormationSpacing / 2;
             slot++;
             unit.Route = route;
             unit.RouteIndex = 0;
             unit.PathKey = null;
+            unit.Portal = null;
             unit.DestTileId = dest.Id;
-            unit.DestX = (int)Math.Clamp(x, 0, (long)dest.Grid.Width * Unit.CellScale - 1);
-            unit.DestY = (int)Math.Clamp(y, 0, (long)dest.Grid.Height * Unit.CellScale - 1);
+            long ox = (long)dest.OriginX * Unit.CellScale, oy = (long)dest.OriginY * Unit.CellScale;
+            unit.DestX = (int)Math.Clamp(x, ox, ox + (long)dest.Grid.Width * Unit.CellScale - 1);
+            unit.DestY = (int)Math.Clamp(y, oy, oy + (long)dest.Grid.Height * Unit.CellScale - 1);
             result = MoveResult.Ok;
         }
         return result;

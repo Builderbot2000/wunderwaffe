@@ -13,8 +13,11 @@ public enum PlaceResult
     InvalidRecipe,
     CannotAfford,
 
-    /// <summary>Ports only fit within <see cref="PortRules.ZoneDepth"/> cells of the edge they face.</summary>
+    /// <summary>Ports only fit wholly inside one I/O zone (see <see cref="PortRules"/>).</summary>
     NotInPortZone,
+
+    /// <summary>Some cell of the footprint is terrain buildings can't stand on, such as water or peaks (FB-002).</summary>
+    BadTerrain,
 
     /// <summary>The building or its recipe needs a tech node the player hasn't completed (TT-004).</summary>
     Locked,
@@ -52,8 +55,10 @@ public static class Placement
             return PlaceResult.OutOfBounds;
         if (!grid.IsFree(x, y, w, h))
             return PlaceResult.Blocked;
+        if (!grid.Buildable(x, y, w, h))
+            return PlaceResult.BadTerrain;
 
-        if (def.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && !PortRules.InZone(grid, rotation, x, y, w, h))
+        if (def.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && !PortRules.InZone(grid, x, y, w, h))
             return PlaceResult.NotInPortZone;
 
         var resolved = ResolveRecipe(sim, player, grid, def, x, y, w, h, recipeId);

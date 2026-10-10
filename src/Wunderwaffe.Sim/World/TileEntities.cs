@@ -197,8 +197,8 @@ internal static class TileEntities
     }
 
     /// <summary>
-    /// An export port takes an item only if a neighbour you own has an import port in its lane to receive it,
-    /// so a missing or full link backs the belt up instead of losing items.
+    /// An export port takes an item only if the tile its zone faces is yours and has an import port in its zone facing
+    /// back, so a missing or full link backs the belt up instead of losing items.
     /// </summary>
     static bool Send(Simulation sim, TileState tile, PlacedBuilding port, string item)
     {
@@ -206,10 +206,10 @@ internal static class TileEntities
         if (link.InFlight.Count >= ExportState.LinkCapacity)
             return false;
 
-        var side = PortRules.SideOf(port.Rotation);
-        if (sim.Neighbor(tile, side) is not { } neighbor || neighbor.Owner != tile.Owner || tile.Owner == TileState.Unowned)
+        if (sim.TryGetTile(PortRules.PartnerOf(tile.Grid, port)) is not { } neighbor
+            || neighbor.Owner != tile.Owner || tile.Owner == TileState.Unowned)
             return false;
-        if (FindImport(neighbor, side.Opposite(), PortRules.Lane(port), 0, needRoom: false) < 0)
+        if (FindImport(neighbor, tile.Id, 0, needRoom: false) < 0)
             return false;
 
         link.InFlight.Enqueue(new Shipment(sim.Tick + PortRules.TransitTicksPerTile, item));
@@ -219,14 +219,13 @@ internal static class TileEntities
     static void Deliver(Simulation sim, TileState tile, PlacedBuilding port)
     {
         var link = port.Export!;
-        var side = PortRules.SideOf(port.Rotation);
-        var neighbor = sim.Neighbor(tile, side);
+        var neighbor = sim.TryGetTile(PortRules.PartnerOf(tile.Grid, port));
 
         while (link.InFlight.Count > 0 && link.InFlight.Peek().ArriveTick <= sim.Tick)
         {
             if (neighbor == null || neighbor.Owner != tile.Owner)
                 return;
-            int i = FindImport(neighbor, side.Opposite(), PortRules.Lane(port), link.Cursor, needRoom: true);
+            int i = FindImport(neighbor, tile.Id, link.Cursor, needRoom: true);
             if (i < 0)
                 return; // Landing is blocked: the item waits at the edge and the link backs up.
 
@@ -241,15 +240,18 @@ internal static class TileEntities
         }
     }
 
-    /// <summary>Index of an import port facing <paramref name="side"/> in <paramref name="lane"/>, searching from <paramref name="start"/>, or -1.</summary>
-    static int FindImport(TileState tile, Direction side, int lane, int start, bool needRoom)
+    /// <summary>
+    /// Index of an import port in <paramref name="tile"/>'s zone for <paramref name="from"/>, searching from
+    /// <paramref name="start"/>, or -1.
+    /// </summary>
+    static int FindImport(TileState tile, int from, int start, bool needRoom)
     {
         var imports = tile.Grid.ImportPorts;
         for (int k = 0; k < imports.Count; k++)
         {
             int i = (start + k) % imports.Count;
             var p = imports[i];
-            if (PortRules.SideOf(p.Rotation) == side && PortRules.Lane(p) == lane
+            if (PortRules.PartnerOf(tile.Grid, p) == from
                 && (!needRoom || p.Machine!.OutputCount < MachineState.OutputCapacity))
                 return i;
         }

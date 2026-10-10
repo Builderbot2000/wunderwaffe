@@ -47,10 +47,53 @@ public class UnitTests
         return false;
     }
 
-    static double CellsTo(Unit u, int cx, int cy) =>
-        Math.Sqrt(Math.Pow(u.X - (cx + 0.5) * S, 2) + Math.Pow(u.Y - (cy + 0.5) * S, 2)) / S;
+    /// <summary>Distance from the unit to the centre of a cell of <paramref name="on"/> (world cells if null), in cells.</summary>
+    static double CellsTo(Unit u, int cx, int cy, TileState? on = null) =>
+        Math.Sqrt(Math.Pow(u.X - (cx + (on?.OriginX ?? 0) + 0.5) * S, 2) + Math.Pow(u.Y - (cy + (on?.OriginY ?? 0) + 0.5) * S, 2)) / S;
 
     // --- frames ---
+
+    [Fact]
+    public void AUnitCrossesAnIrregularBorderOnAGeneratedWorld()
+    {
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default, Me);
+        UnlockAll(sim, Me);
+        var home = sim.Tiles[sim.StartTileId];
+        home.Inventory.Add("copper_ore", 10_000);
+        home.Inventory.Add("iron_ore", 10_000);
+        home.Inventory.Add("steel", 1_000);
+        home.Inventory.Add("iron_plate", 1_000);
+        home.Inventory.Add("copper_plate", 1_000);
+        var (x, y) = Open(home, 3, 1);
+        var unit = Scout(sim, home, x + 1, y);
+        Assert.Equal(home.Id, unit.TileId);
+
+        // Two tiles away, through whatever lies between.
+        var far = sim.Tiles.First(t => !home.Neighbors.Contains(t.Id) && t != home
+            && t.Neighbors.Any(n => home.Neighbors.Contains(n)));
+        var (gx, gy) = (far.CenterX, far.CenterY);
+        var target = Enumerable.Range(0, far.Grid.Width * far.Grid.Height)
+            .Select(i => (X: i % far.Grid.Width, Y: i / far.Grid.Width))
+            .Where(c => far.Grid.InBounds(c.X, c.Y))
+            .MinBy(c => Math.Abs(far.OriginX + c.X - gx) + Math.Abs(far.OriginY + c.Y - gy));
+        Move(sim, unit, far, target.X, target.Y);
+        sim.Step();
+        Assert.True(unit.Moving);
+
+        var visited = new List<int> { unit.TileId };
+        for (int i = 0; i < 20_000 && unit.Moving; i++)
+        {
+            sim.Step();
+            if (unit.TileId != visited[^1])
+                visited.Add(unit.TileId);
+        }
+        Assert.False(unit.Moving, "never arrived");
+        Assert.Equal(far.Id, unit.TileId);
+        Assert.True(CellsTo(unit, target.X, target.Y, far) < 2, $"stopped {CellsTo(unit, target.X, target.Y, far):F2} cells away");
+        // Every hop was to a neighbour.
+        for (int i = 1; i < visited.Count; i++)
+            Assert.Contains(visited[i], sim.Tiles[visited[i - 1]].Neighbors);
+    }
 
     [Fact]
     public void FramesCostItemsAndAreRefundedOnRemoval()
@@ -181,11 +224,13 @@ public class UnitTests
         Place(sim2, tile2, "unit_core", 3, 3);
         Place(sim2, tile2, "export_port", 4, 3, 0);
         sim2.Step();
-        // Ports are only legal near an edge, so the placement itself is refused here.
+        // Ports are only legal in a port zone, and a tile with no neighbours has none, so the placement is refused.
         Assert.Null(tile2.Grid.BuildingAt(4, 3));
 
+        // A neighbour to the east gives tile 3 a port zone along its east side.
         var sim3 = NewSim();
         var tile3 = Tile(sim3, size: 6);
+        Tile(sim3, 1, 0, size: 6);
         Frame(sim3, tile3, 2, 2, 3);
         Place(sim3, tile3, "unit_core", 2, 2);
         Place(sim3, tile3, "export_port", 3, 2, 0);
@@ -261,11 +306,71 @@ public class UnitTests
         Move(sim, unit, b, 10, 10);
 
         Assert.True(RunUntil(sim, () => unit.TileId == b.Id, 1500), "never crossed");
-        Assert.True(unit.X < 6 * S, "arrives at the west edge of the next tile");
+        Assert.True(unit.X - b.OriginX * S < 6 * S, "arrives at the west edge of the next tile");
         Assert.True(RunUntil(sim, () => !unit.Moving, 2000), "never arrived");
         Run(sim, 200);
-        Assert.True(CellsTo(unit, 10, 10) < 1.5);
+        Assert.True(CellsTo(unit, 10, 10, b) < 1.5);
         Assert.Equal(b.Id, unit.TileId);
+    }
+
+    [Fact]
+    public void TheTileAUnitIsOnIsTheTileUnderItsCentreAndItsPathIsContinuous()
+    {
+        var sim = NewSim();
+        var a = Tile(sim, 0, 0, size: 20);
+        var b = Tile(sim, 1, 0, size: 20);
+        var unit = Scout(sim, a, 12, 10);
+        Move(sim, unit, b, 10, 10);
+
+        long maxStep = 0;
+        int px = unit.X, py = unit.Y;
+        for (int i = 0; i < 2500 && unit.Moving; i++)
+        {
+            sim.Step();
+            // Global coordinates: crossing the border is no jump, just another step.
+            maxStep = Math.Max(maxStep, Math.Abs((long)unit.X - px) + Math.Abs((long)unit.Y - py));
+            (px, py) = (unit.X, unit.Y);
+            Assert.Equal(sim.Map.TileAtCell(unit.X / S, unit.Y / S), unit.TileId);
+        }
+        Assert.False(unit.Moving);
+        Assert.True(maxStep < S, $"jumped {maxStep / (double)S:F2} cells in a tick");
+    }
+
+    [Fact]
+    public void UnitsOnEitherSideOfABorderCollide()
+    {
+        var sim = NewSim();
+        var a = Tile(sim, 0, 0, size: 20);
+        var b = Tile(sim, 1, 0, size: 20);
+        var left = Scout(sim, a, 17, 10);
+        var right = Scout(sim, b, 3, 10);
+        // Each heads for the other's side: they meet at the border.
+        Move(sim, left, b, 5, 10);
+        Move(sim, right, a, 15, 10);
+        long closest = long.MaxValue;
+        for (int i = 0; i < 300; i++)
+        {
+            sim.Step();
+            closest = Math.Min(closest, Math.Abs((long)left.X - right.X) + Math.Abs((long)left.Y - right.Y));
+        }
+        // Their bodies are three cells long; without collisions their centres would pass right through each other.
+        Assert.True(closest > S / 2, $"centres came within {closest / (double)S:F2} cells");
+    }
+
+    [Fact]
+    public void AUnitStopsAtTheEdgeOfTheWorld()
+    {
+        var sim = NewSim();
+        var a = Tile(sim, 0, 0, size: 20);
+        var unit = Scout(sim, a, 12, 10);
+        // Flat out for the westmost cell: there is nothing past it, so the unit is held at the border.
+        Move(sim, unit, a, 0, 10);
+        for (int i = 0; i < 900; i++)
+        {
+            sim.Step();
+            Assert.True(unit.X >= 0, "left the world");
+            Assert.Equal(a.Id, unit.TileId);
+        }
     }
 
     [Fact]

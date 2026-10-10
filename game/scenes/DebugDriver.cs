@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using Godot;
 using Wunderwaffe.Game.Render;
 using Wunderwaffe.Sim.Core;
@@ -13,7 +14,11 @@ namespace Wunderwaffe.Game;
 /// </summary>
 public partial class DebugDriver : Node
 {
-    const int CoreX = 41, CoreY = 48, TargetX = 62, TargetY = 48;
+    /// <summary>How far east of the unit core the unit is sent, in cells.</summary>
+    const int Reach = 21;
+
+    // Set on the first frame: the first open row on the home tile with room for the unit and its trip.
+    int CoreX = 41, CoreY = 48, TargetX = 62, TargetY = 48;
 
     SimHost _host = null!;
     string? _shot;
@@ -70,6 +75,26 @@ public partial class DebugDriver : Node
             GetViewport().PushInput(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = pressed });
     }
 
+    /// <summary>The home tile's shape and terrain depend on the seed: find a clear run of ground for the unit and its trip.</summary>
+    void FindRoom(TileState tile)
+    {
+        // Nearest the middle of the tile, where the camera starts, so it is all on screen.
+        var g = tile.Grid;
+        int mx = tile.CenterX - tile.OriginX - Reach / 2, my = tile.CenterY - tile.OriginY;
+        var spots = Enumerable.Range(0, g.Width * g.Height)
+            .Select(i => (X: i % g.Width, Y: i / g.Width))
+            .Where(p => g.InBounds(p.X - 1, p.Y - 1, Reach + 3, 3) && g.Buildable(p.X - 1, p.Y - 1, Reach + 3, 3)
+                && g.IsFree(p.X - 1, p.Y - 1, Reach + 3, 3))
+            .OrderBy(p => System.Math.Abs(p.X - mx) + System.Math.Abs(p.Y - my));
+        foreach (var (x, y) in spots)
+        {
+            (CoreX, CoreY, TargetX, TargetY) = (x, y, x + Reach, y);
+            GD.Print($"[drive] unit at ({CoreX},{CoreY}), target ({TargetX},{TargetY})");
+            return;
+        }
+        GD.PrintErr("[drive] no room for the unit on the home tile");
+    }
+
     public override void _Process(double delta)
     {
         var sim = _host.Sim;
@@ -79,6 +104,9 @@ public partial class DebugDriver : Node
 
         switch (_frame)
         {
+            case 1:
+                FindRoom(tile);
+                break;
             case 5:
                 // Three framed cells with an engine on each end and the unit core between (commands: this is the setup).
                 // Unit parts are behind the propulsion tech and cost steel.
@@ -103,7 +131,7 @@ public partial class DebugDriver : Node
             case 40:
                 GD.Print($"[drive] after G: {sim.Units.Count} units, {tile.Grid.BuildingCount} buildings");
                 if (sim.Units.Count > 0)
-                    Mouse(Screen(sim.Units[0].X / (double)Unit.CellScale, sim.Units[0].Y / (double)Unit.CellScale));
+                    Mouse(Screen(sim.Units[0].X / (double)Unit.CellScale - tile.OriginX, sim.Units[0].Y / (double)Unit.CellScale - tile.OriginY));
                 break;
             case 43:
                 if (MouseLanded())
@@ -127,7 +155,7 @@ public partial class DebugDriver : Node
                 if (sim.Units.Count > 0)
                 {
                     var u = sim.Units[0];
-                    GD.Print($"[drive] end: at ({u.X / (double)Unit.CellScale:F1}, {u.Y / (double)Unit.CellScale:F1}) " +
+                    GD.Print($"[drive] end: at ({u.X / (double)Unit.CellScale - tile.OriginX:F1}, {u.Y / (double)Unit.CellScale - tile.OriginY:F1}) " +
                              $"target ({TargetX + 0.5}, {TargetY + 0.5}) angle {u.Angle * 360 / Trig.Turn}deg moving={u.Moving}");
                 }
                 if (_shot != null)

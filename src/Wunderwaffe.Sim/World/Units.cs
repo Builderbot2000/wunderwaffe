@@ -16,8 +16,9 @@ public readonly record struct Thruster(int Thrust, int Dir);
 
 /// <summary>
 /// A mobile rigid body built from the blocks that stood on a tile's frame (see <see cref="UnitAssembly"/>). Position
-/// is the centre of mass in sub-cells of the tile it is on (<see cref="CellScale"/> to a cell), velocity is sub-cells per
-/// tick and angle is a fraction of a turn (<see cref="Trig.Turn"/>). All integer, so it is deterministic (NF-004).
+/// is the centre of mass in world sub-cells (<see cref="CellScale"/> to a cell; see <see cref="WorldMap"/>), velocity is
+/// sub-cells per tick and angle is a fraction of a turn (<see cref="Trig.Turn"/>). The tile it is on is the tile of the
+/// cell under its centre. All integer, so it is deterministic (NF-004).
 /// Blocks are inert while the unit is active; they only add mass and thrust.
 /// </summary>
 public sealed class Unit
@@ -71,7 +72,7 @@ public sealed class Unit
         CoreOffY = (int)(coreGY * (long)CellScale + CellScale / 2 - comY);
         CoreGX = coreGX;
         CoreGY = coreGY;
-        // (x, y) is where the core's cell centre stands on the tile; the centre of mass is offset from it.
+        // (x, y) is where the core's cell centre stands in the world; the centre of mass is offset from it.
         X = x - LocalCentre(coreGX) + (int)comX;
         Y = y - LocalCentre(coreGY) + (int)comY;
 
@@ -101,7 +102,7 @@ public sealed class Unit
     public int Owner { get; }
     public int TileId { get; internal set; }
 
-    /// <summary>Centre of mass, in sub-cells of <see cref="TileId"/>.</summary>
+    /// <summary>Centre of mass, in world sub-cells.</summary>
     public int X { get; internal set; }
     public int Y { get; internal set; }
     public int VX { get; internal set; }
@@ -138,23 +139,26 @@ public sealed class Unit
     internal int[]? Route { get; set; }
     internal int RouteIndex { get; set; }
 
-    /// <summary>Where the current move order ends, in sub-cells of <see cref="DestTileId"/>.</summary>
+    /// <summary>Where the current move order ends, in world sub-cells, inside <see cref="DestTileId"/>.</summary>
     public int DestTileId { get; internal set; }
     public int DestX { get; internal set; }
     public int DestY { get; internal set; }
 
-    // The path across the current tile to the next goal (see UnitPath). Recomputed whenever the order, the tile, the
-    // goal or the tile's buildings change, which `PathKey` records.
+    // The path across the current tile (and the next, when crossing) to the next goal, in world cells (see UnitPath).
+    // Recomputed whenever the order, the tile, the goal or the tiles' buildings change, which `PathKey` records.
     internal (int X, int Y)[]? Path { get; set; }
     internal int PathIndex { get; set; }
-    internal (int Tile, int Revision, int GoalX, int GoalY)? PathKey { get; set; }
+    internal (int Tile, int Next, long Revision, int GoalX, int GoalY)? PathKey { get; set; }
+
+    /// <summary>The world cell, in the next tile, where the unit crosses the current border.</summary>
+    internal (int Tile, int Next, int X, int Y)? Portal { get; set; }
 
     public bool Moving => Route != null;
 
     /// <summary>Angular acceleration limit in angle units per tick squared, from the engines' turning torque.</summary>
     internal int TurnAccel => (int)Math.Max(1, TotalThrust * (long)ThrustScale * TurnArm * AnglePerRadian / Inertia);
 
-    /// <summary>A cell centre in the tile's sub-cells, given the unit's current position and heading.</summary>
+    /// <summary>A cell centre in world sub-cells, given the unit's current position and heading.</summary>
     public (long X, long Y) CellWorld(UnitCell c)
     {
         var (rx, ry) = Trig.Rotate(c.OffX, c.OffY, Angle);

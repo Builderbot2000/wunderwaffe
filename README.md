@@ -19,7 +19,7 @@
 | `game/render/` | Drawing. One MultiMesh per layer; redraws only when the grid's `Revision` changes. |
 | `game/input/` | Camera, build tool, default key bindings. |
 | `game/ui/` | Title screen, HUD, pause menu, settings, saves. Built in code from `Ui` helpers, not in .tscn files. |
-| `game/data/*.json` | Content: items, recipes, buildings, tech, goals. |
+| `game/data/*.json` | Content: items, recipes, buildings, tech, goals, terrain. |
 
 ## Playing
 
@@ -29,7 +29,7 @@ Saves are a `GameSetup` plus the command log (`SaveFile`), in `user://saves` (`%
 
 Debug flags, after `--`: `--stress` (add `--headless` to skip rendering) fills the home tile with 2,000 buildings and prints the sim cost per tick (F3 does the same in-game). `--drive [shot.png]` (needs a window) plays a scripted unit session through the real input path. `--tour out_dir` (needs a window) clicks through title, new game, world map, tile, tech tree, claim, pause, save, quit and continue, logs what happened and saves a screenshot per step; it deletes the saves it made. **F4** unlocks all tech and adds 1,000 of every item to the viewed tile.
 
-In game, **Tab** switches between the tile view and the world map. On the world map: click selects a tile, double-click or Enter opens one you own, **C** claims the selected unclaimed tile next to one of yours. Drag with the left mouse button from one of your tiles onto an adjacent one of yours to export an item to it (`[` `]` pick the item, `-` `=` set a per-minute limit, `\` switches back to unlimited); drag with the right button to stop.
+In game, **Tab** switches between the world map and the last tile you viewed. The world map is a blurred picture of every tile's local map, refreshed every few switches (3 by default; **Settings** changes it). On the world map: click selects a tile, double-click or Enter opens one you own, **C** claims the selected unclaimed tile next to one of yours. Drag with the left mouse button from one of your tiles onto an adjacent one of yours to export an item to it (`[` `]` pick the item, `-` `=` set a per-minute limit, `\` switches back to unlimited); drag with the right button to stop.
 
 ## Rules of the codebase
 
@@ -37,11 +37,24 @@ In game, **Tab** switches between the tile view and the world map. On the world 
 - No `float`/`double` in sim state; no Godot types in `src/`.
 - Every tile currently runs the full entity sim. Rate mode for unviewed tiles (FB-012/013/014) is not built yet: it will be derived from the belt graph (OQ-14) and checked against the full sim.
 
+## World
+
+The world is one global grid of cells (`WorldMap`), generated in phases (`World/Gen`), all integer and seeded (WM-009):
+
+1. **Terrain** (`TerrainGen`): domain-warped fractal noise for elevation, sunk toward the rim so land forms continents and islands; sea level and land height by rank, so every seed has 55% land and the same share of high ground; priority-flood drainage, which fills deep depressions as lakes and turns cells with a big enough catchment into rivers; moisture from noise and nearness to water. Each cell takes the first terrain in `terrain.json` whose elevation and moisture bands contain it.
+2. **Tiles** (`Partition`): seeds thrown at random, no two closer than ~0.8 of a nominal tile on land and ~1.15 at sea, grow by cheapest path; climbing, coastlines and rivers cost extra, so borders follow ridges, coasts and rivers. Tiny regions merge into a neighbour. The result is RISK-like territories with 2-9 neighbours; ocean tiles are ordinary tiles, from coastal to all water. `GameSetup` width x height is the world size in nominal 96-cell tiles; the tile count is about that.
+3. **I/O zones** (`Zones`): see Ports below.
+4. **Deposits** (`TileGenerator`): patches on buildable ground, centred by each terrain's deposit weights, with the regional rule (RS-003) as before. The start is the land tile nearest the middle with room for a core and at least two land neighbours.
+
+Two tiles are neighbours if they share at least 3 cell edges. A tile's local map is its bounding box in the world map: local (x, y) is world (OriginX + x, OriginY + y). Cells of the box that belong to other tiles are outside the tile; the tile view shows them dimmed. Water and peaks are unbuildable (`PlaceResult.BadTerrain`). Tests and debugging can still hand-build square tiles with `AddTile(x, y, size)`.
+
+A 5x5 world generates in about 0.3 s, 15x15 in about 2 s.
+
 ## Tile entities
 
 - **Belts** carry up to 4 items per cell at 4/128 of a cell per tick, spaced at least 32 apart, so a belt moves 7.5 items a second. Rotation 0 faces east, then clockwise. A belt hands its front item to whatever it faces, and takes items from behind and the sides, never from the cell it faces.
 - **Machines** (drills, smelters, mills) buffer two batches of each input, run their recipe, and dump output into any adjacent building that accepts it, taking turns. The core accepts everything into the tile inventory. `MachineState.Status` says why one isn't running (starved or output full); the tile view marks machines stopped for 1.5 s with an amber or red dot (FB-006).
-- **Ports** are 1x1 buildings placed within 3 cells of the edge they face (their rotation). An export port sends to the import ports in the same lane of the neighbouring tile's opposite edge, after `PortRules.TransitTicksPerTile` ticks per tile. It refuses items when the neighbour isn't yours, has no import port in that lane, or the link is full, so belts back up rather than losing items. Port throughput is set by the belts feeding them.
+- **Ports** are 1x1 buildings placed in an **I/O zone**. Each tile has one zone per neighbour: the cells within `PortRules.ZoneDepth` (4) steps of the shared border, on the side facing that neighbour. A breadth-first search from all border cells gives each cell to the neighbour that reaches it first (lower id on ties), so zones never overlap. A port's zone, not its rotation, decides the tile it links to. Tile A's zone for B is paired with B's zone for A: an export port in one sends to the import ports in the other, taking turns, and items flow both ways, after `PortRules.TransitTicksPerTile` ticks. An export refuses items when the partner isn't yours, has no import port in the paired zone, or the link is full, so belts back up rather than losing items. Port throughput is set by the belts feeding them. With a port picked, the tile view shades every zone in its own colour and labels the tile it links to. The zone pair is the link a future rate mode (FB-012) would aggregate on.
 - Removing a building returns the items it holds to the tile inventory.
 
 ## Units
@@ -51,12 +64,14 @@ A unit is a group of buildings standing on **frame** (key `0` in the build palet
 - **Lift off:** `ActivateUnitCommand` on a unit core flood-fills the frame joined to it (up to 64 cells). Every building on those cells must lie wholly inside the frame, with no tile core, no second unit core and no ports, or it is refused. The buildings and frame leave the tile and become one unit; items they held go back to the tile inventory. In game, hover the core with no building picked and press **G**.
 - **Body:** the unit's mass is the frame (2 a cell) plus each building's cost, so a heavier build is slower. Blocks are inert while the unit is active, and only add mass and thrust. Running machines inside a moving unit is planned.
 - **Physics:** integer position, velocity, heading and spin (`Trig` is integer CORDIC trig). A **thruster** pushes the way it faces (rotation 0 faces east, as buildings do). Moving to a point, the unit turns its strongest engine toward the acceleration it needs, fires every engine in proportion to how well it lines up, and brakes into the target; turning rate is limited by its engines and its moment of inertia. Drag brings it to rest. Without a thruster it cannot move.
-- **Collisions:** each cell is a circle. Units are pushed out of buildings (conveyors excepted) and out of each other, inelastically. Units path-find inside a tile (A* with clearance for the unit's size, straightened where there is a clear line, replanned when buildings change); with no way round they stop at the obstacle. Units collide only with things on their own tile.
-- **Tiles:** `MoveUnitsCommand` finds a route of tiles by breadth-first search and flies straight across each edge; the unit hops tile when its centre crosses. Units can cross unowned and enemy tiles. At the edge of the world they stop at the border.
-- **Landing:** `DeployUnitCommand` puts the blocks and frame back on the tile, turned to the nearest quarter turn of the unit's heading, if the cells are free, in bounds, and on a tile the player owns.
-- **Controls** (no building picked): left-click or drag a box to select your units (Shift adds), right-click to move them, and right-click past the tile's edge to send them into the neighbouring tile. On the world map, right-click sends the selection to the middle of a tile. With a building picked, left places and right removes, as before.
+- **Collisions:** each cell is a circle. Units are pushed out of buildings (conveyors excepted) on any tile and out of each other, inelastically. Units path-find over the tile they are on and the next one (A* with clearance for the unit's size, straightened where there is a clear line, replanned when buildings change); with no way round they stop at the obstacle.
+- **Tiles:** unit positions are world coordinates, so the tile a unit is on is just the tile of the cell under its centre, and crossing a border is no jump. `MoveUnitsCommand` finds a route of tiles by breadth-first search; for each border the unit aims for the cell of the next tile, along the shared border, that makes the shortest trip, and plans its path over both tiles' buildings. Units can cross unowned and enemy tiles. At the edge of the world they stop at the border. Units collide with units on either side of a border.
+- **Landing:** `DeployUnitCommand` puts the blocks and frame back on the tile, turned to the nearest quarter turn of the unit's heading, if the cells are free, buildable, inside the tile, and on a tile the player owns.
+- **Controls** (no building picked): left-click or drag a box to select your units (Shift adds), right-click to move them, and right-click past the tile's border to send them into the tile there. On the world map, right-click sends the selection to the clicked spot. With a building picked, left places and right removes, as before.
 
 ## Content notes
+
+- `terrain.json` lists terrains in classification order: a generated cell gets the first whose `elevation` and `moisture` bands (0-1000, inclusive) contain it; sea level is 400. `buildable` gates placement and frames; `water` marks coasts and ocean; `river` marks the terrain used for river cells (buildable for now, so rivers don't cut tiles up); `deposits` weights where each ore's patches are centred. `unitPassable` is stored but unused until locomotion types exist (UD-004). Content validation checks every elevation and moisture is covered.
 
 - Item `tier`: 1 raw, 2 refined, 3 advanced, 4 exotic. A recipe can't output an item more than one tier above its best input (RS-001).
 - Recipe `ticks` are at 60 ticks/second. A recipe with empty `inputs` is extraction.

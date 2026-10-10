@@ -9,8 +9,8 @@ namespace Wunderwaffe.Game.Input;
 
 /// <summary>
 /// Unit control. Tile view, with no building picked: left-click or drag a box selects your units (Shift adds),
-/// right-click sends the selection to that cell, and a cell past the tile's edge sends it into the neighbouring
-/// tile. World map: right-click sends the selection to the middle of that tile. G over a unit core lifts the
+/// right-click sends the selection to that cell, and a cell past the tile's border sends it into the tile there.
+/// World map: right-click sends the selection to the clicked spot. G over a unit core lifts the
 /// framed blocks around it off as a unit; G with units selected lands them. The selection is shared between both
 /// views, in <see cref="SimHost.Selected"/>.
 /// </summary>
@@ -136,12 +136,12 @@ public partial class UnitTool : Node2D
             _host.Selected.Clear();
 
         var tile = _host.ViewedTile;
-        var own = _host.Sim.Units.Where(u => u.TileId == tile.Id && u.Owner == _host.LocalPlayer);
+        var own = _host.Sim.Units.Where(u => UnitView.InView(tile, u) && u.Owner == _host.LocalPlayer);
         if (from.DistanceTo(to) < DragThresholdPx)
         {
             // A click picks the nearest unit under the cursor, if any.
             var best = own
-                .Select(u => (Unit: u, Dist: UnitView.PixelPos(u.X, u.Y).DistanceTo(to)))
+                .Select(u => (Unit: u, Dist: UnitView.PixelPos(tile, u.X, u.Y).DistanceTo(to)))
                 .Where(x => x.Dist <= x.Unit.Radius * (float)Palette.CellPx / Unit.CellScale)
                 .OrderBy(x => x.Dist).ThenBy(x => x.Unit.Id)
                 .Select(x => x.Unit).FirstOrDefault();
@@ -151,7 +151,7 @@ public partial class UnitTool : Node2D
         }
 
         var box = new Rect2(from, Vector2.Zero).Expand(to);
-        foreach (var u in own.Where(u => box.HasPoint(UnitView.PixelPos(u.X, u.Y))))
+        foreach (var u in own.Where(u => box.HasPoint(UnitView.PixelPos(tile, u.X, u.Y))))
             _host.Selected.Add(u.Id);
     }
 
@@ -161,7 +161,7 @@ public partial class UnitTool : Node2D
             return;
         var p = GetGlobalMousePosition() / Palette.CellPx;
         var tile = _host.ViewedTile;
-        // The cell may be past the tile's edge; the sim maps it onto the neighbour it falls in.
+        // The cell may be past the tile's border; the sim maps it onto the tile it falls in.
         if (_host.Sim.ResolveCell(tile, Mathf.FloorToInt(p.X), Mathf.FloorToInt(p.Y)) is not { } target)
             return;
         Send(target.Tile.Id, target.X, target.Y);
@@ -171,10 +171,10 @@ public partial class UnitTool : Node2D
     {
         if (_host.Selected.Count == 0)
             return;
-        var p = GetGlobalMousePosition() / WorldMapView.TilePx;
-        if (_host.Sim.TileAt(Mathf.FloorToInt(p.X), Mathf.FloorToInt(p.Y)) is not { } tile)
+        var cell = WorldMapView.CellAt(GetGlobalMousePosition());
+        if (_host.Sim.TileAtCell(cell.X, cell.Y) is not { } tile)
             return;
-        Send(tile.Id, tile.Grid.Width / 2, tile.Grid.Height / 2);
+        Send(tile.Id, cell.X - tile.OriginX, cell.Y - tile.OriginY);
     }
 
     void Send(int tileId, int x, int y) =>

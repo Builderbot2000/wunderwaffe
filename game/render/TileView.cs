@@ -8,10 +8,15 @@ namespace Wunderwaffe.Game.Render;
 /// Draws the viewed tile's ground, deposits and buildings with one MultiMesh per layer, and per sprite within
 /// a layer, so draw cost stays flat as the building count grows (NF-001). Content without a sprite is drawn
 /// as a flat <see cref="Palette"/> colour. Rebuilds only when the grid's revision changes.
+/// The ground is the tile's terrain, one colour per cell. The tile's bounding box also shows the land of the tiles
+/// around it, dimmed, with the border drawn over it and each I/O zone outlined in its own colour.
 /// </summary>
 public partial class TileView : Node2D
 {
     const float BuildingInset = 0.12f;
+
+    /// <summary>How much of the ground sprite's texture shows over the terrain colours.</summary>
+    const float GroundDetail = 0.3f;
 
     /// <summary>Item squares on belts, as a fraction of a cell.</summary>
     const float ItemSize = 0.34f;
@@ -20,6 +25,8 @@ public partial class TileView : Node2D
     const float ItemSpriteSize = 0.45f;
 
     SimHost _host = null!;
+    Sprite2D _terrain = null!;
+    Node2D _outline = null!;
     MultiMeshInstance2D _ground = null!;
     MultiMeshInstance2D _deposits = null!;
     MultiMeshInstance2D _frames = null!;
@@ -38,7 +45,16 @@ public partial class TileView : Node2D
         _host = GetNode<SimHost>("/root/SimHost");
         _host.ViewChanged += OnViewChanged;
         OnViewChanged();
+        _terrain = new Sprite2D
+        {
+            Name = "Terrain",
+            Centered = false,
+            Scale = Vector2.One * Palette.CellPx,
+            TextureFilter = TextureFilterEnum.Nearest,
+        };
+        AddChild(_terrain);
         _ground = AddLayer(this, "Ground", Sprites.Get(Sprites.Ground));
+        _ground.SelfModulate = Colors.White with { A = GroundDetail };
         _deposits = AddLayer(this, "Deposits", null);
         _depositIcons = AddGroup("DepositIcons");
         _frames = AddLayer(this, "Frames", Sprites.Get(Sprites.Frame));
@@ -46,6 +62,8 @@ public partial class TileView : Node2D
         _buildingSprites = AddGroup("BuildingSprites");
         _items = AddLayer(this, "Items", null);
         _itemSprites = AddGroup("ItemSprites");
+        _outline = AddGroup("Outline");
+        _outline.Draw += DrawOutline;
     }
 
     public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
@@ -64,6 +82,11 @@ public partial class TileView : Node2D
         // Grids of different tiles can share a revision number, so the tile id is part of "what's drawn".
         if (grid.Revision != _drawnRevision || tile.Id != _drawnTileId)
         {
+            if (tile.Id != _drawnTileId)
+            {
+                DrawTerrain(tile);
+                _outline.QueueRedraw();
+            }
             _drawnRevision = grid.Revision;
             _drawnTileId = tile.Id;
             DrawGround(grid);
@@ -176,6 +199,39 @@ public partial class TileView : Node2D
         return _spriteLayers[key] = AddLayer(group, id, tex);
     }
 
+    /// <summary>
+    /// One pixel per cell of the bounding box, in its terrain's colour, scaled up to cells. Cells of other tiles are
+    /// dimmed, so the tile's shape stands out against the land around it.
+    /// </summary>
+    void DrawTerrain(TileState tile)
+    {
+        var g = tile.Grid;
+        var image = Image.CreateEmpty(g.Width, g.Height, false, Image.Format.Rgb8);
+        for (int y = 0; y < g.Height; y++)
+        {
+            for (int x = 0; x < g.Width; x++)
+            {
+                var c = Palette.Terrain(g.TerrainAt(x, y));
+                if (((x + y) & 1) == 0)
+                    c = c.Darkened(0.04f);
+                image.SetPixel(x, y, g.InBounds(x, y) ? c : c.Lerp(Colors.Black, Palette.Beyond.A));
+            }
+        }
+        _terrain.Texture = ImageTexture.CreateFromImage(image);
+    }
+
+    /// <summary>The tile's border, and each I/O zone outlined in its neighbour's colour.</summary>
+    void DrawOutline()
+    {
+        if (_drawnTileId < 0)
+            return;
+        var tile = _host.Sim.Tiles[_drawnTileId];
+        float px = Palette.CellPx;
+        foreach (var (zone, lines) in TileShapes.ZoneOutlines(tile))
+            _outline.DrawMultiline(TileShapes.ToPixels(lines, px), Palette.Zone(zone) with { A = 0.45f }, 1);
+        _outline.DrawMultiline(TileShapes.ToPixels(TileShapes.Outline(tile), px), Palette.TileBorder, 2);
+    }
+
     void DrawGround(TileGrid grid)
     {
         var mm = _ground.Multimesh;
@@ -197,15 +253,8 @@ public partial class TileView : Node2D
             return;
         }
 
-        mm.InstanceCount = grid.Width * grid.Height;
-        for (int y = 0, i = 0; y < grid.Height; y++)
-        {
-            for (int x = 0; x < grid.Width; x++, i++)
-            {
-                mm.SetInstanceTransform2D(i, Rect(x, y, 1, 1, 0, 0));
-                mm.SetInstanceColor(i, ((x + y) & 1) == 0 ? Palette.Ground : Palette.GroundAlt);
-            }
-        }
+        // No ground sprite: the terrain colours are the ground.
+        mm.InstanceCount = 0;
     }
 
     /// <summary>Deposit cells show the item's sprite on the ground, or a flat colour if the item has none.</summary>

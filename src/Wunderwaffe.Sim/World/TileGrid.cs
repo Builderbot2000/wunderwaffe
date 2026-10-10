@@ -28,12 +28,18 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int x, int y, int wi
 }
 
 /// <summary>
-/// A tile's local map (FB-001): which building occupies each cell and which deposit lies under it.
+/// A tile's local map (FB-001): which building occupies each cell and which deposit lies under it. It covers the
+/// tile's bounding box in the world map; cells of the box that belong to other tiles are outside the tile
+/// (<see cref="InBounds(int, int)"/> is false) and are kept only to draw the land around it.
 /// </summary>
 public sealed class TileGrid
 {
     readonly int[] _cells;
     readonly string?[] _deposits;
+    readonly bool[] _mask;
+    readonly bool[] _buildable;
+    readonly byte[] _terrain;
+    int[] _zones;
 
     // Index = building id. Slot 0 is unused so a cell value of 0 means empty. Removed slots stay null,
     // which keeps ids and iteration order deterministic.
@@ -46,8 +52,29 @@ public sealed class TileGrid
     readonly List<PlacedBuilding> _importPorts = [];
     readonly bool[] _frames;
 
+    /// <summary>A rectangular tile of buildable ground with no port zones.</summary>
     public TileGrid(int width, int height)
+        : this(width, height, Filled(width * height, true), Filled(width * height, true), new byte[width * height])
     {
+    }
+
+    /// <param name="mask">Which cells of the box are part of the tile.</param>
+    /// <param name="buildable">Which cells of the tile have ground buildings may stand on.</param>
+    /// <param name="terrain">Terrain index of every cell of the box, inside the tile or not.</param>
+    internal TileGrid(int width, int height, bool[] mask, bool[] buildable, byte[] terrain)
+    {
+        _mask = mask;
+        _buildable = buildable;
+        _terrain = terrain;
+        _zones = Filled(width * height, -1);
+        for (int i = 0; i < mask.Length; i++)
+        {
+            if (!mask[i])
+                continue;
+            Area++;
+            if (buildable[i])
+                BuildableCount++;
+        }
         Width = width;
         Height = height;
         _cells = new int[width * height];
@@ -55,8 +82,23 @@ public sealed class TileGrid
         _frames = new bool[width * height];
     }
 
+    static T[] Filled<T>(int n, T value)
+    {
+        var a = new T[n];
+        Array.Fill(a, value);
+        return a;
+    }
+
+    /// <summary>Size of the bounding box.</summary>
     public int Width { get; }
     public int Height { get; }
+
+    /// <summary>Cells that are part of the tile.</summary>
+    public int Area { get; }
+
+    /// <summary>Cells of the tile whose terrain takes buildings.</summary>
+    public int BuildableCount { get; }
+
     public int BuildingCount { get; private set; }
 
     public IReadOnlyList<PlacedBuilding> Belts => _belts;
@@ -85,9 +127,31 @@ public sealed class TileGrid
         }
     }
 
-    public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
+    /// <summary>Inside the bounding box. The cell may still belong to another tile; see <see cref="InBounds(int, int)"/>.</summary>
+    public bool InRect(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
-    public bool HasFrame(int x, int y) => InBounds(x, y) && _frames[y * Width + x];
+    /// <summary>A cell of this tile.</summary>
+    public bool InBounds(int x, int y) => InRect(x, y) && _mask[y * Width + x];
+
+    /// <summary>A cell of this tile whose terrain takes buildings (FB-002).</summary>
+    public bool Buildable(int x, int y) => InBounds(x, y) && _buildable[y * Width + x];
+
+    /// <summary>Terrain index (into <c>ContentDb.TerrainList</c>) of any cell of the box, or 0 outside it.</summary>
+    public int TerrainAt(int x, int y) => InRect(x, y) ? _terrain[y * Width + x] : 0;
+
+    /// <summary>
+    /// The neighbouring tile whose I/O zone this cell is in, or -1 (IO-001). A port placed here links to that tile.
+    /// </summary>
+    public int ZoneAt(int x, int y) => InBounds(x, y) ? _zones[y * Width + x] : -1;
+
+    internal void SetZones(int[] zones)
+    {
+        _zones = zones;
+        Revision++;
+    }
+
+    // Frames and buildings only ever go on cells of the tile, so the cheaper box check is enough here.
+    public bool HasFrame(int x, int y) => InRect(x, y) && _frames[y * Width + x];
 
     internal void SetFrame(int x, int y, bool on)
     {
@@ -119,9 +183,37 @@ public sealed class TileGrid
     }
 
     public PlacedBuilding? BuildingAt(int x, int y) =>
-        InBounds(x, y) ? _buildings[_cells[y * Width + x]] : null;
+        InRect(x, y) ? _buildings[_cells[y * Width + x]] : null;
 
-    public bool InBounds(int x, int y, int w, int h) => x >= 0 && y >= 0 && x + w <= Width && y + h <= Height;
+    /// <summary>Every cell of the footprint is part of this tile.</summary>
+    public bool InBounds(int x, int y, int w, int h)
+    {
+        if (x < 0 || y < 0 || x + w > Width || y + h > Height)
+            return false;
+        for (int cy = y; cy < y + h; cy++)
+        {
+            for (int cx = x; cx < x + w; cx++)
+            {
+                if (!_mask[cy * Width + cx])
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>Every cell of the footprint is buildable ground. Assumes it is in bounds.</summary>
+    public bool Buildable(int x, int y, int w, int h)
+    {
+        for (int cy = y; cy < y + h; cy++)
+        {
+            for (int cx = x; cx < x + w; cx++)
+            {
+                if (!_buildable[cy * Width + cx])
+                    return false;
+            }
+        }
+        return true;
+    }
 
     public bool IsFree(int x, int y, int w, int h)
     {

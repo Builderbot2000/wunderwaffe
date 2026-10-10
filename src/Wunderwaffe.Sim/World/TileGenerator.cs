@@ -6,13 +6,22 @@ namespace Wunderwaffe.Sim.World;
 /// <summary>Seeded deposit layout for a tile's local map (WM-002, WM-009).</summary>
 public static class TileGenerator
 {
+    /// <summary>Patches of each item on a tile of <see cref="Simulation.DefaultTileSize"/> squared buildable cells.</summary>
     const int PatchesPerItem = 6;
     const int MinRadius = 3;
     const int MaxRadius = 7;
 
+    /// <summary>
+    /// Lays circular deposit patches on the tile's buildable ground. The number of patches follows the buildable
+    /// area, and each patch's centre is drawn in proportion to the terrain's weight for the item in
+    /// <c>terrain.json</c>, falling back to any buildable cell when no terrain on the tile carries it.
+    /// </summary>
     /// <param name="exclude">Minable items this tile has no deposits of (RS-003).</param>
     public static void GenerateDeposits(TileGrid grid, ContentDb content, Rng rng, IReadOnlySet<string>? exclude = null)
     {
+        if (grid.BuildableCount == 0)
+            return;
+
         // Anything some building can extract is a deposit. Sorted so the same seed gives the same map.
         var minable = content.Recipes.Values
             .Where(r => r.Inputs.Count == 0)
@@ -22,23 +31,66 @@ public static class TileGenerator
             .Order(StringComparer.Ordinal)
             .ToList();
 
+        const long nominal = (long)Simulation.DefaultTileSize * Simulation.DefaultTileSize;
+        int patches = (int)Math.Max(1, (PatchesPerItem * grid.BuildableCount + nominal / 2) / nominal);
+        var weights = new long[grid.Width * grid.Height];
+
         foreach (var item in minable)
         {
-            for (int p = 0; p < PatchesPerItem; p++)
+            long total = 0;
+            for (int y = 0; y < grid.Height; y++)
             {
-                int cx = rng.Range(0, grid.Width);
-                int cy = rng.Range(0, grid.Height);
+                for (int x = 0; x < grid.Width; x++)
+                {
+                    long w = grid.Buildable(x, y) ? content.TerrainList[grid.TerrainAt(x, y)].DepositWeight(item) : 0;
+                    total += w;
+                    weights[y * grid.Width + x] = total;
+                }
+            }
+            bool uniform = total == 0;
+            if (uniform)
+            {
+                for (int y = 0; y < grid.Height; y++)
+                {
+                    for (int x = 0; x < grid.Width; x++)
+                    {
+                        total += grid.Buildable(x, y) ? 1 : 0;
+                        weights[y * grid.Width + x] = total;
+                    }
+                }
+            }
+
+            for (int p = 0; p < patches; p++)
+            {
+                long pick = (long)(rng.Next() % (ulong)total);
+                int c = UpperBound(weights, pick);
+                int cx = c % grid.Width, cy = c / grid.Width;
                 int r = rng.Range(MinRadius, MaxRadius + 1);
                 for (int y = cy - r; y <= cy + r; y++)
                 {
                     for (int x = cx - r; x <= cx + r; x++)
                     {
                         int dx = x - cx, dy = y - cy;
-                        if (grid.InBounds(x, y) && dx * dx + dy * dy <= r * r)
+                        if (grid.Buildable(x, y) && dx * dx + dy * dy <= r * r)
                             grid.SetDeposit(x, y, item);
                     }
                 }
             }
         }
+    }
+
+    /// <summary>The first index whose running total is above <paramref name="pick"/>.</summary>
+    static int UpperBound(long[] running, long pick)
+    {
+        int lo = 0, hi = running.Length - 1;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) / 2;
+            if (running[mid] > pick)
+                hi = mid;
+            else
+                lo = mid + 1;
+        }
+        return lo;
     }
 }

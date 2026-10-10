@@ -5,6 +5,7 @@ using Xunit.Abstractions;
 
 namespace Wunderwaffe.Sim.Tests;
 
+[Collection(TimingCollection.Name)]
 public class SaveTests(ITestOutputHelper output)
 {
     const int Me = 0;
@@ -16,8 +17,12 @@ public class SaveTests(ITestOutputHelper output)
     static Simulation Session()
     {
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
-        var home = sim.TileAt(2, 2)!;
-        var east = sim.TileAt(3, 2)!;
+        var home = sim.Tiles[sim.StartTileId];
+        var east = sim.Neighbors(home).First(n => n.Grid.BuildableCount * 2 > n.Grid.Area);
+        // Home's shape and terrain depend on the seed, so build on the first open ground: belts on its top row, the
+        // unit three rows down.
+        var (x0, y0) = Harness.Open(home, 12, 6);
+        int ux = x0, uy = y0 + 3;
         void At(int seconds, params Command[] commands)
         {
             while (sim.Tick < seconds * Simulation.TicksPerSecond)
@@ -28,15 +33,15 @@ public class SaveTests(ITestOutputHelper output)
 
         At(0, new DebugGrantCommand(Me, home.Id, "copper_ore", 500), new DebugGrantCommand(Me, home.Id, "steel", 50),
             new DebugGrantCommand(Me, home.Id, "iron_plate", 50), new DebugGrantCommand(Me, home.Id, "copper_plate", 50));
-        At(1, Enumerable.Range(0, 10).Select(i => (Command)new PlaceBuildingCommand(Me, home.Id, "conveyor", 30 + i, 30)).ToArray());
-        At(2, new RemoveBuildingCommand(Me, home.Id, 35, 30), new ClaimTileCommand(Me, east.Id));
+        At(1, Enumerable.Range(0, 10).Select(i => (Command)new PlaceBuildingCommand(Me, home.Id, "conveyor", x0 + i, y0)).ToArray());
+        At(2, new RemoveBuildingCommand(Me, home.Id, x0 + 5, y0), new ClaimTileCommand(Me, east.Id));
         At(3, new DebugUnlockCommand(Me, "propulsion"),
-            new PlaceFrameCommand(Me, home.Id, 20, 20), new PlaceFrameCommand(Me, home.Id, 21, 20), new PlaceFrameCommand(Me, home.Id, 22, 20),
-            new PlaceFrameCommand(Me, home.Id, 23, 20), new RemoveFrameCommand(Me, home.Id, 23, 20));
-        At(4, new PlaceBuildingCommand(Me, home.Id, "thruster", 20, 20), new PlaceBuildingCommand(Me, home.Id, "unit_core", 21, 20),
-            new PlaceBuildingCommand(Me, home.Id, "thruster", 22, 20));
-        At(5, new ActivateUnitCommand(Me, home.Id, 21, 20));
-        At(6, new MoveUnitsCommand(Me, [1], home.Id, 40, 20));
+            new PlaceFrameCommand(Me, home.Id, ux, uy), new PlaceFrameCommand(Me, home.Id, ux + 1, uy), new PlaceFrameCommand(Me, home.Id, ux + 2, uy),
+            new PlaceFrameCommand(Me, home.Id, ux + 3, uy), new RemoveFrameCommand(Me, home.Id, ux + 3, uy));
+        At(4, new PlaceBuildingCommand(Me, home.Id, "thruster", ux, uy), new PlaceBuildingCommand(Me, home.Id, "unit_core", ux + 1, uy),
+            new PlaceBuildingCommand(Me, home.Id, "thruster", ux + 2, uy));
+        At(5, new ActivateUnitCommand(Me, home.Id, ux + 1, uy));
+        At(6, new MoveUnitsCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY));
         At(20, new DeployUnitCommand(Me, 1));
         At(30);
         return sim;
@@ -118,7 +123,7 @@ public class SaveTests(ITestOutputHelper output)
         // NF-002 wants loads well under a few seconds. A save replays every tick, so time a 10-minute session with
         // a working factory and extrapolate.
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
-        var home = sim.TileAt(2, 2)!;
+        var home = sim.Tiles[sim.StartTileId];
         sim.Enqueue(new DebugGrantCommand(Me, home.Id, "copper_ore", 100_000));
         sim.Enqueue(new DebugGrantCommand(Me, home.Id, "iron_ore", 100_000));
         int placed = 0;

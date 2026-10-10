@@ -5,10 +5,19 @@ using Xunit.Abstractions;
 namespace Wunderwaffe.Sim.Tests;
 
 /// <summary>NF-001 budget checks. Every tile runs the entity sim for now; rate mode (FB-012) will cut this later.</summary>
+[Collection(TimingCollection.Name)]
 public class StressTests(ITestOutputHelper output)
 {
     const int Tiles = 8;
     const int BuildingsPerTile = 2000;
+
+    /// <summary>Starts a measurement from a clean heap, so garbage from earlier tests (generated worlds are large) isn't counted.</summary>
+    static void Settle()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
 
     [Fact]
     public void EightTilesOfTwoThousandBuildingsStayWithinTickBudget()
@@ -47,6 +56,7 @@ public class StressTests(ITestOutputHelper output)
         Assert.All(sim.Tiles, t => Assert.True(t.Grid.BuildingCount > BuildingsPerTile, $"tile {t.Id}: {t.Grid.BuildingCount}"));
 
         const int ticks = 600;
+        Settle();
         var run = Stopwatch.StartNew();
         for (int i = 0; i < ticks; i++)
             sim.Step();
@@ -85,6 +95,7 @@ public class StressTests(ITestOutputHelper output)
             sim.Step();
 
         const int ticks = 600;
+        Settle();
         var run = Stopwatch.StartNew();
         for (int i = 0; i < ticks; i++)
             sim.Step();

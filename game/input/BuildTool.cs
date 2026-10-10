@@ -45,6 +45,9 @@ public partial class BuildTool : Node2D
     /// <summary>The placement check for the picked tool at the hovered cell.</summary>
     public PlaceResult Preview => _preview;
 
+    /// <summary>The neighbour whose I/O zone the hovered cell is in, or -1.</summary>
+    public int HoveredZone { get; private set; } = -1;
+
     /// <summary>True while a building is picked. Otherwise the mouse belongs to <see cref="UnitTool"/>.</summary>
     public bool HasTool => _selected >= 0;
 
@@ -121,6 +124,7 @@ public partial class BuildTool : Node2D
         Vector2I cell = HoveredCell();
         var tile = _host.ViewedTile;
         bool overUi = OverUi();
+        HoveredZone = tile.Grid.ZoneAt(cell.X, cell.Y);
 
         if (_selected >= 0)
         {
@@ -175,20 +179,31 @@ public partial class BuildTool : Node2D
         !_tools[_selected].IsFrame
         && _host.Sim.Content.Buildings[_tools[_selected].BuildingId].Kind is BuildingKind.ExportPort or BuildingKind.ImportPort;
 
-    /// <summary>Shades the strip along the edge the port would face, where it can be placed (IO-001).</summary>
+    /// <summary>
+    /// Shades every I/O zone, where ports can go, in its neighbour's colour, the hovered one brighter, each labelled
+    /// with the tile it links to (IO-001).
+    /// </summary>
     void DrawPortZone(float px)
     {
-        var grid = _host.ViewedTile.Grid;
-        int depth = PortRules.ZoneDepth;
-        var zone = PortRules.SideOf(_rotation) switch
+        var tile = _host.ViewedTile;
+        foreach (var run in TileShapes.ZoneRuns(tile))
         {
-            Direction.North => new Rect2(0, 0, grid.Width, depth),
-            Direction.South => new Rect2(0, grid.Height - depth, grid.Width, depth),
-            Direction.West => new Rect2(0, 0, depth, grid.Height),
-            _ => new Rect2(grid.Width - depth, 0, depth, grid.Height),
-        };
-        DrawRect(new Rect2(zone.Position * px, zone.Size * px), Palette.PortZone);
+            var color = Palette.Zone(run.Zone) with { A = run.Zone == HoveredZone ? 0.35f : 0.16f };
+            DrawRect(new Rect2(run.X * px, run.Y * px, run.Length * px, px), color);
+        }
+        var font = ThemeDB.FallbackFont;
+        foreach (var zone in TileShapes.Zones(tile))
+        {
+            var to = _host.Sim.Tiles[zone.Neighbor];
+            string text = $"→ {to.Name}";
+            var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, ZoneFontSize);
+            var at = zone.Label * px - size / 2 + new Vector2(0, size.Y * 0.75f);
+            DrawRect(new Rect2(at - new Vector2(4, size.Y * 0.8f), size + new Vector2(8, 4)), new Color(0, 0, 0, 0.6f));
+            DrawString(font, at, text, HorizontalAlignment.Left, -1, ZoneFontSize, Palette.Zone(zone.Neighbor));
+        }
     }
+
+    const int ZoneFontSize = 14;
 
     public Vector2I HoveredCell()
     {
@@ -208,6 +223,6 @@ public partial class BuildTool : Node2D
         return (cell.X - (w - 1) / 2, cell.Y - (h - 1) / 2, w, h);
     }
 
-    /// <summary>True if the picked tool is an import or export port, which face a tile edge.</summary>
+    /// <summary>True if the picked tool is an import or export port, which go in an I/O zone.</summary>
     public bool SelectedIsPortTool() => _selected >= 0 && SelectedIsPort();
 }

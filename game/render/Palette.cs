@@ -14,21 +14,31 @@ public static class Palette
     public const int CellPx = 16;
 
     public static readonly Color Ground = new(0.16f, 0.17f, 0.19f);
-    public static readonly Color GroundAlt = new(0.18f, 0.19f, 0.21f);
     public static readonly Color Frame = new(0.35f, 0.75f, 0.95f, 0.35f);
     public static readonly Color GhostOk = new(0.3f, 0.9f, 0.4f, 0.45f);
-    public static readonly Color PortZone = new(0.3f, 0.75f, 1f, 0.14f);
     public static readonly Color GhostBad = new(0.95f, 0.25f, 0.25f, 0.45f);
     static readonly Color Core = new(0.95f, 0.8f, 0.3f);
 
+    /// <summary>Outline of a tile's border on its local map, and the dimming over land beyond it.</summary>
+    public static readonly Color TileBorder = new(1f, 0.95f, 0.75f, 0.9f);
+    public static readonly Color Beyond = new(0f, 0f, 0f, 0.55f);
+
     static readonly Dictionary<string, Color> Deposits = [];
     static readonly Dictionary<string, Color> Buildings = [];
+    static Color[] _terrain = [];
 
     public static void Init(ContentDb content)
     {
         Spread(content.Items.Keys, Deposits, saturation: 0.55f, value: 0.5f);
         Spread(content.Buildings.Keys, Buildings, saturation: 0.45f, value: 0.9f);
+        _terrain = content.TerrainList.Select(t => Color.FromHtml(t.Color)).ToArray();
     }
+
+    /// <summary>A terrain's colour from <c>terrain.json</c>, by index.</summary>
+    public static Color Terrain(int index) => index >= 0 && index < _terrain.Length ? _terrain[index] : Colors.Magenta;
+
+    /// <summary>A neighbouring tile's I/O zone colour: hues spread by its id so adjacent zones differ.</summary>
+    public static Color Zone(int neighborId) => Color.FromHsv((0.12f + neighborId * 0.618034f) % 1f, 0.7f, 1f);
 
     /// <summary>A unit's body colour: its owner's hue, brighter than the world map's tile colour.</summary>
     public static Color Unit(int owner) => Color.FromHsv((0.45f + owner * 0.618034f) % 1f, 0.6f, 1f);
