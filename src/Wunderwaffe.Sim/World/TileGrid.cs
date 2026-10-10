@@ -33,6 +33,7 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     public MachineState? Machine { get; } =
         def.Kind is BuildingKind.Machine or BuildingKind.ImportPort ? new MachineState(recipe) : null;
     public ExportState? Export { get; } = def.Kind == BuildingKind.ExportPort ? new ExportState() : null;
+    public FactoryState? Factory { get; } = def.Kind == BuildingKind.UnitFactory ? new FactoryState() : null;
 }
 
 /// <summary>
@@ -58,6 +59,7 @@ public sealed class TileGrid
     readonly List<PlacedBuilding> _machines = [];
     readonly List<PlacedBuilding> _exportPorts = [];
     readonly List<PlacedBuilding> _importPorts = [];
+    readonly List<PlacedBuilding> _factories = [];
     readonly bool[] _frames;
 
     /// <summary>A rectangular tile of buildable ground with no port zones.</summary>
@@ -116,6 +118,9 @@ public sealed class TileGrid
 
     public IReadOnlyList<PlacedBuilding> ExportPorts => _exportPorts;
     public IReadOnlyList<PlacedBuilding> ImportPorts => _importPorts;
+
+    /// <summary>Unit factories (UD-006), in id order.</summary>
+    public IReadOnlyList<PlacedBuilding> Factories => _factories;
 
     /// <summary>Cells carrying a unit frame (the floor a unit is built on).</summary>
     public int FrameCount { get; private set; }
@@ -262,6 +267,7 @@ public sealed class TileGrid
         BuildingKind.Machine => _machines,
         BuildingKind.ExportPort => _exportPorts,
         BuildingKind.ImportPort => _importPorts,
+        BuildingKind.UnitFactory => _factories,
         _ => null,
     };
 

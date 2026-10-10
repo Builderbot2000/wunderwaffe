@@ -191,6 +191,9 @@ internal static class TileEntities
             case BuildingKind.ExportPort:
                 return Send(sim, tile, target, item);
 
+            case BuildingKind.UnitFactory:
+                return UnitFactory.TryInsert(target, item);
+
             default:
                 return false;
         }
@@ -285,5 +288,7 @@ internal static class TileEntities
             foreach (var s in link.InFlight)
                 inv.Add(s.ItemId, 1);
         }
+        if (b.Factory is { } factory)
+            UnitFactory.Drain(tile, factory);
     }
 }

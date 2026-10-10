@@ -118,6 +118,25 @@ internal sealed class StateHash
                 Mix(s.ItemId);
             }
         }
+        if (b.Factory is { } f)
+        {
+            Mix(f.OX);
+            Mix(f.OY);
+            Mix(f.Steps.Count);
+            foreach (var step in f.Steps)
+            {
+                Mix(step.Block);
+                Mix(step.X);
+                Mix(step.Y);
+                Mix(step.Block < 0 ? null : f.Projected!.Blocks[step.Block].DefId);
+                Mix(step.Block < 0 ? 0 : f.Projected!.Blocks[step.Block].Rotation);
+            }
+            Mix(f.Next);
+            Mix(f.Working ? f.Progress + 1 : 0);
+            Mix(f.Buffer);
+            Mix((int)f.Status);
+            Mix(f.Built);
+        }
     }
 
     void MixPlayer(PlayerState p)
@@ -163,5 +182,7 @@ internal sealed class StateHash
         {
             Mix(-1);
         }
+        Mix(u.UpkeepDue);
+        Mix(u.Unsupplied ? 1 : 0);
     }
 }

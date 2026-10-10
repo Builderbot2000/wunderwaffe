@@ -7,5 +7,6 @@
   { "id": "export_port", "name": "Export Port", "kind": "export_port", "width": 1, "height": 1, "power": 0,  "hp": 80, "cost": { "copper_ore": 5 } },
   { "id": "import_port", "name": "Import Port", "kind": "import_port", "width": 1, "height": 1, "power": 0,  "hp": 80, "cost": { "copper_ore": 5 } },
   { "id": "unit_core", "name": "Unit Core", "kind": "unit_core", "width": 1, "height": 1, "power": 0, "hp": 300, "cost": { "copper_plate": 10, "steel": 5 } },
-  { "id": "thruster", "name": "Thruster", "kind": "thruster", "thrust": 60, "width": 1, "height": 1, "power": 0, "hp": 120, "cost": { "iron_plate": 10, "steel": 5 } }
+  { "id": "thruster", "name": "Thruster", "kind": "thruster", "thrust": 60, "width": 1, "height": 1, "power": 0, "hp": 120, "cost": { "iron_plate": 10, "steel": 5 } },
+  { "id": "unit_factory", "name": "Unit Factory", "kind": "unit_factory", "category": "factory", "radius": 6, "blockCap": 16, "width": 3, "height": 3, "power": 10, "hp": 800, "cost": { "iron_plate": 30, "copper_plate": 20, "steel": 10 } }
 ]
