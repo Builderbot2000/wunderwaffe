@@ -19,18 +19,8 @@ public partial class MachineStatusView : Node2D
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
-        _host.ViewChanged += OnViewChanged;
-        OnViewChanged();
-    }
-
-    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
-
-    void OnViewChanged()
-    {
-        bool shown = _host.View == ViewMode.Tile;
-        Visible = shown;
-        ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+        _host = SimHost.Instance;
+        _host.ShowOnlyIn(this, ViewMode.Tile);
     }
 
     public override void _Process(double delta) => QueueRedraw();

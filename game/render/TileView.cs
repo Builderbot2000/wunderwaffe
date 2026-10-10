@@ -42,9 +42,8 @@ public partial class TileView : Node2D
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
-        _host.ViewChanged += OnViewChanged;
-        OnViewChanged();
+        _host = SimHost.Instance;
+        _host.ShowOnlyIn(this, ViewMode.Tile);
         _terrain = new Sprite2D
         {
             Name = "Terrain",
@@ -64,15 +63,6 @@ public partial class TileView : Node2D
         _itemSprites = AddGroup("ItemSprites");
         _outline = AddGroup("Outline");
         _outline.Draw += DrawOutline;
-    }
-
-    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
-
-    void OnViewChanged()
-    {
-        bool shown = _host.View == ViewMode.Tile;
-        Visible = shown;
-        ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
     }
 
     public override void _Process(double delta)
@@ -368,6 +358,10 @@ public partial class TileView : Node2D
         foreach (var child in group.GetChildren())
             ((MultiMeshInstance2D)child).Multimesh.InstanceCount = 0;
     }
+
+    /// <summary>The tile-local cell under a point of the tile view, in its canvas coordinates.</summary>
+    public static Vector2I CellAt(Vector2 world) =>
+        new(Mathf.FloorToInt(world.X / Palette.CellPx), Mathf.FloorToInt(world.Y / Palette.CellPx));
 
     /// <summary>
     /// Transform that maps the unit quad onto a cell rectangle, shrunk by <paramref name="inset"/> cells and turned

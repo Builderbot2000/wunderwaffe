@@ -19,6 +19,7 @@
 | `game/render/` | Drawing. One MultiMesh per layer; redraws only when the grid's `Revision` changes. |
 | `game/input/` | Camera, build tool, default key bindings. |
 | `game/ui/` | Title screen, HUD, pause menu, settings, saves. Built in code from `Ui` helpers, not in .tscn files. |
+| `game/debug/` | Debug tooling: cheats, stress benchmark, scripted `--drive` and `--tour` runs. |
 | `game/data/*.json` | Content: items, recipes, buildings, tech, goals, terrain. |
 
 ## Playing
@@ -35,6 +36,7 @@ In game, **Tab** switches between the world map and the last tile you viewed. Th
 
 - The sim only changes through `Command`s (lockstep multiplayer, replays — NF-004).
 - No `float`/`double` in sim state; no Godot types in `src/`.
+- Economy tuning not yet in JSON (starting items, claim cost, frame cost, refunds) is in `Balance.cs`.
 - Every tile currently runs the full entity sim. Rate mode for unviewed tiles (FB-012/013/014) is not built yet: it will be derived from the belt graph (OQ-14) and checked against the full sim.
 
 ## World
@@ -71,7 +73,7 @@ A unit is a group of buildings standing on **frame** (key `0` in the build palet
 
 ## Content notes
 
-- `terrain.json` lists terrains in classification order: a generated cell gets the first whose `elevation` and `moisture` bands (0-1000, inclusive) contain it; sea level is 400. `buildable` gates placement and frames; `water` marks coasts and ocean; `river` marks the terrain used for river cells (buildable for now, so rivers don't cut tiles up); `deposits` weights where each ore's patches are centred. `unitPassable` is stored but unused until locomotion types exist (UD-004). Content validation checks every elevation and moisture is covered.
+- `terrain.json` lists terrains in classification order: a generated cell gets the first whose `elevation` and `moisture` bands (0-1000, inclusive) contain it; sea level is 400. `buildable` gates placement and frames; `water` marks coasts and ocean; `river` marks the terrain used for river cells (buildable for now, so rivers don't cut tiles up); `deposits` weights where each ore's patches are centred. Content validation checks every elevation and moisture is covered.
 
 - Item `tier`: 1 raw, 2 refined, 3 advanced, 4 exotic. A recipe can't output an item more than one tier above its best input (RS-001).
 - Recipe `ticks` are at 60 ticks/second. A recipe with empty `inputs` is extraction.

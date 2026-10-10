@@ -57,7 +57,7 @@ public sealed record ClaimTileCommand(int Player, int TileId) : Command(Player)
     internal override void Apply(Simulation sim) => sim.TryClaim(Player, TileId);
 }
 
-/// <summary>Lays a unit frame on a cell, paying <see cref="UnitAssembly.FrameCost"/>. Frames go under buildings too.</summary>
+/// <summary>Lays a unit frame on a cell, paying <see cref="Balance.FrameCost"/>. Frames go under buildings too.</summary>
 public sealed record PlaceFrameCommand(int Player, int TileId, int X, int Y) : Command(Player)
 {
     internal override void Apply(Simulation sim)

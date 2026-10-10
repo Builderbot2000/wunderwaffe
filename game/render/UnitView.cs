@@ -19,18 +19,8 @@ public partial class UnitView : Node2D
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
-        _host.ViewChanged += OnViewChanged;
-        OnViewChanged();
-    }
-
-    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
-
-    void OnViewChanged()
-    {
-        bool shown = _host.View == ViewMode.Tile;
-        Visible = shown;
-        ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+        _host = SimHost.Instance;
+        _host.ShowOnlyIn(this, ViewMode.Tile);
     }
 
     public override void _Process(double delta) => QueueRedraw();
@@ -72,7 +62,7 @@ public partial class UnitView : Node2D
         if (!_cellBlocks.TryGetValue(u.Id, out var blocks))
             _cellBlocks[u.Id] = blocks = BlockPerCell(u);
 
-        var outline = Palette.Unit(u.Owner);
+        var outline = Palette.Owner(u.Owner);
         var body = new Transform2D(u.Angle * Mathf.Tau / Trig.Turn, pos);
         DrawSetTransformMatrix(body);
         var frameTex = Sprites.Get(Sprites.Frame);

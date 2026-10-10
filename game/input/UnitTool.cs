@@ -21,7 +21,7 @@ public partial class UnitTool : Node2D
     static readonly Color BoxFill = new(1f, 1f, 1f, 0.12f);
     static readonly Color BoxLine = new(1f, 1f, 1f, 0.8f);
 
-    [Export] public BuildTool? BuildTool;
+    [Export] public BuildTool BuildTool = null!;
 
     SimHost _host = null!;
     Vector2? _dragStart;
@@ -31,15 +31,11 @@ public partial class UnitTool : Node2D
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
-        _host.ViewChanged += OnViewChanged;
+        _host = SimHost.Instance;
+        _host.WatchView(this, () => _dragStart = null);
     }
 
-    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
-
-    void OnViewChanged() => _dragStart = null;
-
-    bool Active => _host.View == ViewMode.World || BuildTool is not { HasTool: true };
+    bool Active => _host.View == ViewMode.World || !BuildTool.HasTool;
 
     public override void _UnhandledInput(InputEvent e)
     {
@@ -107,7 +103,7 @@ public partial class UnitTool : Node2D
         var sim = _host.Sim;
         int mine = sim.Units.Count(u => u.Owner == _host.LocalPlayer);
         string line = $"Units {mine}  selected {_host.Selected.Count}";
-        if (_host.View != ViewMode.Tile || BuildTool is not { HasTool: false })
+        if (_host.View != ViewMode.Tile || BuildTool.HasTool)
             return line;
 
         var cell = HoveredCell();
@@ -159,10 +155,9 @@ public partial class UnitTool : Node2D
     {
         if (_host.Selected.Count == 0)
             return;
-        var p = GetGlobalMousePosition() / Palette.CellPx;
-        var tile = _host.ViewedTile;
+        var cell = HoveredCell();
         // The cell may be past the tile's border; the sim maps it onto the tile it falls in.
-        if (_host.Sim.ResolveCell(tile, Mathf.FloorToInt(p.X), Mathf.FloorToInt(p.Y)) is not { } target)
+        if (_host.Sim.ResolveCell(_host.ViewedTile, cell.X, cell.Y) is not { } target)
             return;
         Send(target.Tile.Id, target.X, target.Y);
     }
@@ -180,11 +175,7 @@ public partial class UnitTool : Node2D
     void Send(int tileId, int x, int y) =>
         _host.Sim.Enqueue(new MoveUnitsCommand(_host.LocalPlayer, [.. _host.Selected.Order()], tileId, x, y));
 
-    Vector2I HoveredCell()
-    {
-        var p = GetGlobalMousePosition() / Palette.CellPx;
-        return new Vector2I(Mathf.FloorToInt(p.X), Mathf.FloorToInt(p.Y));
-    }
+    Vector2I HoveredCell() => TileView.CellAt(GetGlobalMousePosition());
 
     /// <summary>G over a unit core lifts its blocks off; otherwise it lands the selected units.</summary>
     void ToggleUnit()

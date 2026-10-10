@@ -1,8 +1,6 @@
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 using Wunderwaffe.Game.Render;
-using Wunderwaffe.Sim.Content;
 
 namespace Wunderwaffe.Game.Screens;
 
@@ -151,12 +149,6 @@ public static class Ui
         }
         return row;
     }
-
-    /// <summary>"10 Copper Ore, 5 Iron Ore".</summary>
-    public static string Cost(ContentDb content, IEnumerable<KeyValuePair<string, int>> items) =>
-        items.Any() ? string.Join(", ", items.Select(kv => $"{kv.Value} {ItemName(content, kv.Key)}")) : "free";
-
-    public static string ItemName(ContentDb content, string id) => content.Items.TryGetValue(id, out var i) ? i.Name : id;
 
     /// <summary>Anchors <paramref name="c"/> to a corner or edge of its parent, growing away from that edge.</summary>
     public static T Pin<T>(T c, Control.LayoutPreset preset, int margin = 16) where T : Control

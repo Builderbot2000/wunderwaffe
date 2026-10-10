@@ -64,16 +64,6 @@ public class WorldTests
     }
 
     [Fact]
-    public void OwnershipStatesFollowOwnerAndContested()
-    {
-        var (sim, home) = NewWorld();
-        Assert.Equal(TileOwnership.Owned, home.Ownership);
-        Assert.Equal(TileOwnership.Unclaimed, At(sim, 0, 0).Ownership);
-        home.Contested = true;
-        Assert.Equal(TileOwnership.Contested, home.Ownership);
-    }
-
-    [Fact]
     public void StartingTileCannotBeSettledTwice()
     {
         var (sim, home) = NewWorld();
@@ -91,10 +81,10 @@ public class WorldTests
         sim.Step();
 
         Assert.Equal(Me, target.Owner);
-        Assert.Equal(copper - Simulation.ClaimCost["copper_ore"], home.Inventory.Get("copper_ore"));
-        Assert.Equal(iron - Simulation.ClaimCost["iron_ore"], home.Inventory.Get("iron_ore"));
+        Assert.Equal(copper - Balance.ClaimCost["copper_ore"], home.Inventory.Get("copper_ore"));
+        Assert.Equal(iron - Balance.ClaimCost["iron_ore"], home.Inventory.Get("iron_ore"));
         Assert.Equal(1, target.Grid.BuildingCount); // The core.
-        Assert.Equal(Simulation.ClaimedTileItems["copper_ore"], target.Inventory.Get("copper_ore"));
+        Assert.Equal(Balance.ClaimedTileItems["copper_ore"], target.Inventory.Get("copper_ore"));
     }
 
     [Fact]
@@ -140,7 +130,7 @@ public class WorldTests
     }
 
     [Fact]
-    public void RefusesClaimsWhenOwnedContestedOrUnaffordable()
+    public void RefusesClaimsWhenOwnedOrUnaffordable()
     {
         var (sim, home) = NewWorld();
         var target = At(sim, 1, 0);
@@ -148,10 +138,6 @@ public class WorldTests
         Assert.Equal(ClaimResult.AlreadyOwned, Expansion.Check(sim, Me, home.Id, out _));
         Assert.Equal(ClaimResult.AlreadyOwned, Expansion.Check(sim, Them, home.Id, out _));
         Assert.Equal(ClaimResult.NotAdjacent, Expansion.Check(sim, Them, target.Id, out _));
-
-        target.Contested = true;
-        Assert.Equal(ClaimResult.Contested, Expansion.Check(sim, Me, target.Id, out _));
-        target.Contested = false;
 
         home.Inventory.TryTake(new Dictionary<string, int> { ["copper_ore"] = (int)home.Inventory.Get("copper_ore") });
         Assert.Equal(ClaimResult.CannotAfford, Expansion.Check(sim, Me, target.Id, out _));
@@ -177,12 +163,12 @@ public class WorldTests
     }
 
     [Fact]
-    public void StateHashSeesOwnershipAndContested()
+    public void StateHashSeesOwnership()
     {
         var (a, _) = NewWorld();
         var (b, _) = NewWorld();
         Assert.Equal(a.StateHash(), b.StateHash());
-        At(b, 0, 0).Contested = true;
+        At(b, 0, 0).Owner = Them;
         Assert.NotEqual(a.StateHash(), b.StateHash());
     }
 }

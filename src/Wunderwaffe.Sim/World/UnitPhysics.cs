@@ -1,4 +1,5 @@
 using Wunderwaffe.Sim.Content;
+using static Wunderwaffe.Sim.Core.IntMath;
 
 namespace Wunderwaffe.Sim.World;
 
@@ -374,18 +375,4 @@ internal static class UnitPhysics
         b.VY -= (int)(ny * kb / One);
     }
 
-    static long FloorDiv(long a, long b) => a >= 0 ? a / b : -((-a + b - 1) / b);
-
-    internal static long ISqrt(long n)
-    {
-        if (n < 2)
-            return n;
-        long x = n, y = (x + 1) / 2;
-        while (y < x)
-        {
-            x = y;
-            y = (x + n / x) / 2;
-        }
-        return x;
-    }
 }

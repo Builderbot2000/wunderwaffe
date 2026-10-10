@@ -46,9 +46,7 @@ public static class Placement
             return PlaceResult.Locked;
 
         rotation &= 3;
-        bool turned = (rotation & 1) == 1;
-        int w = turned ? def.Height : def.Width;
-        int h = turned ? def.Width : def.Height;
+        var (w, h) = def.Footprint(rotation);
 
         TileGrid grid = tile.Grid;
         if (!grid.InBounds(x, y, w, h))
@@ -58,7 +56,7 @@ public static class Placement
         if (!grid.Buildable(x, y, w, h))
             return PlaceResult.BadTerrain;
 
-        if (def.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && !PortRules.InZone(grid, x, y, w, h))
+        if (def.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && PortRules.ZoneOf(grid, x, y, w, h) < 0)
             return PlaceResult.NotInPortZone;
 
         var resolved = ResolveRecipe(sim, player, grid, def, x, y, w, h, recipeId);

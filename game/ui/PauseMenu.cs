@@ -20,7 +20,7 @@ public partial class PauseMenu : CanvasLayer
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
+        _host = SimHost.Instance;
         Layer = 20;
         ProcessMode = ProcessModeEnum.Always;
 

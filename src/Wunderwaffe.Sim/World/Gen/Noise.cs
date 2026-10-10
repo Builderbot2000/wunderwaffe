@@ -1,3 +1,5 @@
+using Wunderwaffe.Sim.Core;
+
 namespace Wunderwaffe.Sim.World.Gen;
 
 /// <summary>
@@ -22,7 +24,7 @@ internal static class Noise
     /// <summary>Noise in [0, <see cref="Max"/>] with lattice points <paramref name="period"/> cells apart.</summary>
     public static int Value(int x, int y, int period, ulong seed)
     {
-        int ix = FloorDiv(x, period), iy = FloorDiv(y, period);
+        int ix = IntMath.FloorDiv(x, period), iy = IntMath.FloorDiv(y, period);
         int fx = Smooth((x - ix * period) * Frac / period), fy = Smooth((y - iy * period) * Frac / period);
         long a = Lattice(ix, iy, seed), b = Lattice(ix + 1, iy, seed);
         long c = Lattice(ix, iy + 1, seed), d = Lattice(ix + 1, iy + 1, seed);
@@ -43,6 +45,4 @@ internal static class Noise
         }
         return (int)(sum / weight);
     }
-
-    public static int FloorDiv(int a, int b) => a >= 0 ? a / b : -((-a + b - 1) / b);
 }

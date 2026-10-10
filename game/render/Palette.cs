@@ -40,8 +40,8 @@ public static class Palette
     /// <summary>A neighbouring tile's I/O zone colour: hues spread by its id so adjacent zones differ.</summary>
     public static Color Zone(int neighborId) => Color.FromHsv((0.12f + neighborId * 0.618034f) % 1f, 0.7f, 1f);
 
-    /// <summary>A unit's body colour: its owner's hue, brighter than the world map's tile colour.</summary>
-    public static Color Unit(int owner) => Color.FromHsv((0.45f + owner * 0.618034f) % 1f, 0.6f, 1f);
+    /// <summary>A player's colour, hue spread by id: full brightness for units, darker for the world map's tile tint.</summary>
+    public static Color Owner(int owner, float value = 1f) => Color.FromHsv((0.45f + owner * 0.618034f) % 1f, 0.6f, value);
 
     public static Color Deposit(string itemId) => Deposits.GetValueOrDefault(itemId, Colors.Magenta);
 

@@ -1,4 +1,5 @@
 using Wunderwaffe.Sim.Content;
+using Wunderwaffe.Sim.Core;
 
 namespace Wunderwaffe.Sim.World;
 
@@ -62,7 +63,7 @@ public sealed class Unit
             long r2 = (long)ox * ox + (long)oy * oy;
             // Point mass at the cell centre plus the cell's own spread (a square: m * side^2 / 6).
             inertia += m * (r2 + (long)CellScale * CellScale / 6);
-            reach = Math.Max(reach, UnitPhysics.ISqrt(r2));
+            reach = Math.Max(reach, IntMath.ISqrt(r2));
         }
         Cells = body;
         Mass = (int)mass;

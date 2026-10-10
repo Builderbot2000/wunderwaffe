@@ -11,7 +11,7 @@ public partial class CameraController : Camera2D
     [Export] public float MaxZoom = 4f;
     [Export] public float ZoomStep = 1.15f;
 
-    [Export] public WorldMapView? WorldMap;
+    [Export] public WorldMapView WorldMap = null!;
 
     SimHost _host = null!;
     ViewMode _mode;
@@ -20,9 +20,9 @@ public partial class CameraController : Camera2D
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
+        _host = SimHost.Instance;
         _mode = _host.View;
-        _host.ViewChanged += OnViewChanged;
+        _host.WatchView(this, OnViewChanged);
         if (_mode == ViewMode.World)
         {
             FitWorld();
@@ -36,8 +36,6 @@ public partial class CameraController : Camera2D
 
     void FitWorld()
     {
-        if (WorldMap == null)
-            return;
         var (center, zoom) = WorldMap.Fit(GetViewportRect().Size);
         Position = center;
         Zoom = new Vector2(zoom, zoom);
@@ -50,8 +48,6 @@ public partial class CameraController : Camera2D
         Position = new Vector2(tile.CenterX - tile.OriginX + 0.5f, tile.CenterY - tile.OriginY + 0.5f) * Palette.CellPx;
         Zoom = Vector2.One;
     }
-
-    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
 
     /// <summary>
     /// Each layer keeps its own zoom. The tile view returns to where you left the same tile; the world map centres on

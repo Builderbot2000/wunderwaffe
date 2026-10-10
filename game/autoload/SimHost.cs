@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Godot;
+using Wunderwaffe.Game.Debug;
 using Wunderwaffe.Game.Input;
 using Wunderwaffe.Game.Render;
 using Wunderwaffe.Game.Screens;
@@ -19,9 +21,10 @@ public enum ViewMode
 }
 
 /// <summary>
-/// Owns the match: starts a new one or rebuilds a saved one, then advances it at a fixed tick rate, independent of
-/// frame rate. Frame delta is only used to decide how many ticks to run; it never enters sim state.
-/// Pausing the scene tree pauses the sim too.
+/// The autoload that owns the match (<see cref="Instance"/>): starts a new one or rebuilds a saved one, then advances it
+/// at a fixed tick rate, independent of frame rate. Frame delta is only used to decide how many ticks to run; it never
+/// enters sim state. Pausing the scene tree pauses the sim too. Also holds what every view shares: which layer is shown,
+/// the viewed tile and the unit selection.
 /// </summary>
 public partial class SimHost : Node
 {
@@ -30,16 +33,15 @@ public partial class SimHost : Node
 
     const double TickSeconds = 1.0 / Simulation.TicksPerSecond;
     const int MaxTicksPerFrame = 8;
-    const int StressBuildings = 2000;
-    const int BenchTicks = 600;
 
     /// <summary>Wall time a loading replay may take per frame, so the progress bar keeps moving.</summary>
     const double LoadBudgetMs = 40;
 
     double _accumulator;
-    long _benchStartTick = -1;
-    double _benchStepMs;
     Replay? _replay;
+    int _viewedTileId;
+
+    public static SimHost Instance { get; private set; } = null!;
 
     public ContentDb Content { get; private set; } = null!;
 
@@ -47,7 +49,7 @@ public partial class SimHost : Node
     public Simulation Sim { get; private set; } = null!;
 
     public bool HasGame { get; private set; }
-    public int LocalPlayer { get; } = 0;
+    public int LocalPlayer => 0;
 
     /// <summary>Ids of the local player's selected units. Shared by the tile view and the world map.</summary>
     public HashSet<int> Selected { get; } = [];
@@ -58,16 +60,20 @@ public partial class SimHost : Node
     /// <summary>The tile shown in <see cref="ViewMode.Tile"/>; the last one visited otherwise.</summary>
     public TileState ViewedTile => Sim.Tiles[_viewedTileId];
 
-    int _viewedTileId;
-
     /// <summary>
     /// How many times the view has switched between the world map and a tile this match. The world map refreshes its
     /// pictures of the tiles every <see cref="GameSettings.SnapshotEvery"/> switches.
     /// </summary>
     public int ToggleCount { get; private set; }
 
-    /// <summary>Raised after <see cref="View"/> or <see cref="ViewedTile"/> changes.</summary>
-    public event System.Action? ViewChanged;
+    /// <summary>Raised after <see cref="View"/> or <see cref="ViewedTile"/> changes. Prefer <see cref="WatchView"/>.</summary>
+    public event Action? ViewChanged;
+
+    /// <summary>Smoothed wall time of one <see cref="Simulation.Step"/>, for the NF-001 budget.</summary>
+    public double StepMs { get; private set; }
+
+    /// <summary>Wall time of every <see cref="Simulation.Step"/> this match, summed, for benchmarks.</summary>
+    public double TotalStepMs { get; private set; }
 
     /// <summary>0..1 while a save is replaying, null otherwise.</summary>
     public double? LoadProgress => _replay == null ? null : _replay.TotalTicks == 0 ? 1 : (double)_replay.Sim.Tick / _replay.TotalTicks;
@@ -77,6 +83,28 @@ public partial class SimHost : Node
 
     /// <summary>A save the title screen should load when it opens (set by the pause menu's Load).</summary>
     public string? PendingLoad { get; set; }
+
+    /// <summary>
+    /// Calls <paramref name="onChange"/> now and after every view change, until <paramref name="owner"/> leaves the tree.
+    /// </summary>
+    public void WatchView(Node owner, Action onChange)
+    {
+        ViewChanged += onChange;
+        owner.TreeExiting += () => ViewChanged -= onChange;
+        onChange();
+    }
+
+    /// <summary>
+    /// Shows <paramref name="node"/>, and lets it process, only while <paramref name="mode"/> is the view. Runs
+    /// <paramref name="onChange"/>, if given, after each view change.
+    /// </summary>
+    public void ShowOnlyIn(CanvasItem node, ViewMode mode, Action? onChange = null) => WatchView(node, () =>
+    {
+        bool shown = View == mode;
+        node.Visible = shown;
+        node.ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+        onChange?.Invoke();
+    });
 
     public void ShowWorld()
     {
@@ -99,10 +127,11 @@ public partial class SimHost : Node
         return true;
     }
 
-    /// <summary>Smoothed wall time of one <see cref="Simulation.Step"/>, for the NF-001 budget.</summary>
-    public double StepMs { get; private set; }
-
-    public override void _EnterTree() => InputActions.Register();
+    public override void _EnterTree()
+    {
+        Instance = this;
+        InputActions.Register();
+    }
 
     public override void _Ready()
     {
@@ -112,7 +141,7 @@ public partial class SimHost : Node
 
         // `-- --tour out_dir` clicks through the menus and HUD, saving screenshots (needs a window).
         var args = OS.GetCmdlineUserArgs();
-        int tour = System.Array.IndexOf(args, "--tour");
+        int tour = Array.IndexOf(args, "--tour");
         if (tour >= 0)
             UiTour.Attach(this, tour + 1 < args.Length ? args[tour + 1] : "tour");
     }
@@ -181,8 +210,7 @@ public partial class SimHost : Node
         HasGame = true;
         Selected.Clear();
         _accumulator = 0;
-        _benchStartTick = -1;
-        StepMs = 0;
+        StepMs = TotalStepMs = 0;
         var home = sim.Tiles.FirstOrDefault(t => t.Owner == LocalPlayer) ?? sim.Tiles[0];
         _viewedTileId = home.Id;
         ToggleCount = 0;
@@ -197,14 +225,14 @@ public partial class SimHost : Node
     public bool TryAutoStart()
     {
         var args = OS.GetCmdlineUserArgs();
-        int drive = System.Array.IndexOf(args, "--drive");
+        int drive = Array.IndexOf(args, "--drive");
         bool stress = args.Contains("--stress");
         if (drive < 0 && !stress)
             return false;
 
         StartNew(GameSetup.Default, ViewMode.Tile);
         if (stress)
-            StressFill();
+            DebugTools.StressFill(this);
         // Plays a scripted unit session through the input path (needs a window).
         if (drive >= 0)
             DebugDriver.Attach(this, drive + 1 < args.Length ? args[drive + 1] : null);
@@ -216,9 +244,9 @@ public partial class SimHost : Node
         if (!HasGame)
             return;
         if (e.IsActionPressed(InputActions.DebugCheat))
-        {
-            Cheat();
-        }
+            DebugTools.Cheat(this);
+        else if (e.IsActionPressed(InputActions.Stress) && View == ViewMode.Tile)
+            DebugTools.StressFill(this);
         else if (e.IsActionPressed(InputActions.WorldToggle))
         {
             if (View == ViewMode.Tile)
@@ -246,17 +274,12 @@ public partial class SimHost : Node
             Sim.Step();
             double ms = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
             StepMs = StepMs == 0 ? ms : StepMs * 0.95 + ms * 0.05;
-            if (_benchStartTick >= 0)
-                _benchStepMs += ms;
-
+            TotalStepMs += ms;
             _accumulator -= TickSeconds;
             steps++;
         }
         if (steps == MaxTicksPerFrame)
             _accumulator = 0; // Falling behind: drop time rather than spiral.
-
-        if (_benchStartTick >= 0 && Sim.Tick - _benchStartTick >= BenchTicks)
-            ReportBench();
     }
 
     void AdvanceLoad()
@@ -274,51 +297,6 @@ public partial class SimHost : Node
             LoadMessage = "This save was made with different game rules, so it may not match what you left.";
         Begin(replay.Sim, ViewMode.World);
         GoTo(GameScene);
-    }
-
-    /// <summary>Debug (F4): every tech node, and plenty of every item on the viewed tile.</summary>
-    void Cheat()
-    {
-        foreach (var tech in Content.TechList)
-            Sim.Enqueue(new DebugUnlockCommand(LocalPlayer, tech.Id));
-        foreach (var item in Content.Items.Keys)
-            Sim.Enqueue(new DebugGrantCommand(LocalPlayer, ViewedTile.Id, item, 1000));
-    }
-
-    /// <summary>Debug: covers the viewed tile with ~2,000 producing buildings (NF-001 stress test).</summary>
-    public void StressFill()
-    {
-        var tile = ViewedTile;
-        Sim.Enqueue(new DebugGrantCommand(LocalPlayer, tile.Id, "copper_ore", 1_000_000));
-        Sim.Enqueue(new DebugGrantCommand(LocalPlayer, tile.Id, "iron_ore", 1_000_000));
-
-        int placed = 0;
-        for (int y = 0; y < tile.Grid.Height - 1 && placed < StressBuildings; y += 2)
-        {
-            for (int x = 0; x < tile.Grid.Width - 1 && placed < StressBuildings; x += 2)
-            {
-                if (!tile.Grid.IsFree(x, y, 2, 2))
-                    continue;
-                bool onOre = Placement.Check(Sim, tile, LocalPlayer, "drill", x, y, 0, null, out _)
-                    != PlaceResult.NeedsDeposit;
-                Sim.Enqueue(onOre
-                    ? new PlaceBuildingCommand(LocalPlayer, tile.Id, "drill", x, y)
-                    : new PlaceBuildingCommand(LocalPlayer, tile.Id, "smelter", x, y, RecipeId: "smelt_iron"));
-                placed++;
-            }
-        }
-        _benchStartTick = Sim.Tick + 1;
-        _benchStepMs = 0;
-    }
-
-    void ReportBench()
-    {
-        GD.Print($"stress: {ViewedTile.Grid.BuildingCount} buildings, " +
-                 $"{_benchStepMs / BenchTicks:F4} ms/tick over {BenchTicks} ticks, " +
-                 $"{Engine.GetFramesPerSecond()} fps");
-        _benchStartTick = -1;
-        if (DisplayServer.GetName() == "headless")
-            GetTree().Quit();
     }
 
     static ContentDb LoadContent()

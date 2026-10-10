@@ -20,6 +20,12 @@ public sealed class Inventory
             _counts[id] = next;
     }
 
+    public void Add(IReadOnlyDictionary<string, int> items)
+    {
+        foreach (var (id, n) in items)
+            Add(id, n);
+    }
+
     public bool Has(IReadOnlyDictionary<string, int> items) =>
         items.All(kv => Get(kv.Key) >= kv.Value);
 

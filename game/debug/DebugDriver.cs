@@ -5,7 +5,7 @@ using Wunderwaffe.Game.Render;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 
-namespace Wunderwaffe.Game;
+namespace Wunderwaffe.Game.Debug;
 
 /// <summary>
 /// Debug (`-- --drive [screenshot.png]`): plays a scripted session through the real input path (injected mouse and key

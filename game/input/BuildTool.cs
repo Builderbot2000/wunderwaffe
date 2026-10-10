@@ -18,6 +18,8 @@ public partial class BuildTool : Node2D
 {
     public const string FrameId = "frame";
 
+    const int ZoneFontSize = 14;
+
     /// <summary>One build-menu entry: a building, a crafter with a chosen recipe, or the unit frame.</summary>
     public sealed record Tool(string BuildingId, string? RecipeId, string Label)
     {
@@ -40,7 +42,8 @@ public partial class BuildTool : Node2D
 
     public int SelectedIndex => _selected;
     public Tool? Selected => _selected >= 0 ? _tools[_selected] : null;
-    public int Rotation => _rotation;
+    /// <summary>Quarter turns clockwise from east for the next placement. Not <c>Node2D.Rotation</c>.</summary>
+    public int BuildRotation => _rotation;
 
     /// <summary>The placement check for the picked tool at the hovered cell.</summary>
     public PlaceResult Preview => _preview;
@@ -59,20 +62,9 @@ public partial class BuildTool : Node2D
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
+        _host = SimHost.Instance;
         BuildPalette(_host.Sim);
-        _host.ViewChanged += OnViewChanged;
-        OnViewChanged();
-    }
-
-    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
-
-    void OnViewChanged()
-    {
-        bool shown = _host.View == ViewMode.Tile;
-        Visible = shown;
-        ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
-        _lastActionCell = new(-1, -1);
+        _host.ShowOnlyIn(this, ViewMode.Tile, () => _lastActionCell = new(-1, -1));
     }
 
     /// <summary>One slot per building, in buildings.json order, or per recipe for crafters that need one chosen.</summary>
@@ -113,8 +105,6 @@ public partial class BuildTool : Node2D
         }
         if (e.IsActionPressed(InputActions.Rotate))
             _rotation = (_rotation + 1) & 3;
-        if (e.IsActionPressed(InputActions.Stress))
-            _host.StressFill();
         if (e is InputEventMouseButton { Pressed: true })
             _lastActionCell = new(-1, -1);
     }
@@ -157,7 +147,7 @@ public partial class BuildTool : Node2D
         if (_selected < 0 || OverUi())
             return;
         float px = Palette.CellPx;
-        if (SelectedIsPort())
+        if (PickedIsPort)
             DrawPortZone(px);
         var (x, y, w, h) = Footprint(HoveredCell());
         var tint = _preview == PlaceResult.Ok ? Palette.GhostOk : Palette.GhostBad;
@@ -175,9 +165,10 @@ public partial class BuildTool : Node2D
         DrawRect(new Rect2(x * px, y * px, w * px, h * px), tint);
     }
 
-    bool SelectedIsPort() =>
-        !_tools[_selected].IsFrame
-        && _host.Sim.Content.Buildings[_tools[_selected].BuildingId].Kind is BuildingKind.ExportPort or BuildingKind.ImportPort;
+    /// <summary>True if the picked tool is an import or export port, which go in an I/O zone.</summary>
+    public bool PickedIsPort =>
+        Selected is { IsFrame: false } tool
+        && _host.Sim.Content.Buildings[tool.BuildingId].Kind is BuildingKind.ExportPort or BuildingKind.ImportPort;
 
     /// <summary>
     /// Shades every I/O zone, where ports can go, in its neighbour's colour, the hovered one brighter, each labelled
@@ -203,26 +194,14 @@ public partial class BuildTool : Node2D
         }
     }
 
-    const int ZoneFontSize = 14;
-
-    public Vector2I HoveredCell()
-    {
-        var p = GetGlobalMousePosition() / Palette.CellPx;
-        return new Vector2I(Mathf.FloorToInt(p.X), Mathf.FloorToInt(p.Y));
-    }
+    public Vector2I HoveredCell() => TileView.CellAt(GetGlobalMousePosition());
 
     /// <summary>Rotated footprint centred on the hovered cell.</summary>
     (int X, int Y, int W, int H) Footprint(Vector2I cell)
     {
         if (_tools[_selected].IsFrame)
             return (cell.X, cell.Y, 1, 1);
-        var def = _host.Sim.Content.Buildings[_tools[_selected].BuildingId];
-        bool turned = (_rotation & 1) == 1;
-        int w = turned ? def.Height : def.Width;
-        int h = turned ? def.Width : def.Height;
+        var (w, h) = _host.Sim.Content.Buildings[_tools[_selected].BuildingId].Footprint(_rotation);
         return (cell.X - (w - 1) / 2, cell.Y - (h - 1) / 2, w, h);
     }
-
-    /// <summary>True if the picked tool is an import or export port, which go in an I/O zone.</summary>
-    public bool SelectedIsPortTool() => _selected >= 0 && SelectedIsPort();
 }

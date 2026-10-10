@@ -26,7 +26,6 @@ public partial class WorldMapView : Node2D
     static readonly Color Selected = new(1f, 1f, 1f);
     static readonly Color Claimable = new(1f, 0.85f, 0.25f);
     static readonly Color TooPoor = new(0.8f, 0.45f, 0.2f);
-    static readonly Color Disputed = new(0.95f, 0.25f, 0.25f);
 
     SimHost _host = null!;
     WorldSnapshot? _snapshot;
@@ -41,7 +40,7 @@ public partial class WorldMapView : Node2D
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
+        _host = SimHost.Instance;
         TextureFilter = TextureFilterEnum.LinearWithMipmaps;
         _borders = new Node2D { Name = "Borders" };
         _borders.Draw += DrawBorders;
@@ -50,18 +49,12 @@ public partial class WorldMapView : Node2D
         _overlay.Draw += DrawOverlay;
         AddChild(_overlay);
         SelectedTileId = _host.ViewedTile.Id;
-        _host.ViewChanged += OnViewChanged;
-        OnViewChanged();
+        _host.ShowOnlyIn(this, ViewMode.World, OnViewChanged);
     }
-
-    public override void _ExitTree() => _host.ViewChanged -= OnViewChanged;
 
     void OnViewChanged()
     {
-        bool shown = _host.View == ViewMode.World;
-        Visible = shown;
-        ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
-        if (!shown)
+        if (!Visible)
             return;
         SelectedTileId = _host.ViewedTile.Id;
         if (_snapshot?.Sim != _host.Sim)
@@ -140,12 +133,12 @@ public partial class WorldMapView : Node2D
             DrawTextureRect(_owners, WorldRect, false);
     }
 
-    /// <summary>Rebuilds the owner tint when any tile's owner or contested state changed. Returns true if it did.</summary>
+    /// <summary>Rebuilds the owner tint when any tile's owner changed. Returns true if it did.</summary>
     bool OwnersChanged()
     {
         long key = 17;
         foreach (var t in _host.Sim.Tiles)
-            key = key * 31 + t.Owner * 2 + (t.Contested ? 1 : 0);
+            key = key * 31 + t.Owner;
         if (key == _ownerKey && _owners != null)
             return false;
         _ownerKey = key;
@@ -162,11 +155,9 @@ public partial class WorldMapView : Node2D
                 int id = map.TileAtCell(x * d, y * d);
                 if (id < 0)
                     continue;
-                var t = tiles[id];
-                if (t.Contested)
-                    image.SetPixel(x, y, Disputed with { A = OwnerTint });
-                else if (t.Owner != TileState.Unowned)
-                    image.SetPixel(x, y, OwnerColor(t.Owner) with { A = OwnerTint });
+                int owner = tiles[id].Owner;
+                if (owner != TileState.Unowned)
+                    image.SetPixel(x, y, Palette.Owner(owner, 0.55f) with { A = OwnerTint });
             }
         }
         image.GenerateMipmaps();
@@ -191,8 +182,6 @@ public partial class WorldMapView : Node2D
                 _overlay.DrawMultiline(Outline(tile), Claimable, 3);
             else if (claim == ClaimResult.CannotAfford)
                 _overlay.DrawMultiline(Outline(tile), TooPoor, 3);
-            if (tile.Contested)
-                _overlay.DrawMultiline(Outline(tile), Disputed, 4);
         }
         if (sim.TryGetTile(SelectedTileId) is { } selected)
             _overlay.DrawMultiline(Outline(selected), Selected, 3);
@@ -256,7 +245,7 @@ public partial class WorldMapView : Node2D
         foreach (var u in _host.Sim.Units)
         {
             var pos = new Vector2(u.X, u.Y) / Sim.World.Unit.CellScale * CellPx;
-            _overlay.DrawCircle(pos, 7, Palette.Unit(u.Owner));
+            _overlay.DrawCircle(pos, 7, Palette.Owner(u.Owner));
             _overlay.DrawArc(pos, 7, 0, Mathf.Tau, 16, Colors.Black, 1.5f);
             if (_host.Selected.Contains(u.Id))
                 _overlay.DrawArc(pos, 11, 0, Mathf.Tau, 20, Colors.White, 2.5f);
@@ -305,18 +294,12 @@ public partial class WorldMapView : Node2D
         }
     }
 
-    string Describe(TileState tile)
+    string Describe(TileState tile) => tile.Owner switch
     {
-        return tile.Ownership switch
-        {
-            TileOwnership.Contested => "contested",
-            TileOwnership.Unclaimed => "unclaimed",
-            _ when tile.Owner == _host.LocalPlayer => $"you · {tile.Grid.BuildingCount} bldgs",
-            _ => $"player {tile.Owner}",
-        };
-    }
-
-    static Color OwnerColor(int owner) => Color.FromHsv((0.45f + owner * 0.618034f) % 1f, 0.55f, 0.55f);
+        TileState.Unowned => "unclaimed",
+        _ when tile.Owner == _host.LocalPlayer => $"you · {tile.Grid.BuildingCount} bldgs",
+        _ => $"player {tile.Owner}",
+    };
 
     /// <summary>Screen pixels kept clear for the HUD's side panels.</summary>
     const float HudLeft = 440, HudRight = 460;

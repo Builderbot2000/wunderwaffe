@@ -1,7 +1,6 @@
 // Terrain kinds (WM-002, FB-002). A generated cell gets the first entry, in this order, whose elevation and moisture
 // bands (inclusive, 0-1000) contain it. Sea level is elevation 400. "river" marks the terrain used for river cells.
 // "deposits" weights where each minable item's patches are centred; 0 or absent means never.
-// "unitPassable" is not used yet: passability will come with locomotion types (UD-004).
 [
   { "id": "river",         "name": "River",         "color": "#4f86b8", "river": true, "water": true, "buildable": true },
   { "id": "deep_water",    "name": "Deep Water",    "color": "#1d3a5c", "water": true, "buildable": false, "elevation": [0, 299] },

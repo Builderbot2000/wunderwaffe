@@ -31,8 +31,6 @@ public static class PortRules
         return zone;
     }
 
-    public static bool InZone(TileGrid grid, int x, int y, int w, int h) => ZoneOf(grid, x, y, w, h) >= 0;
-
     /// <summary>The tile a port on <paramref name="grid"/> links to.</summary>
     public static int PartnerOf(TileGrid grid, PlacedBuilding port) => grid.ZoneAt(port.X, port.Y);
 }

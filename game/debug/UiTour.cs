@@ -5,10 +5,11 @@ using System.Linq;
 using Godot;
 using Wunderwaffe.Game.Input;
 using Wunderwaffe.Game.Render;
+using Wunderwaffe.Game.Screens;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 
-namespace Wunderwaffe.Game;
+namespace Wunderwaffe.Game.Debug;
 
 /// <summary>
 /// Debug (`-- --tour out_dir`): clicks through the menus and HUD the way a player would (title, new game, world map,
@@ -39,7 +40,7 @@ public partial class UiTour : Node
     {
         Step(0, "title", () =>
         {
-            _savesBefore = Screens.SaveSlots.List().Select(s => s.Path).ToHashSet();
+            _savesBefore = SaveSlots.List().Select(s => s.Path).ToHashSet();
             Shot("01_title");
         });
         Step(1, "new game", () => Press("New game"));
@@ -84,8 +85,8 @@ public partial class UiTour : Node
         Step(1, "done", () =>
         {
             // Leave the player's saves folder as it was.
-            foreach (var save in Screens.SaveSlots.List().Where(s => !_savesBefore.Contains(s.Path)))
-                Screens.SaveSlots.Delete(save.Path);
+            foreach (var save in SaveSlots.List().Where(s => !_savesBefore.Contains(s.Path)))
+                SaveSlots.Delete(save.Path);
             GetTree().Quit();
         });
     }

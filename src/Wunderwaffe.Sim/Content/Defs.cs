@@ -55,7 +55,11 @@ public sealed record BuildingDef(
     Dictionary<string, int> Cost,
     [property: JsonConverter(typeof(SnakeCaseEnumConverter))] BuildingKind Kind = BuildingKind.Machine,
     int Speed = 0,
-    int Thrust = 0);
+    int Thrust = 0)
+{
+    /// <summary>Width and height after <paramref name="rotation"/> quarter turns: odd turns swap them.</summary>
+    public (int W, int H) Footprint(int rotation) => (rotation & 1) == 0 ? (Width, Height) : (Height, Width);
+}
 
 /// <summary>
 /// What a player must have done for a tech node or goal to complete (TT-002). Counts are cumulative per player:
@@ -85,7 +89,6 @@ public sealed record GoalDef(string Id, string Name, string Description, UnlockC
 /// </summary>
 /// <param name="Color">Map colour, <c>#rrggbb</c>.</param>
 /// <param name="Buildable">Whether buildings and frame may stand on it.</param>
-/// <param name="UnitPassable">Not used yet: passability will depend on locomotion (UD-004).</param>
 /// <param name="Water">Counts as water for coasts, moisture and a tile's land share.</param>
 /// <param name="River">Used for river cells instead of the bands. At most one terrain should set it.</param>
 /// <param name="Deposits">Relative chance, per minable item, that a deposit patch of it is centred on this terrain.</param>
@@ -94,7 +97,6 @@ public sealed record TerrainDef(
     string Name,
     string Color,
     bool Buildable = true,
-    bool UnitPassable = true,
     bool Water = false,
     bool River = false,
     int[]? Elevation = null,

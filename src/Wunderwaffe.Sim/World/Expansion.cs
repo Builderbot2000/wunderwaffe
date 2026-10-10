@@ -4,7 +4,6 @@ public enum ClaimResult
 {
     Ok,
     NoSuchTile,
-    Contested,
     AlreadyOwned,
     NotAdjacent,
     CannotAfford,
@@ -25,18 +24,16 @@ public static class Expansion
         source = null;
         if (sim.TryGetTile(tileId) is not { } tile)
             return ClaimResult.NoSuchTile;
-        if (tile.Contested)
-            return ClaimResult.Contested;
         if (tile.Owner != TileState.Unowned)
             return ClaimResult.AlreadyOwned;
 
         bool adjacent = false;
         foreach (var n in sim.Neighbors(tile))
         {
-            if (n.Owner != player || n.Contested)
+            if (n.Owner != player)
                 continue;
             adjacent = true;
-            if (n.Inventory.Has(Simulation.ClaimCost))
+            if (n.Inventory.Has(Balance.ClaimCost))
             {
                 source = n;
                 return ClaimResult.Ok;

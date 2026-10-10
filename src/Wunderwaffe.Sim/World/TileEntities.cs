@@ -259,7 +259,7 @@ internal static class TileEntities
     }
 
     /// <summary>Everything a building holds, so removing it doesn't destroy items.</summary>
-    public static void Drain(TileState tile, PlacedBuilding b, ContentDb content)
+    public static void Drain(TileState tile, PlacedBuilding b)
     {
         var inv = tile.Inventory;
         if (b.Belt is { } belt)

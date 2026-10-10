@@ -1,4 +1,5 @@
 using Wunderwaffe.Sim.Content;
+using Wunderwaffe.Sim.Core;
 
 namespace Wunderwaffe.Sim.World;
 
@@ -46,12 +47,6 @@ public static class UnitAssembly
 {
     public const int MaxCells = 64;
 
-    /// <summary>What a frame cell costs, paid from the tile inventory and refunded on removal.</summary>
-    public static readonly IReadOnlyDictionary<string, int> FrameCost = new SortedDictionary<string, int>(StringComparer.Ordinal)
-    {
-        ["iron_ore"] = 2,
-    };
-
     public static PlaceResult CheckFrame(TileState tile, int player, int x, int y)
     {
         if (tile.Owner != player)
@@ -62,14 +57,14 @@ public static class UnitAssembly
             return PlaceResult.Blocked;
         if (!tile.Grid.Buildable(x, y))
             return PlaceResult.BadTerrain;
-        return tile.Inventory.Has(FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
+        return tile.Inventory.Has(Balance.FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
     }
 
     internal static void PlaceFrame(TileState tile, int player, int x, int y)
     {
         if (CheckFrame(tile, player, x, y) != PlaceResult.Ok)
             return;
-        tile.Inventory.TryTake(FrameCost);
+        tile.Inventory.TryTake(Balance.FrameCost);
         tile.Grid.SetFrame(x, y, true);
     }
 
@@ -78,8 +73,7 @@ public static class UnitAssembly
         if (tile.Owner != player || !tile.Grid.HasFrame(x, y))
             return;
         tile.Grid.SetFrame(x, y, false);
-        foreach (var (id, n) in FrameCost)
-            tile.Inventory.Add(id, n);
+        tile.Inventory.Add(Balance.FrameCost);
     }
 
     /// <summary>Everything an activation would take, found by walking the frame out from the core.</summary>
@@ -178,7 +172,7 @@ public static class UnitAssembly
         foreach (var b in buildings)
         {
             tile.Grid.Remove(b);
-            TileEntities.Drain(tile, b, content);
+            TileEntities.Drain(tile, b);
         }
         foreach (var (cx, cy) in cells)
             tile.Grid.SetFrame(cx, cy, false);
@@ -199,8 +193,8 @@ public static class UnitAssembly
 
         int q = ((unit.Angle + Trig.Quarter / 2) / Trig.Quarter) & 3;
         var (rx, ry) = Trig.Rotate(unit.CoreOffX, unit.CoreOffY, unit.Angle);
-        int coreX = (int)FloorDiv(unit.X + rx, Unit.CellScale) - tile.OriginX;
-        int coreY = (int)FloorDiv(unit.Y + ry, Unit.CellScale) - tile.OriginY;
+        int coreX = (int)IntMath.FloorDiv(unit.X + rx, Unit.CellScale) - tile.OriginX;
+        int coreY = (int)IntMath.FloorDiv(unit.Y + ry, Unit.CellScale) - tile.OriginY;
 
         var grid = tile.Grid;
         var cells = new List<(int X, int Y)>();
@@ -253,5 +247,4 @@ public static class UnitAssembly
         _ => (y, -x),
     };
 
-    static long FloorDiv(long a, long b) => a >= 0 ? a / b : -((-a + b - 1) / b);
 }

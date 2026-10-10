@@ -21,7 +21,7 @@ public partial class TitleScreen : Control
 
     public override void _Ready()
     {
-        _host = GetNode<SimHost>("/root/SimHost");
+        _host = SimHost.Instance;
         if (_host.TryAutoStart())
             return;
 
@@ -58,7 +58,7 @@ public partial class TitleScreen : Control
 
     void BuildBackground()
     {
-        AddChild(new ColorRect { Color = Palette.Ground, MouseFilter = MouseFilterEnum.Ignore }.Also(c => c.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect)));
+        AddChild(FullRect(new ColorRect { Color = Palette.Ground, MouseFilter = MouseFilterEnum.Ignore }));
         if (Sprites.Get(Sprites.Ground) is { } ground)
         {
             var tiles = new TextureRect
@@ -66,14 +66,12 @@ public partial class TitleScreen : Control
                 Texture = ground, StretchMode = TextureRect.StretchModeEnum.Tile, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 Modulate = new Color(0.55f, 0.55f, 0.6f), MouseFilter = MouseFilterEnum.Ignore, Scale = new Vector2(3, 3),
             };
-            tiles.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-            AddChild(tiles);
+            AddChild(FullRect(tiles));
         }
-        AddChild(new ColorRect { Color = new Color(0.03f, 0.035f, 0.045f, 0.55f), MouseFilter = MouseFilterEnum.Ignore }.Also(c => c.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect)));
+        AddChild(FullRect(new ColorRect { Color = new Color(0.03f, 0.035f, 0.045f, 0.55f), MouseFilter = MouseFilterEnum.Ignore }));
 
         // A few factory pieces on the right as decoration.
-        var deco = new Control { MouseFilter = MouseFilterEnum.Ignore };
-        deco.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        var deco = FullRect(new Control { MouseFilter = MouseFilterEnum.Ignore });
         AddChild(deco);
         (string Id, float X, float Y, float Size)[] pieces =
         [
@@ -144,6 +142,12 @@ public partial class TitleScreen : Control
         return Ui.Panel(col);
     }
 
+    static T FullRect<T>(T c) where T : Control
+    {
+        c.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        return c;
+    }
+
     static string RandomSeed() => (GD.Randi() % 1_000_000).ToString();
 
     void Show(Control page)
@@ -184,15 +188,5 @@ public partial class TitleScreen : Control
     {
         if (_loadBar != null && _host.LoadProgress is { } p)
             _loadBar.Value = p;
-    }
-}
-
-static class NodeExtensions
-{
-    /// <summary>Runs <paramref name="setup"/> on <paramref name="node"/> and returns it, for one-expression construction.</summary>
-    public static T Also<T>(this T node, System.Action<T> setup)
-    {
-        setup(node);
-        return node;
     }
 }
