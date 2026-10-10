@@ -2,11 +2,19 @@ using Wunderwaffe.Sim.Content;
 
 namespace Wunderwaffe.Sim.World;
 
-public sealed class PlacedBuilding(int id, BuildingDef def, int x, int y, int width, int height, int rotation, RecipeDef? recipe)
+/// <param name="hp">Starting hit points; null for the def's full <see cref="BuildingDef.Hp"/>.</param>
+public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, int y, int width, int height, int rotation, RecipeDef? recipe, int? hp = null)
 {
     public int Id { get; } = id;
     public string DefId { get; } = def.Id;
     public BuildingKind Kind { get; } = def.Kind;
+
+    /// <summary>Player who placed or landed it; a tile's core belongs to the tile's owner. Need not be the tile's owner.</summary>
+    public int Owner { get; internal set; } = owner;
+
+    /// <summary>Hit points left, out of <see cref="BuildingDef.Hp"/>. Kept while the building rides on a unit.</summary>
+    public int Hp { get; internal set; } = hp ?? def.Hp;
+
     public int X { get; } = x;
     public int Y { get; } = y;
 
@@ -228,9 +236,9 @@ public sealed class TileGrid
         return true;
     }
 
-    internal PlacedBuilding Add(BuildingDef def, int x, int y, int w, int h, int rotation, RecipeDef? recipe)
+    internal PlacedBuilding Add(BuildingDef def, int owner, int x, int y, int w, int h, int rotation, RecipeDef? recipe, int? hp = null)
     {
-        var b = new PlacedBuilding(_buildings.Count, def, x, y, w, h, rotation, recipe);
+        var b = new PlacedBuilding(_buildings.Count, def, owner, x, y, w, h, rotation, recipe, hp);
         _buildings.Add(b);
         KindList(b.Kind)?.Add(b);
         Fill(b, b.Id);

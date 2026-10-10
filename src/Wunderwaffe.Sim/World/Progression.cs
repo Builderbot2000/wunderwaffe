@@ -3,8 +3,8 @@ using Wunderwaffe.Sim.Content;
 namespace Wunderwaffe.Sim.World;
 
 /// <summary>
-/// Resource-gated tech (TT-001, TT-002, TT-004) and the guided goal chain. Read-only checks are public so the UI shows
-/// the same progress and locks the sim applies.
+/// The guided goal chain. There is no tech tree (TT-001): every building and recipe is available from the start.
+/// Read-only checks are public so the UI shows the same progress the sim applies.
 /// </summary>
 public static class Progression
 {
@@ -25,17 +25,6 @@ public static class Progression
     public static bool IsMet(Simulation sim, int player, UnlockCondition condition) =>
         Progress(sim, player, condition) >= condition.Amount;
 
-    /// <summary>
-    /// True if <paramref name="player"/> may use a building or recipe: it is starter content or its tech node is
-    /// complete.
-    /// </summary>
-    public static bool IsUnlocked(Simulation sim, int player, string contentId) =>
-        !sim.Content.UnlockedBy.TryGetValue(contentId, out var tech) || sim.PlayerOrNull(player)?.HasTech(tech) == true;
-
-    /// <summary>The tech node that unlocks <paramref name="contentId"/>, or null for starter content.</summary>
-    public static TechDef? UnlockingTech(ContentDb content, string contentId) =>
-        content.UnlockedBy.TryGetValue(contentId, out var tech) ? content.Tech[tech] : null;
-
     /// <summary>The goal <paramref name="player"/> is working on, or null once the chain is done.</summary>
     public static GoalDef? CurrentGoal(Simulation sim, int player)
     {
@@ -43,17 +32,12 @@ public static class Progression
         return done < sim.Content.Goals.Count ? sim.Content.Goals[done] : null;
     }
 
-    /// <summary>Completes any tech node or goal whose condition is now met. Runs at the end of each tick.</summary>
+    /// <summary>Completes any goal whose condition is now met. Runs at the end of each tick.</summary>
     internal static void Step(Simulation sim)
     {
         var goals = sim.Content.Goals;
         foreach (var p in sim.Players)
         {
-            foreach (var tech in sim.Content.TechList)
-            {
-                if (!p.HasTech(tech.Id) && IsMet(sim, p.Id, tech.Condition))
-                    p.Unlock(tech.Id, sim.Tick);
-            }
             while (p.GoalsDone < goals.Count && IsMet(sim, p.Id, goals[p.GoalsDone].Condition))
                 p.CompleteGoal(sim.Tick);
         }

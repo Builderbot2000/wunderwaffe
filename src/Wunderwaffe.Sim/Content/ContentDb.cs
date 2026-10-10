@@ -23,13 +23,9 @@ public sealed class ContentDb
     public IReadOnlyDictionary<string, ItemDef> Items { get; }
     public IReadOnlyDictionary<string, RecipeDef> Recipes { get; }
     public IReadOnlyDictionary<string, BuildingDef> Buildings { get; }
-    public IReadOnlyDictionary<string, TechDef> Tech { get; }
 
     /// <summary>Buildings in file order, which is the order the build menu shows them in.</summary>
     public IReadOnlyList<BuildingDef> BuildingList { get; }
-
-    /// <summary>Tech nodes in file order: roughly the order a player reaches them, and the order they are checked in.</summary>
-    public IReadOnlyList<TechDef> TechList { get; }
 
     /// <summary>The guided objective chain, in the order goals must be completed.</summary>
     public IReadOnlyList<GoalDef> Goals { get; }
@@ -49,9 +45,6 @@ public sealed class ContentDb
     /// <summary>Used when no terrain file is given: one buildable terrain everywhere.</summary>
     static readonly TerrainDef FallbackTerrain = new("plains", "Plains", "#6b8f47");
 
-    /// <summary>The tech node that unlocks each building or recipe id. Ids not in here are starter content (TT-004).</summary>
-    public IReadOnlyDictionary<string, string> UnlockedBy { get; }
-
     /// <summary>Recipes each building can run, sorted by recipe id.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<RecipeDef>> RecipesByBuilding { get; }
 
@@ -60,8 +53,6 @@ public sealed class ContentDb
         Dictionary<string, RecipeDef> recipes,
         List<BuildingDef> buildingList,
         Dictionary<string, BuildingDef> buildings,
-        List<TechDef> techList,
-        Dictionary<string, TechDef> tech,
         List<GoalDef> goals,
         List<TerrainDef> terrain)
     {
@@ -69,21 +60,12 @@ public sealed class ContentDb
         Recipes = recipes;
         Buildings = buildings;
         BuildingList = buildingList;
-        Tech = tech;
-        TechList = techList;
         Goals = goals;
         TerrainList = terrain;
         static bool Land(TerrainDef t) => t.Buildable && !t.Water && !t.River;
         int catchAll = terrain.FindIndex(t => Land(t) && t.Elevation == null && t.Moisture == null);
         DefaultTerrain = catchAll >= 0 ? catchAll : Math.Max(0, terrain.FindIndex(Land));
         RiverTerrain = terrain.FindIndex(t => t.River);
-        var unlockedBy = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var t in TechList)
-        {
-            foreach (var id in t.Unlocks)
-                unlockedBy.TryAdd(id, t.Id);
-        }
-        UnlockedBy = unlockedBy;
         RecipesByBuilding = recipes.Values
             .GroupBy(r => r.Building)
             .ToDictionary(
@@ -93,11 +75,10 @@ public sealed class ContentDb
 
     /// <param name="goals">The objective chain; null for none.</param>
     /// <param name="terrain">Terrain kinds for world generation; null for a single buildable terrain.</param>
-    public static ContentDb FromJson(string items, string recipes, string buildings, string tech, string? goals = null, string? terrain = null)
+    public static ContentDb FromJson(string items, string recipes, string buildings, string? goals = null, string? terrain = null)
     {
         var errors = new List<string>();
         var buildingList = Parse<BuildingDef>(buildings, "buildings");
-        var techList = Parse<TechDef>(tech, "tech");
         var goalList = goals == null ? [] : Parse<GoalDef>(goals, "goals");
         Index(goalList, x => x.Id, "goal", errors);
         var terrainList = terrain == null ? [FallbackTerrain] : Parse<TerrainDef>(terrain, "terrain");
@@ -107,8 +88,6 @@ public sealed class ContentDb
             Index(Parse<RecipeDef>(recipes, "recipes"), x => x.Id, "recipe", errors),
             buildingList,
             Index(buildingList, x => x.Id, "building", errors),
-            techList,
-            Index(techList, x => x.Id, "tech", errors),
             goalList,
             terrainList);
         db.Validate(errors);
@@ -169,19 +148,8 @@ public sealed class ContentDb
                 errors.Add($"building '{b.Id}': a thruster must be 1x1 with thrust > 0");
             if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort or BuildingKind.UnitCore && (b.Width != 1 || b.Height != 1))
                 errors.Add($"building '{b.Id}': ports must be 1x1");
-        }
-
-        var unlockedBy = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var t in TechList)
-        {
-            ValidateCondition(t.Condition, $"tech '{t.Id}'", errors);
-            foreach (var id in t.Unlocks)
-            {
-                if (!Buildings.ContainsKey(id) && !Recipes.ContainsKey(id))
-                    errors.Add($"tech '{t.Id}': unlocks unknown building/recipe '{id}'");
-                else if (!unlockedBy.TryAdd(id, t.Id))
-                    errors.Add($"tech '{t.Id}': '{id}' is already unlocked by '{unlockedBy[id]}'");
-            }
+            if (b.Hp <= 0)
+                errors.Add($"building '{b.Id}': hp must be > 0");
         }
 
         foreach (var g in Goals)

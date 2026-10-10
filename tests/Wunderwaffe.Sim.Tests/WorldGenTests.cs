@@ -221,4 +221,29 @@ public class WorldGenTests
         Assert.Equal(GameSetup.ParseSeed("wunderwaffe"), GameSetup.ParseSeed("wunderwaffe"));
         Assert.NotEqual(GameSetup.ParseSeed("wunderwaffe"), GameSetup.ParseSeed("wunderwaffe2"));
     }
+
+    [Theory]
+    [InlineData(1UL)]
+    [InlineData(3037UL)]
+    [InlineData(123456789UL)]
+    public void EachPlayerGetsTheirOwnStartDeterministically(ulong seed)
+    {
+        var a = Simulation.NewGame(TestContent.Load(), new GameSetup(5, 5, seed, Players: 2));
+        var b = Simulation.NewGame(TestContent.Load(), new GameSetup(5, 5, seed, Players: 2));
+        Assert.Equal(2, a.StartTileIds.Count);
+        Assert.NotEqual(a.StartTileIds[0], a.StartTileIds[1]);
+        Assert.Equal(a.StartTileIds, b.StartTileIds);
+        Assert.Equal(a.StateHash(), b.StateHash());
+        // Player 0 starts where a single-player game would.
+        Assert.Equal(World(seed).StartTileId, a.StartTileId);
+        for (int p = 0; p < 2; p++)
+        {
+            var home = a.Tiles[a.StartTileIds[p]];
+            Assert.Equal(p, home.Owner);
+            Assert.Equal(p, home.Grid.Buildings.Single(x => x.DefId == Simulation.CoreBuildingId).Owner);
+            Assert.False(Has(home, "coal"));
+        }
+        Assert.DoesNotContain(a.StartTileIds[1], a.Tiles[a.StartTileIds[0]].Neighbors);
+        Assert.Equal(2, a.Players.Count);
+    }
 }

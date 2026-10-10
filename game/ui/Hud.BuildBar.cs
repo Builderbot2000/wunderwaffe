@@ -11,8 +11,7 @@ using Wunderwaffe.Sim.World;
 namespace Wunderwaffe.Game.Screens;
 
 /// <summary>
-/// Bottom centre, tile view only: one button per <see cref="BuildTool.Tools"/> entry (dimmed when locked, tinted when
-/// unaffordable), and a line saying what the picked building would do at the cursor.
+/// Bottom centre, tile view only: one button per <see cref="BuildTool.Tools"/> entry (tinted when unaffordable), and a line saying what the picked building would do at the cursor.
 /// </summary>
 public partial class Hud
 {
@@ -53,10 +52,9 @@ public partial class Hud
             var tool = BuildTool.Tools[i];
             var b = _toolButtons[i];
             b.SetPressedNoSignal(i == BuildTool.SelectedIndex);
-            bool locked = !tool.IsFrame && LockingTech(tool) != null;
             bool afford = tile.Inventory.Has(ToolCost(tool));
-            b.Modulate = locked ? new Color(1, 1, 1, 0.3f) : afford ? Colors.White : new Color(1f, 0.7f, 0.7f, 0.75f);
-            b.TooltipText = ToolTooltip(tool, locked);
+            b.Modulate = afford ? Colors.White : new Color(1f, 0.7f, 0.7f, 0.75f);
+            b.TooltipText = ToolTooltip(tool);
         }
 
         if (BuildTool.Selected is not { } picked)
@@ -76,12 +74,7 @@ public partial class Hud
     IReadOnlyDictionary<string, int> ToolCost(BuildTool.Tool tool) =>
         tool.IsFrame ? Balance.FrameCost : Content.Buildings[tool.BuildingId].Cost;
 
-    /// <summary>The tech node keeping the tool's building or recipe locked for the local player, or null.</summary>
-    TechDef? LockingTech(BuildTool.Tool tool) =>
-        (Progression.IsUnlocked(Sim, Me, tool.BuildingId) ? null : Progression.UnlockingTech(Content, tool.BuildingId))
-        ?? (tool.RecipeId == null || Progression.IsUnlocked(Sim, Me, tool.RecipeId) ? null : Progression.UnlockingTech(Content, tool.RecipeId));
-
-    string ToolTooltip(BuildTool.Tool tool, bool locked)
+    string ToolTooltip(BuildTool.Tool tool)
     {
         var sb = new StringBuilder(tool.Label).Append('\n');
         sb.Append("Cost: ").Append(GameText.Cost(Content, ToolCost(tool)));
@@ -89,8 +82,6 @@ public partial class Hud
             sb.Append('\n').Append(GameText.Recipe(Content, Content.Recipes[rid]));
         else if (!tool.IsFrame && Content.RecipesByBuilding.GetValueOrDefault(tool.BuildingId) is { Count: > 0 } rs && rs.All(r => r.Inputs.Count == 0))
             sb.Append("\nMines whatever deposit it sits on");
-        if (locked && LockingTech(tool) is { } tech)
-            sb.Append($"\nLocked: unlocks with {tech.Name} ({ConditionText(tech.Condition)})");
         return sb.ToString();
     }
 
@@ -105,8 +96,6 @@ public partial class Hud
                 var missing = ToolCost(tool).Where(kv => tile.Inventory.Get(kv.Key) < kv.Value)
                     .Select(kv => $"{kv.Value - tile.Inventory.Get(kv.Key)} more {GameText.ItemName(Content, kv.Key)}");
                 return "needs " + string.Join(", ", missing);
-            case PlaceResult.Locked:
-                return LockingTech(tool) is { } tech ? $"locked until {tech.Name} ({ConditionText(tech.Condition)})" : "locked";
             case PlaceResult.NeedsDeposit:
                 return "must sit on an ore deposit";
             case PlaceResult.Blocked:

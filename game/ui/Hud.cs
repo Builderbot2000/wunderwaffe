@@ -12,12 +12,12 @@ namespace Wunderwaffe.Game.Screens;
 /// The in-game HUD (UI-001, UI-002), built in code. This file has the layout, overlays and per-frame refresh; each panel's
 /// contents live in a partial next to it:
 /// <list type="bullet">
-/// <item><c>Hud.Objectives.cs</c>: current goal, tech line, toasts, tech tree (top right).</item>
+/// <item><c>Hud.Objectives.cs</c>: current goal and toasts (top right).</item>
 /// <item><c>Hud.SidePanel.cs</c>: the viewed tile's inventory, or the selected world tile with claim/open (left).</item>
 /// <item><c>Hud.BuildBar.cs</c>: build bar and what the picked building would do (bottom centre).</item>
 /// <item><c>Hud.Hover.cs</c>: what's under the cursor (bottom left).</item>
 /// </list>
-/// F1 opens the controls, T the tech tree, F2 the performance line.
+/// F1 opens the controls, F2 the performance line.
 /// </summary>
 public partial class Hud : Control
 {
@@ -39,7 +39,7 @@ public partial class Hud : Control
     Label _title = null!, _clock = null!, _stats = null!;
     VBoxContainer _sideInfo = null!;
     Button _claim = null!, _enter = null!;
-    Label _goalStep = null!, _goalName = null!, _goalText = null!, _goalCount = null!, _techLine = null!;
+    Label _goalStep = null!, _goalName = null!, _goalText = null!, _goalCount = null!;
     ProgressBar _goalBar = null!;
     VBoxContainer _toasts = null!;
     Control _buildArea = null!;
@@ -49,10 +49,9 @@ public partial class Hud : Control
     PanelContainer _hoverPanel = null!;
     VBoxContainer _hover = null!;
     Label _hints = null!;
-    Control _help = null!, _tech = null!, _complete = null!;
-    VBoxContainer _techList = null!;
+    Control _help = null!, _complete = null!;
 
-    int _seenUnlocks, _seenGoals;
+    int _seenGoals;
     Control? _welcome;
     bool _showStats;
     double _slowTimer;
@@ -71,7 +70,6 @@ public partial class Hud : Control
         BuildBottom();
         BuildOverlays();
 
-        _seenUnlocks = MyState?.UnlockLog.Count ?? 0;
         _seenGoals = MyState?.GoalsDone ?? 0;
         _host.WatchView(this, OnViewChanged);
 
@@ -145,12 +143,10 @@ public partial class Hud : Control
         _goalCount = Ui.Label("", Ui.SmallFont, Ui.Text);
         bar.AddChild(_goalBar);
         bar.AddChild(_goalCount);
-        _techLine = Ui.Label("", Ui.SmallFont, Ui.Muted, RightWidth - 24);
         goal.AddChild(_goalStep);
         goal.AddChild(_goalName);
         goal.AddChild(_goalText);
         goal.AddChild(bar);
-        goal.AddChild(_techLine);
         col.AddChild(Ui.Panel(goal));
 
         _toasts = Ui.Column(6);
@@ -191,7 +187,6 @@ public partial class Hud : Control
         var buttons = Ui.Row(6);
         buttons.Alignment = BoxContainer.AlignmentMode.End;
         buttons.AddChild(Ui.Button("Help  F1", () => Toggle(_help)));
-        buttons.AddChild(Ui.Button("Tech  T", () => Toggle(_tech)));
         buttons.AddChild(Ui.Button("Menu  Esc", PauseMenu.Open));
         right.AddChild(buttons);
         AddChild(right);
@@ -200,8 +195,6 @@ public partial class Hud : Control
     void BuildOverlays()
     {
         _help = Modal("Controls", HelpText());
-        _techList = Ui.Column(10);
-        _tech = Modal("Tech tree", null, _techList);
 
         var done = Ui.Column(10);
         done.AddChild(Ui.Label("You found coal, linked your tiles, made steel and flew your first unit. " +
@@ -239,10 +232,8 @@ public partial class Hud : Control
     void Toggle(Control c)
     {
         bool show = !c.Visible;
-        _help.Visible = _tech.Visible = false;
+        _help.Visible = false;
         c.Visible = show;
-        if (show && c == _tech)
-            RefreshTech();
     }
 
     static string HelpText() => string.Join("\n", [
@@ -265,7 +256,7 @@ public partial class Hud : Control
         "    G with units selected lands them",
         "",
         "Camera: WASD or arrows pan · wheel zooms · middle-drag pans",
-        "Debug: F2 performance · F3 stress test · F4 unlock everything and add 1000 of each item",
+        "Debug: F2 performance · F3 stress test · F4 add 1000 of each item",
     ]);
 
     // ---- Per frame ----
@@ -274,12 +265,10 @@ public partial class Hud : Control
     {
         if (e.IsActionPressed(InputActions.Help))
             Toggle(_help);
-        else if (e.IsActionPressed(InputActions.TechTree))
-            Toggle(_tech);
         else if (e.IsActionPressed(InputActions.DebugStats))
             _stats.Visible = _showStats = !_showStats;
-        else if (e.IsActionPressed(InputActions.Cancel) && (_help.Visible || _tech.Visible))
-            _help.Visible = _tech.Visible = false;
+        else if (e.IsActionPressed(InputActions.Cancel) && _help.Visible)
+            _help.Visible = false;
         else
             return;
         GetViewport().SetInputAsHandled();
@@ -324,8 +313,6 @@ public partial class Hud : Control
             _hoverPanel.Visible = _host.Selected.Count > 0 && SetHover(UnitTool.Status);
             _hints.Text = "Double-click your tile to open it · C claims · Tab back";
         }
-        if (_tech.Visible)
-            RefreshTech();
     }
 
     void SaveNow()

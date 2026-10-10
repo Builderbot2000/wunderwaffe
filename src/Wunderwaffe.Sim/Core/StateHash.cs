@@ -83,6 +83,8 @@ internal sealed class StateHash
             Mix(b.Y);
             Mix(b.Rotation);
             Mix(b.RecipeId);
+            Mix(b.Owner);
+            Mix(b.Hp);
             MixEntity(b);
         }
     }
@@ -124,11 +126,6 @@ internal sealed class StateHash
         Mix(p.Produced);
         Mix(p.Shipped);
         Mix(p.Launched);
-        foreach (var u in p.UnlockLog)
-        {
-            Mix(u.Tick);
-            Mix(u.TechId);
-        }
         foreach (long t in p.GoalTicks)
             Mix(t);
     }
@@ -151,6 +148,7 @@ internal sealed class StateHash
             Mix(blk.GX);
             Mix(blk.GY);
             Mix(blk.Rotation);
+            Mix(blk.Hp);
         }
         if (u.Route is { } route)
         {

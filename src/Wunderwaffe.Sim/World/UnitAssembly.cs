@@ -159,7 +159,7 @@ public static class UnitAssembly
                 for (int cx = b.X; cx < b.X + b.Width; cx++, i++)
                     mass[(cx, cy)] += total / n + (i < total % n ? 1 : 0);
             }
-            blocks.Add(new UnitBlock(b.DefId, b.X - core.X, b.Y - core.Y, b.Width, b.Height, b.Rotation, b.RecipeId));
+            blocks.Add(new UnitBlock(b.DefId, b.X - core.X, b.Y - core.Y, b.Width, b.Height, b.Rotation, b.RecipeId, b.Hp));
         }
 
         var body = cells.Select(c => (c.X - core.X, c.Y - core.Y, mass[c])).ToList();
@@ -232,7 +232,7 @@ public static class UnitAssembly
         foreach (var (block, x, y, w, h, rotation) in plan.Blocks)
         {
             var recipe = block.RecipeId == null ? null : sim.Content.Recipes[block.RecipeId];
-            tile.Grid.Add(sim.Content.Buildings[block.DefId], x, y, w, h, rotation, recipe);
+            tile.Grid.Add(sim.Content.Buildings[block.DefId], unit.Owner, x, y, w, h, rotation, recipe, block.Hp);
         }
         sim.RemoveUnit(unit);
         return DeployResult.Ok;

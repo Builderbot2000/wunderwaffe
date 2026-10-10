@@ -25,6 +25,7 @@ public sealed partial class Simulation(ContentDb content)
     readonly Dictionary<int, Unit> _unitsById = [];
     readonly List<PlayerState> _players = [];
     readonly List<LoggedCommand> _log = [];
+    readonly List<int> _startTileIds = [];
     int _nextUnitId = 1;
 
     public ContentDb Content { get; } = content;
@@ -35,7 +36,10 @@ public sealed partial class Simulation(ContentDb content)
     public WorldMap Map => _map;
 
     /// <summary>The tile <see cref="GenerateWorld"/> picked for the first player, or -1.</summary>
-    public int StartTileId { get; private set; } = -1;
+    public int StartTileId => _startTileIds.Count > 0 ? _startTileIds[0] : -1;
+
+    /// <summary>The starting tile <see cref="GenerateWorld"/> picked for each player, indexed by player id.</summary>
+    public IReadOnlyList<int> StartTileIds => _startTileIds;
 
     /// <summary>What the match was built from, if it came from <see cref="NewGame"/>. Saves need it.</summary>
     public GameSetup? Setup { get; private set; }
@@ -52,12 +56,18 @@ public sealed partial class Simulation(ContentDb content)
     /// <summary>All units, in id order.</summary>
     public IReadOnlyList<Unit> Units => _units;
 
-    /// <summary>A whole match: the world from <paramref name="setup"/>, with <paramref name="player"/> settled in the middle.</summary>
-    public static Simulation NewGame(ContentDb content, GameSetup setup, int player = 0)
+    /// <summary>
+    /// A whole match: the world from <paramref name="setup"/>, with each of its players (ids 0 up) settled on their
+    /// starting tile. Player 0 starts in the middle.
+    /// </summary>
+    public static Simulation NewGame(ContentDb content, GameSetup setup)
     {
+        if (setup.Players is < 1 or > GameSetup.MaxPlayers)
+            throw new ArgumentOutOfRangeException(nameof(setup), $"{setup.Players} players; 1 to {GameSetup.MaxPlayers} allowed");
         var sim = new Simulation(content) { Setup = setup };
-        sim.GenerateWorld(setup.Width, setup.Height, setup.Seed);
-        sim.SettleStartingTile(sim.Tiles[sim.StartTileId], player);
+        sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, setup.Players);
+        for (int p = 0; p < setup.Players; p++)
+            sim.SettleStartingTile(sim.Tiles[sim.StartTileIds[p]], p);
         return sim;
     }
 
@@ -112,18 +122,10 @@ public sealed partial class Simulation(ContentDb content)
         _unitsById.Remove(unit.Id);
     }
 
-    /// <summary>Setup and debug: completes a tech node outside its condition. During a match use <see cref="DebugUnlockCommand"/>.</summary>
-    public void GrantTech(int player, string techId)
-    {
-        if (!Content.Tech.ContainsKey(techId))
-            throw new ArgumentException($"unknown tech '{techId}'", nameof(techId));
-        Player(player).Unlock(techId, Tick);
-    }
-
     /// <summary>Queues a command to apply at the start of the next <see cref="Step"/>.</summary>
     public void Enqueue(Command command) => _pending.Add(command);
 
-    /// <summary>One tick: queued commands, then each tile's entities, then units, then tech and goals.</summary>
+    /// <summary>One tick: queued commands, then each tile's entities, then units, then goals.</summary>
     public void Step()
     {
         foreach (var command in _pending)
@@ -170,7 +172,7 @@ public sealed partial class Simulation(ContentDb content)
 
         tile.Inventory.TryTake(plan.Def.Cost);
         var recipe = plan.RecipeId == null ? null : Content.Recipes[plan.RecipeId];
-        tile.Grid.Add(plan.Def, plan.X, plan.Y, plan.Width, plan.Height, plan.Rotation, recipe);
+        tile.Grid.Add(plan.Def, player, plan.X, plan.Y, plan.Width, plan.Height, plan.Rotation, recipe);
         return PlaceResult.Ok;
     }
 

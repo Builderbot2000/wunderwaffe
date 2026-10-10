@@ -44,6 +44,7 @@ public enum BuildingKind
 
 public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower);
 
+/// <param name="Hp">Hit points of one placed block (one building, wherever it stands: tile or unit). Must be &gt; 0.</param>
 /// <param name="Speed">Conveyors only: how far an item moves along a cell each tick, out of <c>BeltState.CellLength</c>.</param>
 /// <param name="Thrust">Thrusters only: force on the unit while it is active.</param>
 public sealed record BuildingDef(
@@ -53,6 +54,7 @@ public sealed record BuildingDef(
     int Height,
     int Power,
     Dictionary<string, int> Cost,
+    int Hp,
     [property: JsonConverter(typeof(SnakeCaseEnumConverter))] BuildingKind Kind = BuildingKind.Machine,
     int Speed = 0,
     int Thrust = 0)
@@ -62,7 +64,7 @@ public sealed record BuildingDef(
 }
 
 /// <summary>
-/// What a player must have done for a tech node or goal to complete (TT-002). Counts are cumulative per player:
+/// What a player must have done for a goal to complete. Counts are cumulative per player:
 /// <list type="bullet">
 /// <item><c>produce</c>: <see cref="Item"/> made by machines, extraction included.</item>
 /// <item><c>claim</c>: tiles owned at once.</item>
@@ -74,10 +76,6 @@ public sealed record UnlockCondition(string Type, string? Item = null, int Amoun
 {
     public static readonly IReadOnlyList<string> Types = ["produce", "claim", "ship", "launch"];
 }
-
-/// <summary>Tech node unlocked by acquiring resources, not science points (TT-001).</summary>
-/// <param name="Unlocks">Building and recipe ids. Content no node unlocks is available from the start (TT-004).</param>
-public sealed record TechDef(string Id, string Name, UnlockCondition Condition, List<string> Unlocks);
 
 /// <summary>One step of the guided objective chain. Goals complete in file order.</summary>
 public sealed record GoalDef(string Id, string Name, string Description, UnlockCondition Condition);

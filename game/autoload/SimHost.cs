@@ -149,7 +149,7 @@ public partial class SimHost : Node
     /// <summary>Starts a fresh match and opens it on the world map, centred on the player's first tile.</summary>
     public void StartNew(GameSetup setup, ViewMode view = ViewMode.World)
     {
-        Begin(Simulation.NewGame(Content, setup, LocalPlayer), view);
+        Begin(Simulation.NewGame(Content, setup), view);
         GoTo(GameScene);
     }
 
@@ -160,7 +160,7 @@ public partial class SimHost : Node
         try
         {
             var save = SaveFile.FromJson(FileAccess.GetFileAsString(path));
-            _replay = new Replay(Content, save, LocalPlayer);
+            _replay = new Replay(Content, save);
             return true;
         }
         catch (SaveException e)
@@ -302,6 +302,6 @@ public partial class SimHost : Node
     static ContentDb LoadContent()
     {
         static string Read(string name) => FileAccess.GetFileAsString($"res://data/{name}");
-        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("tech.json"), Read("goals.json"), Read("terrain.json"));
+        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"));
     }
 }

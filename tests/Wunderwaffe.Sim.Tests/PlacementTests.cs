@@ -45,6 +45,20 @@ public class PlacementTests
     }
 
     [Fact]
+    public void PlacedBuildingsBelongToTheirPlacerWithFullHitPoints()
+    {
+        var (sim, tile) = NewSim();
+        sim.Enqueue(new PlaceBuildingCommand(Player, 0, "conveyor", 5, 5));
+        sim.Step();
+        var belt = tile.Grid.BuildingAt(5, 5)!;
+        Assert.Equal(Player, belt.Owner);
+        Assert.Equal(sim.Content.Buildings["conveyor"].Hp, belt.Hp);
+
+        var start = new Simulation(TestContent.Load()).AddStartingTile(0, 0, 1, seed: 1);
+        Assert.Equal(1, start.Grid.Buildings.Single().Owner);
+    }
+
+    [Fact]
     public void CraftersWithSeveralRecipesNeedOneChosen()
     {
         var (sim, tile) = NewSim();
@@ -57,7 +71,7 @@ public class PlacementTests
     public void RotationSwapsFootprint()
     {
         var content = Content.ContentDb.FromJson(
-            "[]", "[]", """[ { "id": "wall", "name": "Wall", "width": 1, "height": 3, "power": 0, "cost": {} } ]""", "[]");
+            "[]", "[]", """[ { "id": "wall", "name": "Wall", "width": 1, "height": 3, "power": 0, "hp": 10, "cost": {} } ]""");
         var sim = new Simulation(content);
         var tile = sim.AddTile(0, 0, Player, size: 10);
 
@@ -87,7 +101,6 @@ public class PlacementTests
     {
         var (sim, tile) = NewSim();
         Assert.Equal(PlaceResult.NotOwner, Check(sim, tile, "conveyor", 5, 5, player: 1));
-        sim.GrantTech(Player, "steelworks");
         Assert.Equal(PlaceResult.CannotAfford, Check(sim, tile, "steel_mill", 5, 5));
     }
 
@@ -106,8 +119,7 @@ public class PlacementTests
     public void RejectsCellsOfOtherTilesAndUnbuildableTerrain()
     {
         // On a generated world a tile's box overlaps its neighbours, and some of its ground is water or peaks.
-        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default, Player);
-        Harness.UnlockAll(sim, Player);
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         foreach (var tile in sim.Tiles)
             tile.Owner = Player;
         var coast = sim.Tiles.First(t => t.Grid.BuildableCount > 0 && t.Grid.BuildableCount < t.Grid.Area);

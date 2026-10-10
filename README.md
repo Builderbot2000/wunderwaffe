@@ -20,15 +20,15 @@
 | `game/input/` | Camera, build tool, default key bindings. |
 | `game/ui/` | Title screen, HUD, pause menu, settings, saves. Built in code from `Ui` helpers, not in .tscn files. |
 | `game/debug/` | Debug tooling: cheats, stress benchmark, scripted `--drive` and `--tour` runs. |
-| `game/data/*.json` | Content: items, recipes, buildings, tech, goals, terrain. |
+| `game/data/*.json` | Content: items, recipes, buildings, goals, terrain. |
 
 ## Playing
 
-The game opens on the title screen (`scenes/title.tscn`): **New game** (seed and map size), **Continue** (newest save), **Load game**, **Settings** (fullscreen, V-Sync), **Quit**. A match starts on the world map; the HUD's objective panel (top right) walks through the demo loop in `goals.json`: mine, smelt, claim a tile with coal, ship it home through ports, make steel, lift off a unit. **Esc** drops the picked building, then clears the unit selection, then opens the pause menu (save, load, settings, quit). **F1** lists the controls, **T** opens the tech tree, **F2** shows fps and sim cost.
+The game opens on the title screen (`scenes/title.tscn`): **New game** (seed and map size), **Continue** (newest save), **Load game**, **Settings** (fullscreen, V-Sync), **Quit**. A match starts on the world map; the HUD's objective panel (top right) walks through the demo loop in `goals.json`: mine, smelt, claim a tile with coal, ship it home through ports, make steel, lift off a unit. **Esc** drops the picked building, then clears the unit selection, then opens the pause menu (save, load, settings, quit). **F1** lists the controls, **F2** shows fps and sim cost. There is no tech tree (TT-001): every building and recipe is available from the start.
 
 Saves are a `GameSetup` plus the command log (`SaveFile`), in `user://saves` (`%APPDATA%\Godot\app_userdata\Wunderwaffe 3037\saves`). Loading replays the log (`Replay`) behind a progress bar, about 1.5 s per hour of play for a mid-sized factory, and warns if the replay doesn't end at the saved state hash (a save from different rules or content).
 
-Debug flags, after `--`: `--stress` (add `--headless` to skip rendering) fills the home tile with 2,000 buildings and prints the sim cost per tick (F3 does the same in-game). `--drive [shot.png]` (needs a window) plays a scripted unit session through the real input path. `--tour out_dir` (needs a window) clicks through title, new game, world map, tile, tech tree, claim, pause, save, quit and continue, logs what happened and saves a screenshot per step; it deletes the saves it made. **F4** unlocks all tech and adds 1,000 of every item to the viewed tile.
+Debug flags, after `--`: `--stress` (add `--headless` to skip rendering) fills the home tile with 2,000 buildings and prints the sim cost per tick (F3 does the same in-game). `--drive [shot.png]` (needs a window) plays a scripted unit session through the real input path. `--tour out_dir` (needs a window) clicks through title, new game, world map, tile, claim, pause, save, quit and continue, logs what happened and saves a screenshot per step; it deletes the saves it made. **F4** adds 1,000 of every item to the viewed tile.
 
 In game, **Tab** switches between the world map and the last tile you viewed. The world map is a blurred picture of every tile's local map, refreshed every few switches (3 by default; **Settings** changes it). On the world map: click selects a tile, double-click or Enter opens one you own, **C** claims the selected unclaimed tile next to one of yours. Drag with the left mouse button from one of your tiles onto an adjacent one of yours to export an item to it (`[` `]` pick the item, `-` `=` set a per-minute limit, `\` switches back to unlimited); drag with the right button to stop.
 
@@ -46,7 +46,7 @@ The world is one global grid of cells (`WorldMap`), generated in phases (`World/
 1. **Terrain** (`TerrainGen`): domain-warped fractal noise for elevation, sunk toward the rim so land forms continents and islands; sea level and land height by rank, so every seed has 55% land and the same share of high ground; priority-flood drainage, which fills deep depressions as lakes and turns cells with a big enough catchment into rivers; moisture from noise and nearness to water. Each cell takes the first terrain in `terrain.json` whose elevation and moisture bands contain it.
 2. **Tiles** (`Partition`): seeds thrown at random, no two closer than ~0.8 of a nominal tile on land and ~1.15 at sea, grow by cheapest path; climbing, coastlines and rivers cost extra, so borders follow ridges, coasts and rivers. Tiny regions merge into a neighbour. The result is RISK-like territories with 2-9 neighbours; ocean tiles are ordinary tiles, from coastal to all water. `GameSetup` width x height is the world size in nominal 96-cell tiles; the tile count is about that.
 3. **I/O zones** (`Zones`): see Ports below.
-4. **Deposits** (`TileGenerator`): patches on buildable ground, centred by each terrain's deposit weights, with the regional rule (RS-003) as before. The start is the land tile nearest the middle with room for a core and at least two land neighbours.
+4. **Deposits** (`TileGenerator`): patches on buildable ground, centred by each terrain's deposit weights, with the regional rule (RS-003) as before. Player 0's start is the land tile nearest the middle with room for a core and at least two land neighbours. With more players (`GameSetup.Players`, no menu option yet), each next start is the eligible tile farthest in tile-graph steps from those already picked: a placeholder until the fair-start algorithm (OQ-22). Every building records the player who placed it (`PlacedBuilding.Owner`).
 
 Two tiles are neighbours if they share at least 3 cell edges. A tile's local map is its bounding box in the world map: local (x, y) is world (OriginX + x, OriginY + y). Cells of the box that belong to other tiles are outside the tile; the tile view shows them dimmed. Water and peaks are unbuildable (`PlaceResult.BadTerrain`). Tests and debugging can still hand-build square tiles with `AddTile(x, y, size)`.
 
@@ -78,8 +78,8 @@ A unit is a group of buildings standing on **frame** (key `0` in the build palet
 - Item `tier`: 1 raw, 2 refined, 3 advanced, 4 exotic. A recipe can't output an item more than one tier above its best input (RS-001).
 - Recipe `ticks` are at 60 ticks/second. A recipe with empty `inputs` is extraction.
 - Items with `"regional": true` (coal) never appear on a starting tile and appear on 35% of other tiles, always including at least one neighbour of each start (RS-003).
-- Tech and goal conditions: `produce` (an item, counted when a batch finishes, extraction included), `claim` (tiles owned), `ship` (items arriving through import ports), `launch` (units lifted off). Counters are per player, empire-wide (TT-005).
-- A building or recipe listed in some tech node's `unlocks` is locked until that node completes (`PlaceResult.Locked`); anything not listed is starter content (TT-004). Each id may be unlocked by one node only.
+- Building `hp`: hit points of one placed block, kept while it rides on a unit. Must be > 0. Nothing deals damage yet.
+- Goal conditions: `produce` (an item, counted when a batch finishes, extraction included), `claim` (tiles owned), `ship` (items arriving through import ports), `launch` (units lifted off). Counters are per player, empire-wide (TT-005).
 - `goals.json` is the guided objective chain, completed in order. `DemoLoopTests` plays the whole chain with real content and no cheats, so a content change that breaks the loop fails the tests.
 - Build-menu order (and hotkeys 1-9, 0) is `buildings.json` order; crafters with several recipes get one slot per recipe, and the unit frame is last.
 

@@ -10,6 +10,8 @@ update `.claude/index.md` in the same change. Keep entries one line where possib
 
 @index.md
 
+Agent-team work (silos A-G): also follow `.claude/team.md` (tick order, file ownership, shared-hotspot rules).
+
 ## Commands
 
 ```
@@ -74,15 +76,15 @@ game/data/*.json ── text ──▶ ContentDb.FromJson (validated) ◀── 
 
 ## Recipes
 
-- **New building with existing behaviour**: add to `buildings.json` (+ recipes in `recipes.json`, unlock in
-  `tech.json`), optional sprite `game/assets/sprites/<id>.png`. Build menu picks it up in file order.
+- **New building with existing behaviour**: add to `buildings.json` with an `hp` (+ recipes in `recipes.json`), optional
+  sprite `game/assets/sprites/<id>.png`. Build menu picks it up in file order.
 - **New building behaviour**: add a `BuildingKind`, runtime state in `World/Entities.cs` + `PlacedBuilding`
   (`TileGrid.cs`), a kind list in `TileGrid.KindList`, stepping in `TileEntities.Step`/`TryInsert`, draining in
   `TileEntities.Drain`, hashing in `StateHash.MixEntity`, validation in `ContentDb.Validate`, hover text in
   `Hud.Hover.cs`.
 - **New command**: record in `Core/Command.cs` + JSON tag; logic as a `Check` + internal apply in the owning
   `World/*` static class (or `Simulation.Try*`); a round-trip case in `SaveTests.EveryCommandKindRoundTrips`.
-- **New tech/goal condition type**: `UnlockCondition.Types`, `Progression.Progress`, a counter on `PlayerState`
+- **New goal condition type**: `UnlockCondition.Types`, `Progression.Progress`, a counter on `PlayerState`
   (hashed), `GameText.ConditionUnit`.
 - **New HUD panel**: a new `Hud.<Panel>.cs` partial; build its controls in `Hud.cs` layout, refresh from `RefreshSlow`.
 - **New view-layer node**: add to `scenes/main.tscn`; in `_Ready` call `SimHost.Instance.ShowOnlyIn(this, ViewMode.Tile)`.

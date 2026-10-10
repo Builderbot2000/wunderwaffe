@@ -56,8 +56,7 @@ public class UnitTests
     [Fact]
     public void AUnitCrossesAnIrregularBorderOnAGeneratedWorld()
     {
-        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default, Me);
-        UnlockAll(sim, Me);
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         var home = sim.Tiles[sim.StartTileId];
         home.Inventory.Add("copper_ore", 10_000);
         home.Inventory.Add("iron_ore", 10_000);
@@ -544,6 +543,29 @@ public class UnitTests
         Assert.Equal("thruster", tile.Grid.BuildingAt(9, 10)!.DefId);
         Assert.Equal("thruster", tile.Grid.BuildingAt(11, 10)!.DefId);
         Assert.Equal(3, tile.Grid.FrameCount);
+    }
+
+    [Fact]
+    public void BlocksKeepTheirHitPointsAndOwnerThroughLiftOffAndLanding()
+    {
+        var sim = NewSim();
+        var tile = Tile(sim);
+        LayScout(sim, tile, 10, 10);
+        var thruster = tile.Grid.BuildingAt(9, 10)!;
+        Assert.Equal(Me, thruster.Owner);
+        Assert.Equal(sim.Content.Buildings["thruster"].Hp, thruster.Hp);
+
+        sim.Enqueue(new ActivateUnitCommand(Me, tile.Id, 10, 10));
+        sim.Step();
+        var unit = Assert.Single(sim.Units);
+        Assert.Equal(sim.Content.Buildings["thruster"].Hp, unit.Blocks.Single(b => b.GX == -1).Hp);
+
+        sim.Enqueue(new DeployUnitCommand(Me, unit.Id));
+        sim.Step();
+        var landed = tile.Grid.BuildingAt(9, 10)!;
+        Assert.Equal(sim.Content.Buildings["thruster"].Hp, landed.Hp);
+        Assert.Equal(Me, landed.Owner);
+        Assert.Equal(sim.Content.Buildings["unit_core"].Hp, tile.Grid.BuildingAt(10, 10)!.Hp);
     }
 
     [Fact]

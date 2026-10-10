@@ -109,8 +109,7 @@ public partial class DebugDriver : Node
                 break;
             case 5:
                 // Three framed cells with an engine on each end and the unit core between (commands: this is the setup).
-                // Unit parts are behind the propulsion tech and cost steel.
-                sim.Enqueue(new DebugUnlockCommand(me, "propulsion"));
+                // Unit parts cost steel.
                 foreach (var item in new[] { "steel", "iron_plate", "copper_plate" })
                     sim.Enqueue(new DebugGrantCommand(me, tile.Id, item, 100));
                 for (int x = CoreX - 1; x <= CoreX + 1; x++)

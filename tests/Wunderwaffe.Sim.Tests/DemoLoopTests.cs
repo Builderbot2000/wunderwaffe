@@ -6,7 +6,7 @@ namespace Wunderwaffe.Sim.Tests;
 
 /// <summary>
 /// Plays the whole goal chain with real content, starting items and costs, using only the commands a player has
-/// (no debug grants or unlocks). If a content change makes the demo loop impossible, this fails.
+/// (no debug grants). If a content change makes the demo loop impossible, this fails.
 /// </summary>
 public class DemoLoopTests(ITestOutputHelper output)
 {
@@ -71,8 +71,8 @@ public class DemoLoopTests(ITestOutputHelper output)
         sim.Step();
         Assert.Equal(3, coal.Grid.BuildingCount);
 
-        // Goal 5: the steel mill unlocks at 100 iron plates; it needs plates from its own smelter and coal from the port.
-        Assert.True(RunUntil(() => me().HasTech("steelworks") && home.Inventory.Has(sim.Content.Buildings["steel_mill"].Cost), 900),
+        // Goal 5: the steel mill, once affordable; it needs plates from its own smelter and coal from the port.
+        Assert.True(RunUntil(() => home.Inventory.Has(sim.Content.Buildings["steel_mill"].Cost), 900),
             $"steel mill not reached: {me().ProducedOf("iron_plate")} plates, inventory {Inv(home)}");
         Place(home, "steel_mill", 92, 46);
         Place(home, "smelter", 92, 49, recipe: "smelt_iron");
@@ -80,10 +80,10 @@ public class DemoLoopTests(ITestOutputHelper output)
         sim.Step();
         Assert.Equal("steel_mill", home.Grid.BuildingAt(92, 46)?.DefId);
 
-        // Goal 6: a unit core on frame, lifted off once propulsion is in and it's affordable.
+        // Goal 6: a unit core on frame, lifted off once the steel goal is met and the core is affordable.
         var unitCost = sim.Content.Buildings["unit_core"].Cost;
-        Assert.True(RunUntil(() => me().HasTech("propulsion") && home.Inventory.Has(unitCost), 900),
-            $"propulsion not reached: {me().ProducedOf("steel")} steel, shipped {me().Shipped}, inventory {Inv(home)}");
+        Assert.True(RunUntil(() => me().ProducedOf("steel") >= 20 && home.Inventory.Has(unitCost), 900),
+            $"unit core not reached: {me().ProducedOf("steel")} steel, shipped {me().Shipped}, inventory {Inv(home)}");
         for (int x = 60; x <= 62; x++)
             Do(new PlaceFrameCommand(Me, home.Id, x, 40));
         Place(home, "unit_core", 61, 40);

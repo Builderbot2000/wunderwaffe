@@ -8,11 +8,9 @@ public static class DebugTools
 {
     const int StressBuildings = 2000;
 
-    /// <summary>F4: every tech node, and plenty of every item on the viewed tile.</summary>
+    /// <summary>F4: plenty of every item on the viewed tile.</summary>
     public static void Cheat(SimHost host)
     {
-        foreach (var tech in host.Content.TechList)
-            host.Sim.Enqueue(new DebugUnlockCommand(host.LocalPlayer, tech.Id));
         foreach (var item in host.Content.Items.Keys)
             host.Sim.Enqueue(new DebugGrantCommand(host.LocalPlayer, host.ViewedTile.Id, item, 1000));
     }

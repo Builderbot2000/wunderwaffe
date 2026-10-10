@@ -21,16 +21,11 @@ public class ProgressionTests
 
     const string Buildings = """
         [
-          { "id": "core", "name": "Core", "kind": "core", "width": 1, "height": 1, "power": 0, "cost": {} },
-          { "id": "drill", "name": "Drill", "width": 1, "height": 1, "power": 0, "cost": {} },
-          { "id": "furnace", "name": "Furnace", "width": 1, "height": 1, "power": 0, "cost": {} },
-          { "id": "wall", "name": "Wall", "width": 1, "height": 1, "power": 0, "cost": {} }
+          { "id": "core", "name": "Core", "kind": "core", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": {} },
+          { "id": "drill", "name": "Drill", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
+          { "id": "furnace", "name": "Furnace", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
+          { "id": "wall", "name": "Wall", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} }
         ]
-        """;
-
-    /// <summary>Mining 3 ore unlocks the wall and the fast furnace recipe.</summary>
-    const string Tech = """
-        [ { "id": "walls", "name": "Walls", "condition": { "type": "produce", "item": "ore", "amount": 3 }, "unlocks": [ "wall", "smelt_fast" ] } ]
         """;
 
     const string Goals = """
@@ -43,7 +38,7 @@ public class ProgressionTests
     /// <summary>A 10x10 tile owned by <see cref="Harness.Me"/> with an ore deposit under (0, 0).</summary>
     static (Simulation Sim, TileState Tile) Small()
     {
-        var sim = new Simulation(ContentDb.FromJson(Items, Recipes, Buildings, Tech, Goals));
+        var sim = new Simulation(ContentDb.FromJson(Items, Recipes, Buildings, Goals));
         var tile = sim.AddTile(0, 0, Me, size: 10);
         tile.Grid.SetDeposit(0, 0, "ore");
         return (sim, tile);
@@ -53,61 +48,14 @@ public class ProgressionTests
         Placement.Check(sim, tile, Me, building, x, y, 0, recipe, out _);
 
     [Fact]
-    public void ContentNoTechUnlocksIsAvailableFromTheStart()
+    public void EveryBuildingAndRecipeIsAvailableFromTheStart()
     {
+        // TT-001: there is no tech tree.
         var (sim, tile) = Small();
         Assert.Equal(PlaceResult.Ok, Check(sim, tile, "drill", 0, 0));
-        Assert.Equal(PlaceResult.Locked, Check(sim, tile, "wall", 5, 5));
-        Assert.Equal(PlaceResult.Locked, Check(sim, tile, "furnace", 5, 5, "smelt_fast"));
-        Assert.Equal(PlaceResult.Ok, Check(sim, tile, "furnace", 5, 5, "smelt_bar"));
-        Assert.Equal("walls", Progression.UnlockingTech(sim.Content, "wall")!.Id);
-        Assert.Null(Progression.UnlockingTech(sim.Content, "drill"));
-    }
-
-    [Fact]
-    public void ProducingTheConditionItemUnlocksTheNode()
-    {
-        // TT-001/TT-002: unlocks come from making things, not from points.
-        var (sim, tile) = Small();
-        sim.Enqueue(new PlaceBuildingCommand(Me, tile.Id, "drill", 0, 0));
-        sim.Enqueue(new PlaceBuildingCommand(Me, tile.Id, "core", 1, 0));
-        Run(sim, 25);
-        Assert.Equal(2, sim.PlayerOrNull(Me)!.ProducedOf("ore"));
-        Assert.Equal(PlaceResult.Locked, Check(sim, tile, "wall", 5, 5));
-
-        Run(sim, 10);
-        Assert.Equal(3, sim.PlayerOrNull(Me)!.ProducedOf("ore"));
         Assert.Equal(PlaceResult.Ok, Check(sim, tile, "wall", 5, 5));
         Assert.Equal(PlaceResult.Ok, Check(sim, tile, "furnace", 5, 5, "smelt_fast"));
-        var unlock = Assert.Single(sim.PlayerOrNull(Me)!.UnlockLog);
-        Assert.Equal("walls", unlock.TechId);
-    }
-
-    [Fact]
-    public void LockedBuildCommandsDoNothing()
-    {
-        var (sim, tile) = Small();
-        sim.Enqueue(new PlaceBuildingCommand(Me, tile.Id, "wall", 5, 5));
-        sim.Step();
-        Assert.Null(tile.Grid.BuildingAt(5, 5));
-
-        sim.Enqueue(new DebugUnlockCommand(Me, "walls"));
-        sim.Enqueue(new PlaceBuildingCommand(Me, tile.Id, "wall", 5, 5));
-        sim.Step();
-        Assert.Equal("wall", tile.Grid.BuildingAt(5, 5)!.DefId);
-    }
-
-    [Fact]
-    public void UnlocksAreEmpireWide()
-    {
-        // TT-005: a node completed on one tile applies on every tile.
-        var (sim, home) = Small();
-        var other = sim.AddTile(1, 0, Me, size: 10);
-        sim.Enqueue(new PlaceBuildingCommand(Me, home.Id, "drill", 0, 0));
-        sim.Enqueue(new PlaceBuildingCommand(Me, home.Id, "core", 1, 0));
-        Run(sim, 40);
-        Assert.Equal(PlaceResult.Ok, Check(sim, other, "wall", 5, 5));
-        Assert.Null(sim.PlayerOrNull(Them));
+        Assert.Equal(PlaceResult.Ok, Check(sim, tile, "furnace", 5, 5, "smelt_bar"));
     }
 
     [Fact]
@@ -121,7 +69,6 @@ public class ProgressionTests
         Run(sim, 40);
         Assert.Equal(0, sim.PlayerOrNull(Me)?.ProducedOf("ore") ?? 0);
         Assert.True(sim.PlayerOrNull(Them)!.ProducedOf("ore") >= 3);
-        Assert.Equal(PlaceResult.Locked, Check(sim, tile, "wall", 5, 5));
     }
 
     [Fact]
@@ -174,22 +121,16 @@ public class ProgressionTests
     {
         var content = TestContent.Load();
         Assert.NotEmpty(content.Goals);
-        Assert.Equal("propulsion", content.UnlockedBy["thruster"]);
-        Assert.Equal("steelworks", content.UnlockedBy["steel_mill"]);
         Assert.True(content.Items["coal"].Regional);
     }
 
     [Theory]
-    [InlineData("""[ { "id": "x", "name": "X", "condition": { "type": "dance", "amount": 1 }, "unlocks": [] } ]""", "unknown condition type")]
-    [InlineData("""[ { "id": "x", "name": "X", "condition": { "type": "produce", "item": "gold", "amount": 1 }, "unlocks": [] } ]""", "unknown condition item")]
-    [InlineData("""[ { "id": "x", "name": "X", "condition": { "type": "claim", "amount": 0 }, "unlocks": [] } ]""", "amount must be > 0")]
-    [InlineData("""
-        [ { "id": "x", "name": "X", "condition": { "type": "claim", "amount": 2 }, "unlocks": [ "wall" ] },
-          { "id": "y", "name": "Y", "condition": { "type": "claim", "amount": 3 }, "unlocks": [ "wall" ] } ]
-        """, "already unlocked by 'x'")]
-    public void InvalidTechIsRejected(string tech, string error)
+    [InlineData("""[ { "id": "x", "name": "X", "description": "", "condition": { "type": "dance", "amount": 1 } } ]""", "unknown condition type")]
+    [InlineData("""[ { "id": "x", "name": "X", "description": "", "condition": { "type": "produce", "item": "gold", "amount": 1 } } ]""", "unknown condition item")]
+    [InlineData("""[ { "id": "x", "name": "X", "description": "", "condition": { "type": "claim", "amount": 0 } } ]""", "amount must be > 0")]
+    public void InvalidGoalsAreRejected(string goals, string error)
     {
-        var ex = Assert.Throws<ContentException>(() => ContentDb.FromJson(Items, Recipes, Buildings, tech));
+        var ex = Assert.Throws<ContentException>(() => ContentDb.FromJson(Items, Recipes, Buildings, goals));
         Assert.Contains(ex.Errors, e => e.Contains(error));
     }
 

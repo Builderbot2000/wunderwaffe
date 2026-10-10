@@ -17,7 +17,6 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(DeployUnitCommand), "deploy_unit")]
 [JsonDerivedType(typeof(MoveUnitsCommand), "move_units")]
 [JsonDerivedType(typeof(DebugGrantCommand), "debug_grant")]
-[JsonDerivedType(typeof(DebugUnlockCommand), "debug_unlock")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -111,15 +110,5 @@ public sealed record DebugGrantCommand(int Player, int TileId, string ItemId, in
     {
         if (sim.TryGetTile(TileId) is { } tile && sim.Content.Items.ContainsKey(ItemId) && Amount > 0)
             tile.Inventory.Add(ItemId, Amount);
-    }
-}
-
-/// <summary>Debug only: completes a tech node without its condition. Must be disabled in multiplayer.</summary>
-public sealed record DebugUnlockCommand(int Player, string TechId) : Command(Player)
-{
-    internal override void Apply(Simulation sim)
-    {
-        if (Player >= 0 && sim.Content.Tech.ContainsKey(TechId))
-            sim.GrantTech(Player, TechId);
     }
 }

@@ -9,20 +9,8 @@ static class Harness
     public const int Me = 0;
     public const int Them = 1;
 
-    /// <summary>A sim where both players hold every tech node, so tests can build anything.</summary>
-    public static Simulation NewSim()
-    {
-        var sim = new Simulation(TestContent.Load());
-        UnlockAll(sim, Me);
-        UnlockAll(sim, Them);
-        return sim;
-    }
-
-    public static void UnlockAll(Simulation sim, int player)
-    {
-        foreach (var id in sim.Content.Tech.Keys)
-            sim.GrantTech(player, id);
-    }
+    /// <summary>An empty sim on the real content, for hand-built tiles.</summary>
+    public static Simulation NewSim() => new(TestContent.Load());
 
     /// <summary>An owned tile with plenty of items to pay for buildings. Tests measure deltas, not totals.</summary>
     public static TileState Tile(Simulation sim, int x = 0, int y = 0, int size = 30, int owner = Me)

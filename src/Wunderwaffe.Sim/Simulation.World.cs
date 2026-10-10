@@ -16,11 +16,12 @@ public sealed partial class Simulation
 
     /// <summary>
     /// Generates the world (WM-001, WM-002, WM-009): terrain over (width x height) nominal tiles, cut into irregular
-    /// tiles of varying size and neighbour count, each with deposits that follow its terrain. Picks
-    /// <see cref="StartTileId"/>. Regional items appear on <see cref="Balance.RegionalChancePercent"/> of tiles, never on
-    /// the start, and always on at least one of its land neighbours (RS-003).
+    /// tiles of varying size and neighbour count, each with deposits that follow its terrain. Picks a start for each of
+    /// <paramref name="players"/> players (<see cref="StartTileIds"/>). Regional items appear on
+    /// <see cref="Balance.RegionalChancePercent"/> of tiles, never on a start, and always on at least one land neighbour
+    /// of each start (RS-003).
     /// </summary>
-    public void GenerateWorld(int width, int height, ulong seed, int tileSize = DefaultTileSize)
+    public void GenerateWorld(int width, int height, ulong seed, int players = 1, int tileSize = DefaultTileSize)
     {
         if (_tiles.Count > 0)
             throw new InvalidOperationException("the world already has tiles");
@@ -44,17 +45,17 @@ public sealed partial class Simulation
             CreateTile(b.X0, b.Y0, b.X1 - b.X0 + 1, b.Y1 - b.Y0 + 1);
         RebuildTopology();
 
-        StartTileId = ChooseStart(w, h);
-        var missing = RegionalExclusions(_tiles[StartTileId], seed);
+        _startTileIds.AddRange(ChooseStarts(w, h, players));
+        var missing = RegionalExclusions(_startTileIds.Select(id => _tiles[id]).ToList(), seed);
         foreach (var t in _tiles)
             TileGenerator.GenerateDeposits(t.Grid, Content, new Rng(seed ^ (ulong)(t.Id + 1) * 0x9E3779B97F4A7C15UL), missing[t.Id]);
     }
 
     /// <summary>
-    /// Per tile, the regional items it gets no deposits of (RS-003): all of them on the start, and each one on
-    /// <c>100 - RegionalChancePercent</c>% of other tiles, but never on every land neighbour of the start.
+    /// Per tile, the regional items it gets no deposits of (RS-003): all of them on the starts, and each one on
+    /// <c>100 - RegionalChancePercent</c>% of other tiles, but never on every land neighbour of a start.
     /// </summary>
-    Dictionary<int, HashSet<string>> RegionalExclusions(TileState start, ulong seed)
+    Dictionary<int, HashSet<string>> RegionalExclusions(List<TileState> starts, ulong seed)
     {
         var missing = _tiles.ToDictionary(t => t.Id, _ => new HashSet<string>(StringComparer.Ordinal));
         var rng = new Rng(seed ^ 0xD1B54A32D192ED03UL);
@@ -62,14 +63,17 @@ public sealed partial class Simulation
         {
             foreach (var t in _tiles)
             {
-                if (t == start || rng.Range(0, 100) >= Balance.RegionalChancePercent)
+                if (starts.Contains(t) || rng.Range(0, 100) >= Balance.RegionalChancePercent)
                     missing[t.Id].Add(item);
             }
-            var near = Neighbors(start).Where(n => IsLand(n, Balance.LandPercent)).ToList();
-            if (near.Count == 0)
-                near = Neighbors(start).ToList();
-            if (near.Count > 0 && near.All(n => missing[n.Id].Contains(item)))
-                missing[near[rng.Range(0, near.Count)].Id].Remove(item);
+            foreach (var start in starts)
+            {
+                var near = Neighbors(start).Where(n => IsLand(n, Balance.LandPercent) && !starts.Contains(n)).ToList();
+                if (near.Count == 0)
+                    near = Neighbors(start).Where(n => !starts.Contains(n)).ToList();
+                if (near.Count > 0 && near.All(n => missing[n.Id].Contains(item)))
+                    missing[near[rng.Range(0, near.Count)].Id].Remove(item);
+            }
         }
         return missing;
     }
@@ -80,21 +84,60 @@ public sealed partial class Simulation
     static bool IsLand(TileState t, int percent) => t.Grid.BuildableCount * 100L >= (long)t.Grid.Area * percent;
 
     /// <summary>
-    /// The land tile nearest the middle of the world with room for a core and at least two land neighbours to expand
-    /// into; failing that, the tile with most buildable ground.
+    /// Starting tiles for <paramref name="players"/> players. Good starts are land tiles with room for a core and at
+    /// least two land neighbours to expand into. Player 0 gets the good start nearest the middle of the world (failing
+    /// that, the tile with most buildable ground); each next player gets the start farthest, in tile-graph steps, from
+    /// those already picked (ties to the lowest id), taken from the good starts and then any tile with room for a core.
+    /// Placeholder spread until the fair-start algorithm (OQ-22).
     /// </summary>
-    int ChooseStart(int w, int h)
+    List<int> ChooseStarts(int w, int h, int players)
     {
         var fits = _tiles.Where(t => CoreSpot(t) != null).ToList();
-        if (fits.Count == 0)
-            throw new InvalidOperationException("no tile has room for a core");
+        if (fits.Count < players)
+            throw new InvalidOperationException($"only {fits.Count} tiles have room for a core, {players} players need one each");
         var good = fits.Where(t => IsLand(t, Balance.StartLandPercent) && Neighbors(t).Count(n => IsLand(n, Balance.LandPercent)) >= 2).ToList();
-        if (good.Count == 0)
-            return fits.MaxBy(t => t.Grid.BuildableCount)!.Id;
-        return good
-            .OrderBy(t => (long)(t.CenterX - w / 2) * (t.CenterX - w / 2) + (long)(t.CenterY - h / 2) * (t.CenterY - h / 2))
-            .ThenBy(t => t.Id)
-            .First().Id;
+        int first = good.Count == 0
+            ? fits.MaxBy(t => t.Grid.BuildableCount)!.Id
+            : good
+                .OrderBy(t => (long)(t.CenterX - w / 2) * (t.CenterX - w / 2) + (long)(t.CenterY - h / 2) * (t.CenterY - h / 2))
+                .ThenBy(t => t.Id)
+                .First().Id;
+        var starts = new List<int> { first };
+        while (starts.Count < players)
+        {
+            var steps = TileSteps(starts);
+            var pool = good.Any(t => !starts.Contains(t.Id)) ? good : fits;
+            starts.Add(pool
+                .Where(t => !starts.Contains(t.Id))
+                .OrderByDescending(t => steps[t.Id])
+                .ThenBy(t => t.Id)
+                .First().Id);
+        }
+        return starts;
+    }
+
+    /// <summary>Fewest border crossings from any of <paramref name="from"/> to each tile; int.MaxValue if unreachable.</summary>
+    int[] TileSteps(List<int> from)
+    {
+        var steps = Enumerable.Repeat(int.MaxValue, _tiles.Count).ToArray();
+        var queue = new Queue<int>();
+        foreach (int id in from)
+        {
+            steps[id] = 0;
+            queue.Enqueue(id);
+        }
+        while (queue.Count > 0)
+        {
+            int id = queue.Dequeue();
+            foreach (int n in _tiles[id].Neighbors)
+            {
+                if (steps[n] != int.MaxValue)
+                    continue;
+                steps[n] = steps[id] + 1;
+                queue.Enqueue(n);
+            }
+        }
+        return steps;
     }
 
     /// <summary>
@@ -252,6 +295,6 @@ public sealed partial class Simulation
     void PlaceCore(TileState tile)
     {
         if (CoreSpot(tile) is { } spot)
-            tile.Grid.Add(CoreDef, spot.X, spot.Y, CoreDef.Width, CoreDef.Height, 0, null);
+            tile.Grid.Add(CoreDef, tile.Owner, spot.X, spot.Y, CoreDef.Width, CoreDef.Height, 0, null);
     }
 }

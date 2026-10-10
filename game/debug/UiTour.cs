@@ -13,7 +13,7 @@ namespace Wunderwaffe.Game.Debug;
 
 /// <summary>
 /// Debug (`-- --tour out_dir`): clicks through the menus and HUD the way a player would (title, new game, world map,
-/// tile, tech tree, pause, save, quit, continue), logs what happened and saves a screenshot per step, so a UI change
+/// tile, pause, save, quit, continue), logs what happened and saves a screenshot per step, so a UI change
 /// can be checked without someone at the keyboard. Needs a window.
 /// </summary>
 public partial class UiTour : Node
@@ -54,8 +54,6 @@ public partial class UiTour : Node
         Step(10, "hover shot", () => Shot("05b_hover"));
         Step(1, "port zones", ShowPortZones);
         Step(10, "port zones shot", () => { Shot("05c_port_zones"); Key(Godot.Key.Escape); });
-        Step(1, "tech", () => Key(Godot.Key.T));
-        Step(10, "tech shot", () => { Shot("06_tech"); Key(Godot.Key.T); });
         Step(5, "world again", () => { Key(Godot.Key.Tab); });
         Step(10, "select coal tile", SelectCoalNeighbour);
         Step(10, "world tile panel", () => { Shot("07_world_coal"); Press("Claim"); });

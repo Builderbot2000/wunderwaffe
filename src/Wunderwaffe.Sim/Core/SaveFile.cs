@@ -55,10 +55,10 @@ public sealed class Replay
     readonly SaveFile _save;
     int _next;
 
-    public Replay(ContentDb content, SaveFile save, int player = 0)
+    public Replay(ContentDb content, SaveFile save)
     {
         _save = save;
-        Sim = Simulation.NewGame(content, save.Setup, player);
+        Sim = Simulation.NewGame(content, save.Setup);
     }
 
     public Simulation Sim { get; }

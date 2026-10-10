@@ -19,7 +19,6 @@ public static class InputActions
     public const string DebugCheat = "debug_cheat";
     public const string DebugStats = "debug_stats";
     public const string Help = "ui_help";
-    public const string TechTree = "ui_tech";
     public const string WorldToggle = "world_toggle";
     public const string WorldEnter = "world_enter";
     public const string WorldClaim = "world_claim";
@@ -41,7 +40,6 @@ public static class InputActions
         Add(DebugCheat, Key.F4);
         Add(DebugStats, Key.F2);
         Add(Help, Key.F1);
-        Add(TechTree, Key.T);
         Add(WorldToggle, Key.Tab);
         Add(WorldEnter, Key.Enter, Key.KpEnter);
         Add(WorldClaim, Key.C);

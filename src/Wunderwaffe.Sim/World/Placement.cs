@@ -18,9 +18,6 @@ public enum PlaceResult
 
     /// <summary>Some cell of the footprint is terrain buildings can't stand on, such as water or peaks (FB-002).</summary>
     BadTerrain,
-
-    /// <summary>The building or its recipe needs a tech node the player hasn't completed (TT-004).</summary>
-    Locked,
 }
 
 /// <summary>A placement that passed every check, ready to apply.</summary>
@@ -42,9 +39,6 @@ public static class Placement
             return PlaceResult.NotOwner;
         if (!content.Buildings.TryGetValue(buildingId, out var def))
             return PlaceResult.NoSuchBuilding;
-        if (!Progression.IsUnlocked(sim, player, buildingId))
-            return PlaceResult.Locked;
-
         rotation &= 3;
         var (w, h) = def.Footprint(rotation);
 
@@ -59,7 +53,7 @@ public static class Placement
         if (def.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && PortRules.ZoneOf(grid, x, y, w, h) < 0)
             return PlaceResult.NotInPortZone;
 
-        var resolved = ResolveRecipe(sim, player, grid, def, x, y, w, h, recipeId);
+        var resolved = ResolveRecipe(sim, grid, def, x, y, w, h, recipeId);
         if (resolved.Error != PlaceResult.Ok)
             return resolved.Error;
 
@@ -72,7 +66,7 @@ public static class Placement
 
     readonly record struct Resolved(PlaceResult Error, string? RecipeId);
 
-    static Resolved ResolveRecipe(Simulation sim, int player, TileGrid grid, BuildingDef def, int x, int y, int w, int h, string? recipeId)
+    static Resolved ResolveRecipe(Simulation sim, TileGrid grid, BuildingDef def, int x, int y, int w, int h, string? recipeId)
     {
         var all = sim.Content.RecipesByBuilding.GetValueOrDefault(def.Id) ?? [];
 
@@ -81,15 +75,12 @@ public static class Placement
             var recipe = all.FirstOrDefault(r => r.Id == recipeId);
             if (recipe == null)
                 return new(PlaceResult.InvalidRecipe, null);
-            if (!Progression.IsUnlocked(sim, player, recipe.Id))
-                return new(PlaceResult.Locked, null);
             if (recipe.Inputs.Count == 0 && CountDeposits(grid, x, y, w, h, recipe.Outputs.Keys.First()) == 0)
                 return new(PlaceResult.NeedsDeposit, null);
             return new(PlaceResult.Ok, recipe.Id);
         }
 
-        var recipes = all.Where(r => Progression.IsUnlocked(sim, player, r.Id)).ToList();
-        var extraction = recipes.Where(r => r.Inputs.Count == 0).ToList();
+        var extraction = all.Where(r => r.Inputs.Count == 0).ToList();
         if (extraction.Count > 0)
         {
             // Mine whichever extractable deposit covers most of the footprint; ties go to the lowest id.
@@ -107,11 +98,10 @@ public static class Placement
             return best == null ? new(PlaceResult.NeedsDeposit, null) : new(PlaceResult.Ok, best.Id);
         }
 
-        return recipes.Count switch
+        return all.Count switch
         {
-            0 when all.Count > 0 => new(PlaceResult.Locked, null),
             0 => new(PlaceResult.Ok, null),
-            1 => new(PlaceResult.Ok, recipes[0].Id),
+            1 => new(PlaceResult.Ok, all[0].Id),
             _ => new(PlaceResult.InvalidRecipe, null),
         };
     }

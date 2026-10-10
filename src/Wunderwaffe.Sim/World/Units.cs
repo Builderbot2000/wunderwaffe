@@ -6,8 +6,12 @@ namespace Wunderwaffe.Sim.World;
 /// <summary>
 /// A building carried by a unit. <paramref name="GX"/>/<paramref name="GY"/> is its top-left cell in the unit's own
 /// grid, whose origin is the unit core's cell; the footprint and rotation are as they were on the tile.
+/// <paramref name="Hp"/> is the building's hit points, carried over from the tile and back on landing.
 /// </summary>
-public sealed record UnitBlock(string DefId, int GX, int GY, int Width, int Height, int Rotation, string? RecipeId);
+public sealed record UnitBlock(string DefId, int GX, int GY, int Width, int Height, int Rotation, string? RecipeId, int Hp)
+{
+    public int Hp { get; internal set; } = Hp;
+}
 
 /// <summary>One cell of a unit's body. Offsets are from the centre of mass, in the unit's own frame.</summary>
 public readonly record struct UnitCell(int GX, int GY, int OffX, int OffY, int Mass);

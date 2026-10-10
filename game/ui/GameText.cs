@@ -32,10 +32,6 @@ public static class GameText
         _ => c.Type,
     };
 
-    /// <summary>The buildings a tech node unlocks, by name.</summary>
-    public static string UnlockNames(ContentDb content, TechDef tech) =>
-        string.Join(", ", tech.Unlocks.Where(content.Buildings.ContainsKey).Select(id => content.Buildings[id].Name));
-
     public static string TerrainName(ContentDb content, string terrainId) =>
         content.TerrainList.FirstOrDefault(t => t.Id == terrainId)?.Name ?? terrainId;
 
