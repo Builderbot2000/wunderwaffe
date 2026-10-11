@@ -57,10 +57,10 @@ public static class Placement
         if (resolved.Error != PlaceResult.Ok)
             return resolved.Error;
 
+        // Filled in before the cost check too, so planners can lay out what they can't pay for yet.
+        plan = new PlacementPlan(def, x, y, w, h, rotation, resolved.RecipeId);
         if (!tile.Inventory.Has(def.Cost))
             return PlaceResult.CannotAfford;
-
-        plan = new PlacementPlan(def, x, y, w, h, rotation, resolved.RecipeId);
         return PlaceResult.Ok;
     }
 

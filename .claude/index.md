@@ -41,6 +41,16 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Gen/Zones.cs` | Phase 3: per-tile I/O zones by multi-source BFS from borders. |
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
+| `Api/GameQuery.cs` | NF-009 read-only observation API for one player (`new GameQuery(sim, player)`): match, players, tiles, cells, buildings, units, goal, events, checks (`CheckPlace`, `CheckClaim`, `CheckActivate`), `Revision`, planner wrappers. Returns `Views` records. The GUI, AI and external drivers all read through it. |
+| `Api/Views.cs` | Plain records `GameQuery` returns (`MatchView`, `PlayerView`, `TileSummary`, `TileView`, `CellView`, `BuildingView`, `UnitView`, `GoalView`, `Spot`, `BeltStep`). Copies, JSON-serialisable. |
+| `Api/Planner.cs` | Read-only layout searches: `FindSpot`, `RouteBelt` (may merge into a belt already ending at the target), `PlanLine` (drill or first stage, stages, belt; optional zone), `FindFrame`, `OutletOf`. Never places; avoids cross-feeding neighbours. |
+| `Ai/AiPlayer.cs` | MP-002 AI seat: stateless `Think` reads `GameQuery`, returns ordinary commands. Priority list Clean/Economy/Steel/Units/Expand/Outposts/Attack. `Expand` is the claim seam (A's scout flow replaces it), `Attack` the combat seam (F). |
+| `Ai/AiDirector.cs` | Runs the AI seats (`GameSetup.IsAi`): `Collect` / `BeforeStep` before each step on the host; replays never run it. |
+| `Core/GameEvents.cs` | UI-003 event list: `GameEventKind` (append only), `GameEvent` (seq, tick, player, tile, unit, item). |
+| `Simulation.Events.cs` | Partial: `Raise` (internal), `Events`, `EventsSince(seq)`, `LastEventSeq`. Output only, not hashed. |
+| `Simulation.Match.cs` | Partial: `Winner`, `EndTick`, `EndReason`, `IsOver` (MP-001). |
+| `World/Victory.cs` | MP-001: `Step` after `Progression.Step` (elimination when a player has no core, domination at `TilesToWin`), `HasCore`, `IsEliminated`. |
+| `World/Alerts.cs` | Derived alerts: once a second raises `InputsStarved` per tile (`StarvedOn`). |
 
 ## game/ (Godot project; namespaces `Wunderwaffe.Game[.Input/.Render/.Screens/.Debug]`)
 
@@ -98,6 +108,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `SimulationTests.cs` | Determinism, starting tile. |
 | `StressTests.cs` | NF-001 tick budget with thousands of buildings. |
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats: content changes that break the loop fail here. |
+| `AiTests.cs` | AI plays the whole goal chain alone (NF-009 driver through commands + queries), two AIs replay from the log, no stall over a long match. |
 
 ## Other
 

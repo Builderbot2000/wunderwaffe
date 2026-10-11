@@ -46,8 +46,8 @@ public static class Planner
 
     /// <summary>
     /// A belt from building <paramref name="from"/> to building <paramref name="to"/>: the shortest run of free cells
-    /// that starts beside <paramref name="from"/>, ends facing <paramref name="to"/> and passes nothing else that would
-    /// push items onto it. Empty if they already touch; null if there is no way.
+    /// that starts beside <paramref name="from"/>, ends facing <paramref name="to"/> (or merging into a belt that already
+    /// ends there) and passes nothing else that would push items onto it. Empty if they already touch; null if there is no way.
     /// </summary>
     public static IReadOnlyList<BeltStep>? RouteBelt(Simulation sim, TileState tile, int from, int to)
     {
@@ -56,23 +56,40 @@ public static class Planner
     }
 
     /// <summary>
-    /// A whole production line, placed together: a drill on <paramref name="depositItem"/> (or the existing building
-    /// <paramref name="source"/>), then each of <paramref name="stages"/> touching the one before, then a belt into
-    /// building <paramref name="sink"/>. Null if no layout fits. The caller places them in order in one tick.
+    /// A whole production line, placed together: a drill on <paramref name="depositItem"/>, or the existing building
+    /// <paramref name="source"/>, or (with neither) the first stage anywhere, inside the I/O zone facing tile
+    /// <paramref name="zone"/> if given; then each of <paramref name="stages"/> touching the one before, then a belt
+    /// into building <paramref name="sink"/>. Null if no layout fits. The caller places them in order in one tick.
     /// </summary>
     public static IReadOnlyList<PlannedBuilding>? PlanLine(Simulation sim, TileState tile, int player, string? depositItem, int source,
-        IReadOnlyList<Stage> stages, int sink)
+        IReadOnlyList<Stage> stages, int sink, int zone = -1)
     {
         var layout = new Layout(sim, tile);
         if (layout.Real(sink) is not { } target)
             return null;
         var (sx, sy) = (target.X + target.W / 2, target.Y + target.H / 2);
 
+        if (depositItem == null && source >= 0)
+            return layout.Real(source) is { } start ? layout.Extend(player, start, stages, target, []) : null;
         if (depositItem == null)
         {
-            if (layout.Real(source) is not { } start)
+            if (stages.Count == 0 || !sim.Content.Buildings.TryGetValue(stages[0].BuildingId, out var first))
                 return null;
-            return layout.Extend(player, start, stages, target, []);
+            int anchors = 0;
+            foreach (var (x, y) in layout.Candidates(first, null, null, sx, sy))
+            {
+                var node = layout.TryNode(player, first, x, y, stages[0].RecipeId, null, null, stages.Count == 1 ? target : null);
+                if (node == null || (zone >= 0 && PortRules.ZoneOf(tile.Grid, x, y, node.W, node.H) != zone))
+                    continue;
+                layout.Push(node);
+                var plan = layout.Extend(player, node, stages.Skip(1).ToList(), target, [new PlannedBuilding(first.Id, x, y, 0, stages[0].RecipeId)]);
+                layout.Pop();
+                if (plan != null)
+                    return plan;
+                if (++anchors >= DrillTries)
+                    break;
+            }
+            return null;
         }
 
         var drill = sim.Content.Buildings.Values.FirstOrDefault(d =>
@@ -383,10 +400,36 @@ public static class Planner
                 return false;
             foreach (var d in Directions.All)
             {
-                if (At(x + d.Dx(), y + d.Dy()) is { } n && n != from && n != to && n.Dumps)
+                if (At(x + d.Dx(), y + d.Dy()) is not { } n || n == from || n == to)
+                    continue;
+                if (n.Dumps || (n.Real is { Kind: BuildingKind.Conveyor } belt && PointsAt(belt, x, y)))
                     return false;
             }
             return true;
+        }
+
+        static bool PointsAt(PlacedBuilding belt, int x, int y)
+        {
+            var d = Directions.FromRotation(belt.Rotation);
+            return belt.X + d.Dx() == x && belt.Y + d.Dy() == y;
+        }
+
+        /// <summary>
+        /// The direction from (x, y) into a belt that already ends in <paramref name="to"/> and doesn't point back at
+        /// (x, y), so a new belt can merge into it from behind or the side; null if there is none. Lets lines share the
+        /// last stretch when every cell beside the target is taken.
+        /// </summary>
+        Direction? JoinAt(int x, int y, Node to)
+        {
+            if (to.Real == null)
+                return null;
+            foreach (var d in Directions.All)
+            {
+                if (At(x + d.Dx(), y + d.Dy()) is { Real: { Kind: BuildingKind.Conveyor } belt } && !PointsAt(belt, x, y)
+                    && EndOfBelt(_g, belt) == to.Real)
+                    return d;
+            }
+            return null;
         }
 
         public List<BeltStep>? Route(Node from, Node to)
@@ -409,7 +452,7 @@ public static class Planner
             {
                 int i = queue.Dequeue();
                 int x = i % w, y = i / w;
-                if (Touches(to, x, y))
+                if (Touches(to, x, y) || JoinAt(x, y, to) != null)
                     return Steps(prev, i, to);
                 foreach (var d in Directions.All)
                 {
@@ -438,7 +481,7 @@ public static class Planner
                 if (k + 1 < cells.Count)
                     dir = Directions.All.First(d => x + d.Dx() == cells[k + 1].X && y + d.Dy() == cells[k + 1].Y);
                 else
-                    dir = Directions.All.First(d => At(x + d.Dx(), y + d.Dy()) == to);
+                    dir = Directions.All.FirstOrDefault(d => At(x + d.Dx(), y + d.Dy()) == to, JoinAt(x, y, to) ?? Direction.North);
                 steps.Add(new BeltStep(x, y, Rotation(dir)));
             }
             return steps;

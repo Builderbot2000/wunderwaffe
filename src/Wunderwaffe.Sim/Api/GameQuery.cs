@@ -18,6 +18,9 @@ public sealed partial class GameQuery(Simulation sim, int player)
 
     public ContentDb Content => sim.Content;
 
+    /// <summary>For the other partial files of this class: primary-constructor parameters are only in scope in this one.</summary>
+    internal Simulation Sim => sim;
+
     public long Tick => sim.Tick;
 
     // ---- Match and players ----
@@ -77,6 +80,13 @@ public sealed partial class GameQuery(Simulation sim, int player)
         return sim.Tiles.Where(t => t.Owner == who).Select(t => t.Id).ToList();
     }
 
+    /// <summary>The tile <paramref name="owner"/> (default: <see cref="Player"/>) started on, or -1.</summary>
+    public int StartTile(int? owner = null)
+    {
+        int who = owner ?? Player;
+        return who >= 0 && who < sim.StartTileIds.Count ? sim.StartTileIds[who] : -1;
+    }
+
     /// <summary>The tile under a world cell, or -1.</summary>
     public int TileAtCell(int worldX, int worldY) => sim.TileAtCell(worldX, worldY)?.Id ?? -1;
 
@@ -113,6 +123,12 @@ public sealed partial class GameQuery(Simulation sim, int player)
             t.Id, t.Name, t.Owner, t.Biome, t.OriginX, t.OriginY, grid.Width, grid.Height, grid.Area, grid.BuildableCount,
             t.Neighbors, terrain, deposits, missing, InventoryOf(t), grid.BuildingCount, ports, claim, payer?.Id ?? -1);
     }
+
+    /// <summary>
+    /// Grows whenever anything on the tile's grid changes (buildings, frames). Drivers can cache layout searches
+    /// against it.
+    /// </summary>
+    public int Revision(int tileId) => sim.TryGetTile(tileId)?.Grid.Revision ?? -1;
 
     /// <summary>A tile's stock of items, by id.</summary>
     public IReadOnlyDictionary<string, long> Inventory(int tileId) =>
@@ -280,8 +296,9 @@ public sealed partial class GameQuery(Simulation sim, int player)
         sim.TryGetTile(tileId) is { } t ? Planner.FindFrame(sim, t, width, height) : null;
 
     /// <summary>See <see cref="Planner.PlanLine"/>.</summary>
-    public IReadOnlyList<PlannedBuilding>? PlanLine(int tileId, string? depositItem, int source, IReadOnlyList<Stage> stages, int sink) =>
-        sim.TryGetTile(tileId) is { } t ? Planner.PlanLine(sim, t, Player, depositItem, source, stages, sink) : null;
+    public IReadOnlyList<PlannedBuilding>? PlanLine(int tileId, string? depositItem, int source, IReadOnlyList<Stage> stages, int sink,
+        int zone = -1) =>
+        sim.TryGetTile(tileId) is { } t ? Planner.PlanLine(sim, t, Player, depositItem, source, stages, sink, zone) : null;
 
     /// <summary>The building whose output ends up in (see <see cref="Planner.OutletOf"/>), or -1.</summary>
     public int OutletOf(int tileId, int buildingId) =>
