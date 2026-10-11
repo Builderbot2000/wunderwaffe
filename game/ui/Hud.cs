@@ -25,7 +25,11 @@ public partial class Hud : Control
     const double SlowRefresh = 0.2;
     const int SideWidth = 400;
     const int RightWidth = 420;
-    const int BuildBarWidth = 1000;
+    /// <summary>
+    /// Build bar width: 13 buttons a row, so at 1920x1080 its panel (centred) clears the hover panel on the left and
+    /// the hints and buttons on the right, which are held to <see cref="RightWidth"/>.
+    /// </summary>
+    const int BuildBarWidth = 936;
 
     [Export] public BuildTool BuildTool = null!;
     [Export] public WorldMapView WorldMap = null!;
@@ -188,7 +192,7 @@ public partial class Hud : Control
         // Hints and menu buttons, bottom right.
         var right = Ui.Pin(Ui.Column(6), LayoutPreset.BottomRight);
         right.Alignment = BoxContainer.AlignmentMode.End;
-        _hints = Ui.Label("", Ui.SmallFont, Ui.Muted);
+        _hints = Ui.Label("", Ui.SmallFont, Ui.Muted, RightWidth);
         _hints.HorizontalAlignment = HorizontalAlignment.Right;
         right.AddChild(_hints);
         var buttons = Ui.Row(6);
@@ -330,7 +334,7 @@ public partial class Hud : Control
             RefreshStats();
             _hints.Text = BuildTool.HasTool
                 ? "R rotate · drag to place a line · right-click removes · Esc drops the building"
-                : "Tab world map · 1-9 pick a building · P production · drag to select units";
+                : "Tab world map · 1-9 pick a building · O production · drag to select units";
         }
         else
         {
