@@ -154,7 +154,8 @@ public partial class SimHost : Node
     /// <summary>Opens one of the local player's tiles. Returns false for tiles they don't own.</summary>
     public bool EnterTile(int tileId)
     {
-        if (Sim.TryGetTile(tileId) is not { } tile || tile.Owner != LocalPlayer)
+        // Any tile the player has presence on (WM-015): owned, or holding a building or unit of theirs.
+        if (Sim.TryGetTile(tileId) is not { } tile || !Territory.HasPresence(Sim, LocalPlayer, tile))
             return false;
         _viewedTileId = tile.Id;
         if (View != ViewMode.Tile)

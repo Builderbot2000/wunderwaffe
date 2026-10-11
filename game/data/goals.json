@@ -12,15 +12,21 @@
     "condition": { "type": "produce", "item": "iron_plate", "amount": 100 }
   },
   {
+    "id": "scout",
+    "name": "Lift off your scout",
+    "description": "Steel needs coal, and your home tile has none. Your scout stands on its frame above the core: hover its unit core with no building picked and press G to lift it off.",
+    "condition": { "type": "launch", "amount": 1 }
+  },
+  {
     "id": "expand",
-    "name": "Find coal",
-    "description": "Steel needs coal, and your home tile has none. Open the world map (Tab), select a neighbouring tile with coal and claim it (C).",
+    "name": "Claim the coal tile",
+    "description": "Open the world map (Tab), select a neighbouring tile with coal and press C to send the scout to its victory circle. Press G there to land it. Hold a building in the circle until the timer fills and the tile is yours.",
     "condition": { "type": "claim", "amount": 2 }
   },
   {
     "id": "link",
     "name": "Link your tiles",
-    "description": "On the new tile, mine coal and belt it into an export port (6) placed in the I/O zone bordering your home tile. On your home tile, put an import port (7) in the zone bordering the coal tile: ports pair by zone, whichever way they face.",
+    "description": "On the new tile, mine coal (buildings there are paid from your home tile until it has stock of its own) and belt it into an export port (6) placed in the I/O zone bordering your home tile. On your home tile, put an import port (7) in the zone bordering the coal tile: ports pair by zone, whichever way they face.",
     "condition": { "type": "ship", "amount": 30 }
   },
   {
@@ -31,8 +37,8 @@
   },
   {
     "id": "launch",
-    "name": "Lift off",
+    "name": "Build a unit",
     "description": "Lay unit frame (0), put a unit core (8) and thrusters (9) on it, then hover the core with no building picked and press G.",
-    "condition": { "type": "launch", "amount": 1 }
+    "condition": { "type": "launch", "amount": 2 }
   }
 ]

@@ -12,7 +12,7 @@ namespace Wunderwaffe.Sim;
 /// <param name="RichnessPercent">Deposit richness relative to normal (MP-005); 100 is the content as written.</param>
 public sealed record GameSetup(
     int Width, int Height, ulong Seed, int Players = 1,
-    int AiPlayers = 0, int CaptureSeconds = 30, int VictoryPercent = 60, int RichnessPercent = 100)
+    int AiPlayers = 0, int CaptureSeconds = Balance.CaptureSeconds, int VictoryPercent = 60, int RichnessPercent = 100)
 {
     public const int MinSize = 3;
     public const int MaxSize = 15;

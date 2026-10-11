@@ -59,6 +59,13 @@ public static class Palette
 
     public static readonly Color Ground = new(0.16f, 0.17f, 0.19f);
     public static readonly Color Frame = new(0.35f, 0.75f, 0.95f, 0.35f);
+
+    /// <summary>Floating platform deck (FB-017).</summary>
+    public static readonly Color Platform = new(0.55f, 0.42f, 0.28f);
+
+    /// <summary>A tile's victory circle on the tile view (WM-014).</summary>
+    public static readonly Color Circle = new(1f, 0.9f, 0.4f, 0.55f);
+
     public static Color GhostOk => Good with { A = 0.45f };
     public static Color GhostBad => Bad with { A = 0.45f };
     static readonly Color Core = new(0.95f, 0.8f, 0.3f);

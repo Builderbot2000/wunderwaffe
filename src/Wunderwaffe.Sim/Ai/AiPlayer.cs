@@ -234,30 +234,47 @@ public sealed class AiPlayer(int player)
     static Dictionary<string, int> Scale(IReadOnlyDictionary<string, int> cost, int n) => cost.ToDictionary(kv => kv.Key, kv => kv.Value * n);
 
     /// <summary>
-    /// Claims a neighbouring tile: the coal tile first, then, once steel flows, whatever is affordable and best
-    /// (buildable ground, deposits). Expansion seam: today a claim is <see cref="ClaimTileCommand"/>; presence-based
-    /// claiming (WM-006, silo A) replaces this method's body.
+    /// Claims tiles the way a player does (WM-006): a unit flies to a tile's victory circle and lands there, and its
+    /// blocks hold the circle until the timer fills. The coal tile first, then, once steel flows, whichever unclaimed
+    /// neighbour of an owned tile is best (buildable ground, deposits). One unit at a time is sent; the rest stay for
+    /// <see cref="Attack"/>.
     /// </summary>
     IReadOnlyList<Command>? Expand(Context c)
     {
+        var units = c.Q.Units(Player).Where(u => u.MaxSpeed > 0).ToList();
+        // A unit standing in the circle of a tile the AI doesn't own lands there.
+        foreach (var u in units.Where(u => !u.Moving))
+        {
+            var tile = c.Tile(u.TileId);
+            if (tile.Owner != Player && c.Q.InCircle(u.TileId, u.CellX - tile.OriginX, u.CellY - tile.OriginY)
+                && c.Q.CheckDeploy(u.Id) == DeployResult.Ok)
+                return [new DeployUnitCommand(Player, u.Id)];
+        }
+
         int h = c.Home;
         bool haveCoal = c.Owned.Any(t => t != h && c.HasDeposit(t, Coal));
         bool steel = c.Find(h, Mill) != null;
         bool basics = c.Lines(h, "mine_copper_ore", Core) >= 2 && c.Lines(h, "smelt_iron", Core) >= 1;
         if (!basics || (haveCoal && !steel))
             return null;
+        // One claim at a time: a unit on its way to a circle, or a circle being held, waits for the outcome.
+        var tiles = c.Q.Tiles();
+        if (units.Any(u => u.Moving && u.DestTileId >= 0 && tiles[u.DestTileId].Owner != Player && c.Q.InCircle(u.DestTileId, u.DestX, u.DestY))
+            || tiles.Any(t => t.Owner != Player && c.Q.ClaimProgress(t.Id) > 0))
+            return null;
+        if (units.Where(u => !u.Moving).OrderBy(u => u.Id).FirstOrDefault() is not { } scout)
+            return null;
 
         var homeNeighbors = c.Tile(h).Neighbors;
-        var best = c.Q.Tiles()
-            .Where(t => t.Owner == TileState.Unowned && c.Q.CheckClaim(t.Id) == ClaimResult.Ok)
+        var best = tiles
+            .Where(t => t.Owner == TileState.Unowned && c.Owned.Any(o => t.Neighbors.Contains(o)))
             .Select(t => (t.Id, View: c.Tile(t.Id)))
             .Where(t => haveCoal || (homeNeighbors.Contains(t.Id) && t.View.Deposits.ContainsKey(Coal)))
             .OrderByDescending(t => (t.View.Deposits.ContainsKey(Coal) && !haveCoal ? 1000 : 0)
                 + t.View.Buildable * 100 / Math.Max(1, t.View.Area) + t.View.Deposits.Values.Sum() / 20)
             .ThenBy(t => t.Id)
-            .Select(t => t.Id)
-            .DefaultIfEmpty(-1).First();
-        return best < 0 ? null : [new ClaimTileCommand(Player, best)];
+            .FirstOrDefault(t => c.Q.Travel(scout.Id, t.Id, t.View.CircleX, t.View.CircleY) != null);
+        return best.View is not { } target ? null : [new MoveUnitsCommand(Player, [scout.Id], target.Id, target.CircleX, target.CircleY)];
     }
 
     /// <summary>Every other tile: a copper and an iron ore line into its core, so it can pay for the next claim.</summary>
@@ -274,8 +291,8 @@ public sealed class AiPlayer(int player)
     }
 
     /// <summary>
-    /// Sends idle units, once there are <see cref="AttackGroup"/>, at the nearest enemy core (those not there yet). Attack seam: today a
-    /// move order; combat's attack-move (silo F) replaces the command.
+    /// Sends idle units, once there are <see cref="AttackGroup"/>, at the nearest enemy core (those not there yet) with an
+    /// attack-move (CB-001): they fight whatever they meet on the way.
     /// </summary>
     IReadOnlyList<Command>? Attack(Context c)
     {
@@ -296,6 +313,6 @@ public sealed class AiPlayer(int player)
         idle = idle.Where(u => u.TileId != target.Id).ToList();
         if (idle.Count == 0)
             return null;
-        return [new MoveUnitsCommand(Player, idle.Select(u => u.Id).ToArray(), target.Id, core.X + core.Width / 2, core.Y + core.Height / 2)];
+        return [new AttackMoveCommand(Player, idle.Select(u => u.Id).ToArray(), target.Id, core.X + core.Width / 2, core.Y + core.Height / 2)];
     }
 }

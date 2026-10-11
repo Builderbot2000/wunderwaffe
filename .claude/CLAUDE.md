@@ -34,7 +34,7 @@ game/ (Godot, namespace Wunderwaffe.Game.*)            src/Wunderwaffe.Sim (pure
     fixed 60 Hz tick loop, view mode, selection           Step(): commands → TileEntities per tile
   render/  reads sim state, draws                                 → UnitPhysics → Progression → Tick++
   input/   turns mouse/keys into Commands ── Enqueue ──▶  Command.Apply → Simulation.Try*/UnitAssembly/UnitSim
-  ui/      HUD + menus, reads sim, sends Commands         read-only checks (Placement.Check, Expansion.Check,
+  ui/      HUD + menus, reads sim, sends Commands         read-only checks (Placement.Check, Territory.HasPresence,
   debug/   cheats, benchmark, scripted runs                 UnitAssembly.Check*) shared by UI preview and Apply
 game/data/*.json ── text ──▶ ContentDb.FromJson (validated) ◀── tests load the same files
 ```

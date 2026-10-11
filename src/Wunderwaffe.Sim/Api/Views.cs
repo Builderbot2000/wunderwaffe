@@ -31,14 +31,16 @@ public sealed record TileSummary(
 /// <param name="Deposits">Deposit cells per item.</param>
 /// <param name="MissingRegional">Regional items with no deposit here (RS-003).</param>
 /// <param name="Ports">Per neighbour with ports: (neighbour id, exports, imports).</param>
-/// <param name="Claim">What claiming it would do for the asking player.</param>
-/// <param name="ClaimPayer">The tile that would pay for the claim, or -1.</param>
+/// <param name="CircleX">Local cell of the victory circle's centre (WM-014); a building of yours in it claims the tile.</param>
+/// <param name="Presence">Whether the asking player may build or make frames here (WM-015).</param>
+/// <param name="ClaimTicks">The asking player's claim progress, 0 to <paramref name="CaptureTicks"/> (WM-006).</param>
+/// <param name="Contested">Whether more than one player has buildings or units here (WM-004).</param>
 public sealed record TileInfo(
     int Id, string Name, int Owner, string Biome, int OriginX, int OriginY, int Width, int Height,
     int Area, int Buildable, IReadOnlyList<int> Neighbors, IReadOnlyList<TerrainShare> Terrain,
     IReadOnlyDictionary<string, int> Deposits, IReadOnlyList<string> MissingRegional,
     IReadOnlyDictionary<string, long> Inventory, int Buildings, IReadOnlyList<PortLink> Ports,
-    ClaimResult Claim, int ClaimPayer);
+    int CircleX, int CircleY, bool Presence, int ClaimTicks, int CaptureTicks, bool Contested);
 
 /// <summary>How much of a tile is one terrain, in percent.</summary>
 public sealed record TerrainShare(string Terrain, int Percent);
@@ -80,3 +82,32 @@ public sealed record BeltStep(int X, int Y, int Rotation);
 
 /// <summary>A deposit cell.</summary>
 public sealed record DepositCell(int X, int Y, string Item);
+
+/// <summary>How a unit would get somewhere (UC-009).</summary>
+/// <param name="Tiles">Tiles it passes through after its own, ending with the destination.</param>
+/// <param name="Length">Path length in sub-cells.</param>
+/// <param name="Ticks">Estimated travel time, or -1 if it can't move.</param>
+public sealed record TravelView(IReadOnlyList<int> Tiles, long Length, long Ticks);
+
+/// <summary>A squad (UC-002); <paramref name="Members"/> in slot order.</summary>
+public sealed record SquadView(
+    int Id, int Owner, string Name, IReadOnlyList<int> Members, Formation Formation, Stance Stance, OrderKind? Order, int TargetId);
+
+/// <summary>A unit factory's progress (UD-006).</summary>
+/// <param name="Next">Index of the step being built, of <paramref name="Steps"/>.</param>
+public sealed record FactoryView(
+    int BuildingId, FactoryStatus Status, bool Projecting, int Next, int Steps, int Built, int Radius, int BlockCap,
+    IReadOnlyList<StageProgressView> Stages, IReadOnlyDictionary<string, int> Buffer, IReadOnlyDictionary<string, int> Missing);
+
+public sealed record StageProgressView(BuildStage Stage, int Done, int Total);
+
+/// <summary>A power network's balance this tick (FB-005).</summary>
+/// <param name="Satisfaction">Permille of demand met.</param>
+public sealed record PowerView(int Id, IReadOnlyList<int> Members, long Supply, long Demand, long Stored, long Capacity, int Satisfaction);
+
+/// <summary>A tile's production over the last minute (FB-011).</summary>
+public sealed record ProductionView(IReadOnlyList<ItemRate> Items, IReadOnlyList<PartnerRate> Sent);
+
+public sealed record ItemRate(string Item, long MadePerMinute, long UsedPerMinute);
+
+public sealed record PartnerRate(int Partner, long SentPerMinute);

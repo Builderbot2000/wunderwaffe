@@ -19,6 +19,7 @@ namespace Wunderwaffe.Game.Screens;
 /// <item><c>Hud.World.cs</c>: resource summary and armies (UI-001).</item>
 /// <item><c>Hud.Alerts.cs</c>: cross-tile alerts with a filter, click to jump (UI-003).</item>
 /// <item><c>Hud.Match.cs</c>: end screen (MP-001) and multiplayer status (MP-003).</item>
+/// <item><c>Hud.Stats.cs</c>: the viewed tile's production statistics (O, centred).</item>
 /// </list>
 /// F1 opens the controls, F2 the performance line.
 /// </summary>
@@ -27,6 +28,11 @@ public partial class Hud : Control
     const double SlowRefresh = 0.2;
     const int SideWidth = 400;
     const int RightWidth = 420;
+    /// <summary>
+    /// Build bar width: 13 buttons a row, so at 1920x1080 its panel (centred) clears the hover panel on the left and
+    /// the hints and buttons on the right, which are held to <see cref="RightWidth"/>.
+    /// </summary>
+    const int BuildBarWidth = 936;
 
     [Export] public BuildTool BuildTool = null!;
     [Export] public WorldMapView WorldMap = null!;
@@ -58,7 +64,7 @@ public partial class Hud : Control
     Control? _welcome;
     bool _showStats;
     double _slowTimer;
-    int _shownTileId = -1;
+    int _shownTileId = -1, _shownSelection;
     string _sideKey = "";
 
     public override void _Ready()
@@ -72,6 +78,9 @@ public partial class Hud : Control
         BuildRight();
         BuildBottom();
         BuildOverlays();
+        BuildStatsPanel();
+        BuildBlueprints();
+        UnitTool.Notice += text => Toast(text, Ui.Warn);
 
         _seenGoals = MyState?.GoalsDone ?? 0;
         _host.WatchView(this, OnViewChanged);
@@ -94,6 +103,8 @@ public partial class Hud : Control
             _welcome!.QueueFree();
         _buildArea.Visible = tile;
         _claim.GetParent<Control>().Visible = !tile;
+        if (!tile)
+            _statsPanel.Visible = false;
         _sideKey = "";
         RefreshSlow();
     }
@@ -123,7 +134,7 @@ public partial class Hud : Control
         _sideInfo = Ui.Column(4);
         side.AddChild(_sideInfo);
         var buttons = Ui.Row();
-        _claim = Ui.Button("Claim (C)", ClaimSelected);
+        _claim = Ui.Button("Send units (C)", SendToCircle);
         _enter = Ui.Button("Open tile (Enter)", () => _host.EnterTile(SelectedWorldTile().Id));
         buttons.AddChild(_claim);
         buttons.AddChild(_enter);
@@ -187,11 +198,12 @@ public partial class Hud : Control
         // Hints and menu buttons, bottom right.
         var right = Ui.Pin(Ui.Column(6), LayoutPreset.BottomRight);
         right.Alignment = BoxContainer.AlignmentMode.End;
-        _hints = Ui.Label("", Ui.SmallFont, Ui.Muted);
+        _hints = Ui.Label("", Ui.SmallFont, Ui.Muted, RightWidth);
         _hints.HorizontalAlignment = HorizontalAlignment.Right;
         right.AddChild(_hints);
         var buttons = Ui.Row(6);
         buttons.Alignment = BoxContainer.AlignmentMode.End;
+        buttons.AddChild(Ui.Button("Blueprints  B", ToggleLibrary));
         buttons.AddChild(Ui.Button("Help  F1", () => Toggle(_help)));
         buttons.AddChild(Ui.Button("Menu  Esc", PauseMenu.Open));
         right.AddChild(buttons);
@@ -245,6 +257,7 @@ public partial class Hud : Control
     static string HelpText() => string.Join("\n", [
         "World map",
         "    Click selects a tile · double-click or Enter opens one of yours · C claims the selected tile",
+        "    L shows or hides the links between your tiles, with items per minute and transit time",
         "    Tab toggles between the world map and the last tile you viewed",
         "    The map is a blurred picture of each tile, refreshed every few toggles (Settings)",
         "",
@@ -255,11 +268,19 @@ public partial class Hud : Control
         "    Ports go in the I/O zones along the tile's borders: one zone per neighbour, on the side facing it.",
         "    An export port sends to the import ports in the neighbour's zone facing back; items flow both ways.",
         "    Water and peaks can't be built on.",
+        "    Power: machines draw power. A core powers what touches it; power buildings that touch share a network,",
+        "    and wire joins them across gaps. Fuel generators burn fuel for more; batteries store the surplus.",
+        "    Boosters touching a building improve it (hover to see). I sets the hovered sorter's item. O shows production.",
         "",
         "Units",
         "    Lay frame (0) under a unit core and thrusters, hover the core with no building picked and press G",
         "    Left-click / drag selects units · right-click moves them · past the border goes to the next tile",
         "    G with units selected lands them",
+        "    K over a unit core records its design · B opens the blueprint library · R turns and F mirrors a picked blueprint",
+        "    Click a unit factory to select it, then pick a blueprint for it to build within its radius",
+        "    H hold · P then right-click patrols · X retreats · Q makes a squad · T formation · V stance · E escorts the unit under the cursor",
+        "    Right-click an enemy unit or building attacks it · Z then right-click attack-moves (fights on the way)",
+        "    Ctrl+1-9 stores a control group, Alt+1-9 recalls it · Y over a unit core, then right-click: its rally point",
         "",
         "Camera: WASD or arrows pan · wheel zooms · middle-drag pans",
         "Debug: F2 performance · F3 stress test · F4 add 1000 of each item",
@@ -269,12 +290,18 @@ public partial class Hud : Control
 
     public override void _UnhandledInput(InputEvent e)
     {
-        if (e.IsActionPressed(InputActions.Help))
+        if (HandleStatsInput(e))
+            GetViewport().SetInputAsHandled();
+        else if (e.IsActionPressed(InputActions.Help))
             Toggle(_help);
         else if (e.IsActionPressed(InputActions.DebugStats))
             _stats.Visible = _showStats = !_showStats;
         else if (e.IsActionPressed(InputActions.Cancel) && _help.Visible)
             _help.Visible = false;
+        else if (e.IsActionPressed(InputActions.BlueprintLibrary) && _host.View == ViewMode.Tile)
+            ToggleLibrary();
+        else if (e.IsActionPressed(InputActions.Cancel) && _library.Visible)
+            _library.Visible = false;
         else
             return;
         GetViewport().SetInputAsHandled();
@@ -289,12 +316,13 @@ public partial class Hud : Control
         CheckProgress();
         UpdateMatch(delta);
 
-        // A new tile picked on the world map shows at once rather than at the next slow refresh.
+        // A new tile picked on the world map, or a changed unit selection, shows at once rather than at the next slow refresh.
         int selected = _host.View == ViewMode.World ? WorldMap.SelectedTileId : -1;
         _slowTimer -= delta;
-        if (_slowTimer <= 0 || selected != _shownTileId)
+        if (_slowTimer <= 0 || selected != _shownTileId || _host.Selected.Count != _shownSelection)
         {
             _shownTileId = selected;
+            _shownSelection = _host.Selected.Count;
             _slowTimer = SlowRefresh;
             RefreshSlow();
         }
@@ -306,21 +334,23 @@ public partial class Hud : Control
         RefreshGoal();
         RefreshAlerts();
         RefreshWorldHud();
+        RefreshBlueprints();
         if (_host.View == ViewMode.Tile)
         {
             _title.Text = _host.ViewedTile.Name;
             RefreshTileSide();
             RefreshHover();
+            RefreshStats();
             _hints.Text = BuildTool.HasTool
                 ? "R rotate · drag to place a line · right-click removes · Esc drops the building"
-                : "Tab world map · 1-9 pick a building · drag to select units";
+                : "Tab world map · 1-9 pick a building · O production · drag to select units";
         }
         else
         {
             _title.Text = "World map";
             RefreshWorldSide();
             _hoverPanel.Visible = _host.Selected.Count > 0 && SetHover(UnitTool.Status);
-            _hints.Text = "Double-click your tile to open it · C claims · Tab back";
+            _hints.Text = "Double-click your tile to open it · C claims · L logistics overlay · Tab back";
         }
     }
 

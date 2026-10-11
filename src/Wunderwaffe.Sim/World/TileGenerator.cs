@@ -17,7 +17,8 @@ public static class TileGenerator
     /// <c>terrain.json</c>, falling back to any buildable cell when no terrain on the tile carries it.
     /// </summary>
     /// <param name="exclude">Minable items this tile has no deposits of (RS-003).</param>
-    public static void GenerateDeposits(TileGrid grid, ContentDb content, Rng rng, IReadOnlySet<string>? exclude = null)
+    /// <param name="richnessPercent">Scales the number of patches (match setting; 100 is normal), never below one.</param>
+    public static void GenerateDeposits(TileGrid grid, ContentDb content, Rng rng, IReadOnlySet<string>? exclude = null, int richnessPercent = 100)
     {
         if (grid.BuildableCount == 0)
             return;
@@ -32,7 +33,7 @@ public static class TileGenerator
             .ToList();
 
         const long nominal = (long)Simulation.DefaultTileSize * Simulation.DefaultTileSize;
-        int patches = (int)Math.Max(1, (PatchesPerItem * grid.BuildableCount + nominal / 2) / nominal);
+        int patches = (int)Math.Max(1, (PatchesPerItem * grid.BuildableCount * richnessPercent / 100 + nominal / 2) / nominal);
         var weights = new long[grid.Width * grid.Height];
 
         foreach (var item in minable)

@@ -9,8 +9,11 @@ static class Harness
     public const int Me = 0;
     public const int Them = 1;
 
-    /// <summary>An empty sim on the real content, for hand-built tiles.</summary>
-    public static Simulation NewSim() => new(TestContent.Load());
+    /// <summary>An empty sim on the real content with no power draw (<see cref="TestContent.Unpowered"/>), for hand-built tiles.</summary>
+    public static Simulation NewSim() => new(TestContent.Unpowered());
+
+    /// <summary>An empty sim on the real content, power draws included (FB-005).</summary>
+    public static Simulation PoweredSim() => new(TestContent.Load());
 
     /// <summary>An owned tile with plenty of items to pay for buildings. Tests measure deltas, not totals.</summary>
     public static TileState Tile(Simulation sim, int x = 0, int y = 0, int size = 30, int owner = Me)

@@ -13,7 +13,7 @@ namespace Wunderwaffe.Sim.Api;
 /// </summary>
 public sealed partial class GameQuery(Simulation sim, int player)
 {
-    /// <summary>Whose eyes this query sees through: <see cref="TileInfo.Claim"/> and the checks are for them.</summary>
+    /// <summary>Whose eyes this query sees through: <see cref="TileInfo.Presence"/> and the checks are for them.</summary>
     public int Player { get; } = player;
 
     public ContentDb Content => sim.Content;
@@ -127,10 +127,11 @@ public sealed partial class GameQuery(Simulation sim, int player)
             if (exports + imports > 0)
                 ports.Add(new PortLink(n, exports, imports));
         }
-        var claim = Expansion.Check(sim, Player, t.Id, out var payer);
         return new TileInfo(
             t.Id, t.Name, t.Owner, t.Biome, t.OriginX, t.OriginY, grid.Width, grid.Height, grid.Area, grid.BuildableCount,
-            t.Neighbors, terrain, deposits, missing, InventoryOf(t), grid.BuildingCount, ports, claim, payer?.Id ?? -1);
+            t.Neighbors, terrain, deposits, missing, InventoryOf(t), grid.BuildingCount, ports,
+            t.CircleX, t.CircleY, Territory.HasPresence(sim, Player, t), Expansion.Progress(t, Player), Expansion.CaptureTicks(sim),
+            Territory.IsContested(sim, t));
     }
 
     /// <summary>
@@ -276,18 +277,17 @@ public sealed partial class GameQuery(Simulation sim, int player)
         return r is PlaceResult.Ok or PlaceResult.CannotAfford ? plan.RecipeId : null;
     }
 
-    public ClaimResult CheckClaim(int tileId) => Expansion.Check(sim, Player, tileId, out _);
 
     public PlaceResult CheckFrame(int tileId, int x, int y) =>
-        sim.TryGetTile(tileId) is { } t ? UnitAssembly.CheckFrame(t, Player, x, y) : PlaceResult.OutOfBounds;
+        sim.TryGetTile(tileId) is { } t ? UnitAssembly.CheckFrame(Sim, t, Player, x, y) : PlaceResult.OutOfBounds;
 
     public AssembleResult CheckActivate(int tileId, int x, int y) =>
         sim.TryGetTile(tileId) is { } t ? UnitAssembly.CheckActivate(sim, t, Player, x, y, out _) : AssembleResult.NoCore;
 
     public DeployResult CheckDeploy(int unitId) => UnitAssembly.CheckDeploy(sim, Player, unitId, out _);
 
-    /// <summary>True if the tile's stock covers <paramref name="cost"/>.</summary>
-    public bool CanAfford(int tileId, IReadOnlyDictionary<string, int> cost) => sim.TryGetTile(tileId)?.Inventory.Has(cost) ?? false;
+    /// <summary>True if something costing <paramref name="cost"/> on the tile can be paid for: by the tile or an owned neighbour.</summary>
+    public bool CanAfford(int tileId, IReadOnlyDictionary<string, int> cost) => Payer(tileId, cost) >= 0;
 
     // ---- Planning helpers: read-only searches drivers would otherwise have to write themselves ----
 

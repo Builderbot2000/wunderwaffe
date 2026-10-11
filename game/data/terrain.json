@@ -1,13 +1,15 @@
 // Terrain kinds (WM-002, FB-002). A generated cell gets the first entry, in this order, whose elevation and moisture
 // bands (inclusive, 0-1000) contain it. Sea level is elevation 400. "river" marks the terrain used for river cells.
+// "ground"/"naval" say which unit locomotion can cross it (UD-004); by default ground crosses anything but water and
+// naval only water. Air crosses everything.
 // "deposits" weights where each minable item's patches are centred; 0 or absent means never.
 [
-  { "id": "river",         "name": "River",         "color": "#4f86b8", "river": true, "water": true, "buildable": true },
+  { "id": "river",         "name": "River",         "color": "#4f86b8", "river": true, "water": true, "buildable": true, "ground": true },
   { "id": "deep_water",    "name": "Deep Water",    "color": "#1d3a5c", "water": true, "buildable": false, "elevation": [0, 299] },
-  { "id": "shallow_water", "name": "Shallow Water", "color": "#2f5f8a", "water": true, "buildable": false, "elevation": [300, 399] },
+  { "id": "shallow_water", "name": "Shallow Water", "color": "#2f5f8a", "water": true, "buildable": false, "ground": true, "elevation": [300, 399] },
   { "id": "beach",         "name": "Beach",         "color": "#c9b77d", "elevation": [400, 403],
     "deposits": { "copper_ore": 1 } },
-  { "id": "peak",          "name": "Peak",          "color": "#e8e8ec", "buildable": false, "elevation": [900, 1000] },
+  { "id": "peak",          "name": "Peak",          "color": "#e8e8ec", "buildable": false, "ground": false, "elevation": [900, 1000] },
   { "id": "mountain",      "name": "Mountain",      "color": "#7b7468", "elevation": [780, 899],
     "deposits": { "iron_ore": 5, "copper_ore": 3 } },
   { "id": "hills",         "name": "Hills",         "color": "#7d8a55", "elevation": [620, 779],

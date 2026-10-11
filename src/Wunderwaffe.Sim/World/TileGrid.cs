@@ -8,6 +8,10 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     public int Id { get; } = id;
     public string DefId { get; } = def.Id;
     public BuildingKind Kind { get; } = def.Kind;
+    public BuildingDef Def { get; } = def;
+
+    /// <summary>Resource radius in cells (FB-018): <see cref="BuildingDef.SupplyRadius"/>, or <see cref="Balance.CoreSupplyRadius"/> for a core.</summary>
+    public int SupplyRadius { get; } = def.Kind == BuildingKind.Core ? Balance.CoreSupplyRadius : def.SupplyRadius;
 
     /// <summary>Player who placed or landed it; a tile's core belongs to the tile's owner. Need not be the tile's owner.</summary>
     public int Owner { get; internal set; } = owner;
@@ -33,6 +37,26 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     public MachineState? Machine { get; } =
         def.Kind is BuildingKind.Machine or BuildingKind.ImportPort ? new MachineState(recipe) : null;
     public ExportState? Export { get; } = def.Kind == BuildingKind.ExportPort ? new ExportState() : null;
+
+    /// <summary>Weapons, shields and repair blocks (CB-001, FB-010, CB-005). A shield starts fully charged.</summary>
+    public CombatState? Combat { get; } =
+        def.Kind is BuildingKind.Weapon or BuildingKind.Shield or BuildingKind.Repair
+            ? new CombatState { Charge = def.Shield?.Capacity ?? 0, AmmoItem = def.Weapon?.Ammo } : null;
+
+    public FactoryState? Factory { get; } = def.Kind == BuildingKind.UnitFactory ? new FactoryState() : null;
+    public StorageState? Storage { get; } = def.Kind == BuildingKind.Storage ? new StorageState(def.Storage) : null;
+    public BatteryState? Battery { get; } =
+        def.Kind == BuildingKind.Battery ? new BatteryState((long)def.PowerCapacity * Simulation.TicksPerSecond) : null;
+    public RelayState? Relay { get; } = def.Kind switch
+    {
+        BuildingKind.Junction => new RelayState(4),
+        BuildingKind.Router or BuildingKind.Bridge => new RelayState(1),
+        _ => null,
+    };
+    public SorterState? Sorter { get; } = def.Kind == BuildingKind.Sorter ? new SorterState() : null;
+
+    /// <summary>Takes part in a power network (FB-005); see <see cref="BuildingDef.IsPower"/>.</summary>
+    public bool IsPower { get; } = def.IsPower;
 }
 
 /// <summary>
@@ -58,7 +82,13 @@ public sealed class TileGrid
     readonly List<PlacedBuilding> _machines = [];
     readonly List<PlacedBuilding> _exportPorts = [];
     readonly List<PlacedBuilding> _importPorts = [];
+    readonly List<PlacedBuilding> _combat = [];
+    readonly List<PlacedBuilding> _suppliers = [];
+    readonly List<PlacedBuilding> _factories = [];
+    readonly List<PlacedBuilding> _storages = [];
+    readonly List<PlacedBuilding> _relays = [];
     readonly bool[] _frames;
+    readonly bool[] _platforms;
 
     /// <summary>A rectangular tile of buildable ground with no port zones.</summary>
     public TileGrid(int width, int height)
@@ -88,7 +118,11 @@ public sealed class TileGrid
         _cells = new int[width * height];
         _deposits = new string?[width * height];
         _frames = new bool[width * height];
+        _platforms = new bool[width * height];
     }
+
+    /// <summary>A copy of the ground alone (shape, buildability, terrain), with nothing on it: for trying out deposits.</summary>
+    internal TileGrid Blank() => new(Width, Height, _mask, _buildable, _terrain);
 
     static T[] Filled<T>(int n, T value)
     {
@@ -116,6 +150,22 @@ public sealed class TileGrid
 
     public IReadOnlyList<PlacedBuilding> ExportPorts => _exportPorts;
     public IReadOnlyList<PlacedBuilding> ImportPorts => _importPorts;
+    public IReadOnlyList<PlacedBuilding> Storages => _storages;
+
+    /// <summary>Junctions, routers and bridges (FB-004).</summary>
+    public IReadOnlyList<PlacedBuilding> Relays => _relays;
+
+    /// <summary>Power networks and boosted stats, rebuilt from the layout when <see cref="Revision"/> changes (FB-005, FB-016).</summary>
+    public TilePower Power { get; } = new();
+
+    /// <summary>Weapons, shields and repair blocks, in id order: what the combat step visits.</summary>
+    public IReadOnlyList<PlacedBuilding> CombatBuildings => _combat;
+
+    /// <summary>Buildings with a resource radius (FB-018), such as the core and storage, in id order.</summary>
+    public IReadOnlyList<PlacedBuilding> Suppliers => _suppliers;
+
+    /// <summary>Unit factories (UD-006), in id order.</summary>
+    public IReadOnlyList<PlacedBuilding> Factories => _factories;
 
     /// <summary>Cells carrying a unit frame (the floor a unit is built on).</summary>
     public int FrameCount { get; private set; }
@@ -141,8 +191,8 @@ public sealed class TileGrid
     /// <summary>A cell of this tile.</summary>
     public bool InBounds(int x, int y) => InRect(x, y) && _mask[y * Width + x];
 
-    /// <summary>A cell of this tile whose terrain takes buildings (FB-002).</summary>
-    public bool Buildable(int x, int y) => InBounds(x, y) && _buildable[y * Width + x];
+    /// <summary>A cell of this tile whose terrain, or platform (FB-017), takes buildings (FB-002).</summary>
+    public bool Buildable(int x, int y) => InBounds(x, y) && (_buildable[y * Width + x] || _platforms[y * Width + x]);
 
     /// <summary>Terrain index (into <c>ContentDb.TerrainList</c>) of any cell of the box, or 0 outside it.</summary>
     public int TerrainAt(int x, int y) => InRect(x, y) ? _terrain[y * Width + x] : 0;
@@ -170,6 +220,20 @@ public sealed class TileGrid
         Revision++;
     }
 
+    /// <summary>Cells carrying a floating platform (FB-017), which makes water buildable.</summary>
+    public int PlatformCount { get; private set; }
+
+    public bool HasPlatform(int x, int y) => InRect(x, y) && _platforms[y * Width + x];
+
+    internal void SetPlatform(int x, int y, bool on)
+    {
+        if (_platforms[y * Width + x] == on)
+            return;
+        _platforms[y * Width + x] = on;
+        PlatformCount += on ? 1 : -1;
+        Revision++;
+    }
+
     public string? DepositAt(int x, int y) => _deposits[y * Width + x];
 
     public void SetDeposit(int x, int y, string? itemId)
@@ -190,8 +254,34 @@ public sealed class TileGrid
         return counts;
     }
 
+    /// <summary>A building by its id, or null once removed.</summary>
+    public PlacedBuilding? BuildingById(int id) => id > 0 && id < _buildings.Count ? _buildings[id] : null;
+
     public PlacedBuilding? BuildingAt(int x, int y) =>
         InRect(x, y) ? _buildings[_cells[y * Width + x]] : null;
+
+    /// <summary>Buildings sharing an edge with <paramref name="b"/>'s footprint, each once, in id order.</summary>
+    public List<PlacedBuilding> Touching(PlacedBuilding b)
+    {
+        var found = new List<PlacedBuilding>();
+        void At(int x, int y)
+        {
+            if (BuildingAt(x, y) is { } n && n != b && !found.Contains(n))
+                found.Add(n);
+        }
+        for (int x = b.X; x < b.X + b.Width; x++)
+        {
+            At(x, b.Y - 1);
+            At(x, b.Y + b.Height);
+        }
+        for (int y = b.Y; y < b.Y + b.Height; y++)
+        {
+            At(b.X - 1, y);
+            At(b.X + b.Width, y);
+        }
+        found.Sort((p, q) => p.Id.CompareTo(q.Id));
+        return found;
+    }
 
     /// <summary>Every cell of the footprint is part of this tile.</summary>
     public bool InBounds(int x, int y, int w, int h)
@@ -209,14 +299,14 @@ public sealed class TileGrid
         return true;
     }
 
-    /// <summary>Every cell of the footprint is buildable ground. Assumes it is in bounds.</summary>
+    /// <summary>Every cell of the footprint is buildable ground or platform. Assumes it is in bounds.</summary>
     public bool Buildable(int x, int y, int w, int h)
     {
         for (int cy = y; cy < y + h; cy++)
         {
             for (int cx = x; cx < x + w; cx++)
             {
-                if (!_buildable[cy * Width + cx])
+                if (!_buildable[cy * Width + cx] && !_platforms[cy * Width + cx])
                     return false;
             }
         }
@@ -241,6 +331,8 @@ public sealed class TileGrid
         var b = new PlacedBuilding(_buildings.Count, def, owner, x, y, w, h, rotation, recipe, hp);
         _buildings.Add(b);
         KindList(b.Kind)?.Add(b);
+        if (b.SupplyRadius > 0)
+            _suppliers.Add(b);
         Fill(b, b.Id);
         BuildingCount++;
         Revision++;
@@ -252,6 +344,8 @@ public sealed class TileGrid
         Fill(b, 0);
         _buildings[b.Id] = null;
         KindList(b.Kind)?.Remove(b);
+        if (b.SupplyRadius > 0)
+            _suppliers.Remove(b);
         BuildingCount--;
         Revision++;
     }
@@ -262,6 +356,10 @@ public sealed class TileGrid
         BuildingKind.Machine => _machines,
         BuildingKind.ExportPort => _exportPorts,
         BuildingKind.ImportPort => _importPorts,
+        BuildingKind.Weapon or BuildingKind.Shield or BuildingKind.Repair => _combat,
+        BuildingKind.UnitFactory => _factories,
+        BuildingKind.Storage => _storages,
+        BuildingKind.Junction or BuildingKind.Router or BuildingKind.Bridge => _relays,
         _ => null,
     };
 
@@ -271,6 +369,73 @@ public sealed class TileGrid
         {
             for (int cx = b.X; cx < b.X + b.Width; cx++)
                 _cells[cy * Width + cx] = value;
+        }
+    }
+
+    // ---- Wrecks (CB-006): a layer of their own, so the entity sim, pathing and collisions never see them. ----
+
+    // Index = wreck id, slot 0 unused, removed slots stay null (as with buildings). Cells are allocated on first use.
+    readonly List<Wreck?> _wrecks = [null];
+    int[]? _wreckCells;
+
+    public int WreckCount { get; private set; }
+
+    public IEnumerable<Wreck> Wrecks
+    {
+        get
+        {
+            foreach (var w in _wrecks)
+            {
+                if (w != null)
+                    yield return w;
+            }
+        }
+    }
+
+    public Wreck? WreckAt(int x, int y) =>
+        _wreckCells != null && InRect(x, y) ? _wrecks[_wreckCells[y * Width + x]] : null;
+
+    /// <summary>No wreck on any cell of the footprint. Assumes it is in the box.</summary>
+    public bool WreckFree(int x, int y, int w, int h)
+    {
+        if (_wreckCells == null)
+            return true;
+        for (int cy = y; cy < y + h; cy++)
+        {
+            for (int cx = x; cx < x + w; cx++)
+            {
+                if (_wreckCells[cy * Width + cx] != 0)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    internal Wreck AddWreck(string defId, int owner, int x, int y, int w, int h, int rotation)
+    {
+        _wreckCells ??= new int[Width * Height];
+        var wreck = new Wreck(_wrecks.Count, defId, owner, x, y, w, h, rotation);
+        _wrecks.Add(wreck);
+        FillWreck(wreck, wreck.Id);
+        WreckCount++;
+        Revision++;
+        return wreck;
+    }
+
+    internal void RemoveWreck(Wreck wreck)
+    {
+        FillWreck(wreck, 0);
+        _wrecks[wreck.Id] = null;
+        WreckCount--;
+        Revision++;
+    }
+
+    void FillWreck(Wreck w, int value)
+    {
+        for (int cy = w.Y; cy < w.Y + w.Height; cy++)
+        {
+            for (int cx = w.X; cx < w.X + w.Width; cx++)
+                _wreckCells![cy * Width + cx] = value;
         }
     }
 }

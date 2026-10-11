@@ -5,7 +5,6 @@ namespace Wunderwaffe.Sim.World;
 public enum PlaceResult
 {
     Ok,
-    NotOwner,
     NoSuchBuilding,
     OutOfBounds,
     Blocked,
@@ -18,10 +17,19 @@ public enum PlaceResult
 
     /// <summary>Some cell of the footprint is terrain buildings can't stand on, such as water or peaks (FB-002).</summary>
     BadTerrain,
+
+    /// <summary>A wreck lies on the footprint; deconstruct it first (CB-006).</summary>
+    Wreck,
+
+    /// <summary>The player has no building or unit on the tile and doesn't own it (WM-015).</summary>
+    NoPresence,
+
+    /// <summary>The footprint touches an enemy-owned victory circle while a building not of the player's stands in it (WM-015).</summary>
+    EnemyCircle,
 }
 
-/// <summary>A placement that passed every check, ready to apply.</summary>
-public readonly record struct PlacementPlan(BuildingDef Def, int X, int Y, int Width, int Height, int Rotation, string? RecipeId);
+/// <summary>A placement that passed every check, ready to apply. <paramref name="Payer"/> is the tile whose stock pays.</summary>
+public readonly record struct PlacementPlan(BuildingDef Def, int X, int Y, int Width, int Height, int Rotation, string? RecipeId, TileState Payer);
 
 /// <summary>
 /// Building placement rules (FB-002, FB-003). Read-only, so the UI can use the same check to preview
@@ -31,12 +39,12 @@ public static class Placement
 {
     public static PlaceResult Check(
         Simulation sim, TileState tile, int player, string buildingId, int x, int y, int rotation,
-        string? recipeId, out PlacementPlan plan)
+        string? recipeId, out PlacementPlan plan, bool ignoreCost = false)
     {
         plan = default;
         var content = sim.Content;
-        if (tile.Owner != player)
-            return PlaceResult.NotOwner;
+        if (!Territory.HasPresence(sim, player, tile))
+            return PlaceResult.NoPresence;
         if (!content.Buildings.TryGetValue(buildingId, out var def))
             return PlaceResult.NoSuchBuilding;
         rotation &= 3;
@@ -47,8 +55,21 @@ public static class Placement
             return PlaceResult.OutOfBounds;
         if (!grid.IsFree(x, y, w, h))
             return PlaceResult.Blocked;
-        if (!grid.Buildable(x, y, w, h))
+        if (def.Kind == BuildingKind.Platform)
+        {
+            if (AnyPlatform(grid, x, y, w, h))
+                return PlaceResult.Blocked;
+            if (!OnWater(content, grid, x, y, w, h))
+                return PlaceResult.BadTerrain;
+        }
+        else if (!grid.Buildable(x, y, w, h) && !(def.OnWater && StandsOn(content, grid, x, y, w, h)))
+        {
             return PlaceResult.BadTerrain;
+        }
+        if (!grid.WreckFree(x, y, w, h))
+            return PlaceResult.Wreck;
+        if (Territory.EnemyCircleBlocks(tile, player, x, y, w, h))
+            return PlaceResult.EnemyCircle;
 
         if (def.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && PortRules.ZoneOf(grid, x, y, w, h) < 0)
             return PlaceResult.NotInPortZone;
@@ -57,11 +78,54 @@ public static class Placement
         if (resolved.Error != PlaceResult.Ok)
             return resolved.Error;
 
-        // Filled in before the cost check too, so planners can lay out what they can't pay for yet.
-        plan = new PlacementPlan(def, x, y, w, h, rotation, resolved.RecipeId);
-        if (!tile.Inventory.Has(def.Cost))
+        // Filled in before the cost check too, so planners can lay out what they can't pay for yet. With the cost
+        // ignored (a blueprint pays its total at once), the plan's payer is just the tile.
+        var payer = ignoreCost ? tile : Territory.Payer(sim, tile, player, def.Cost);
+        plan = new PlacementPlan(def, x, y, w, h, rotation, resolved.RecipeId, payer ?? tile);
+        if (payer == null)
             return PlaceResult.CannotAfford;
         return PlaceResult.Ok;
+    }
+
+    static bool AnyPlatform(TileGrid grid, int x, int y, int w, int h)
+    {
+        for (int cy = y; cy < y + h; cy++)
+        {
+            for (int cx = x; cx < x + w; cx++)
+            {
+                if (grid.HasPlatform(cx, cy))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Every cell is water terrain (FB-017): where a platform floats.</summary>
+    static bool OnWater(ContentDb content, TileGrid grid, int x, int y, int w, int h)
+    {
+        for (int cy = y; cy < y + h; cy++)
+        {
+            for (int cx = x; cx < x + w; cx++)
+            {
+                if (!content.TerrainList[grid.TerrainAt(cx, cy)].Water)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>Every cell is buildable ground or water, for buildings marked <see cref="BuildingDef.OnWater"/>.</summary>
+    static bool StandsOn(ContentDb content, TileGrid grid, int x, int y, int w, int h)
+    {
+        for (int cy = y; cy < y + h; cy++)
+        {
+            for (int cx = x; cx < x + w; cx++)
+            {
+                if (!grid.Buildable(cx, cy) && !content.TerrainList[grid.TerrainAt(cx, cy)].Water)
+                    return false;
+            }
+        }
+        return true;
     }
 
     readonly record struct Resolved(PlaceResult Error, string? RecipeId);
