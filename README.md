@@ -28,7 +28,7 @@ The game opens on the title screen (`scenes/title.tscn`): **New game** (seed and
 
 Saves are a `GameSetup` plus the command log (`SaveFile`), in `user://saves` (`%APPDATA%\Godot\app_userdata\Wunderwaffe 3037\saves`). Loading replays the log (`Replay`) behind a progress bar, about 1.5 s per hour of play for a mid-sized factory, and warns if the replay doesn't end at the saved state hash (a save from different rules or content).
 
-Debug flags, after `--`: `--stress` (add `--headless` to skip rendering) fills the home tile with 2,000 buildings and prints the sim cost per tick (F3 does the same in-game). `--drive [shot.png]` (needs a window) plays a scripted unit session through the real input path. `--tour out_dir` (needs a window) clicks through title, new game, world map, tile, claim, pause, save, quit and continue, logs what happened and saves a screenshot per step; it deletes the saves it made. **F4** adds 1,000 of every item to the viewed tile.
+Debug flags, after `--`: `--stress` (add `--headless` to skip rendering) opens the NF-001 benchmark world (8 viewed tiles of 2,000 buildings plus 200 rate-mode factory tiles) and prints the sim cost per tick; F3 fills the viewed tile with 2,000 buildings and does the same in-game. `--drive [shot.png]` (needs a window) plays a scripted unit session through the real input path. `--tour out_dir` (needs a window) clicks through title, new game, world map, tile, claim, pause, save, quit and continue, logs what happened and saves a screenshot per step; it deletes the saves it made. **F4** adds 1,000 of every item to the viewed tile.
 
 In game, **Tab** switches between the world map and the last tile you viewed. The world map is a blurred picture of every tile's local map, refreshed every few switches (3 by default; **Settings** changes it). On the world map: click selects a tile, double-click or Enter opens one you own, **C** claims the selected unclaimed tile next to one of yours. Drag with the left mouse button from one of your tiles onto an adjacent one of yours to export an item to it (`[` `]` pick the item, `-` `=` set a per-minute limit, `\` switches back to unlimited); drag with the right button to stop.
 
@@ -37,7 +37,9 @@ In game, **Tab** switches between the world map and the last tile you viewed. Th
 - The sim only changes through `Command`s (lockstep multiplayer, replays — NF-004).
 - No `float`/`double` in sim state; no Godot types in `src/`.
 - Economy tuning not yet in JSON (starting items, claim cost, frame cost, refunds) is in `Balance.cs`.
-- Every tile currently runs the full entity sim. Rate mode for unviewed tiles (FB-012/013/014) is not built yet: it will be derived from the belt graph (OQ-14) and checked against the full sim.
+- **Rate mode (FB-012..014).** Only tiles some player is looking at (the `view_tile` command, sent whenever the view changes, so it is lockstep input) or that are Contested run the full entity sim. Every other tile moves items at rates solved from its building and belt graph (OQ-14), per group of port-linked tiles, so a shortfall in one tile's imports scales down the tiles that depend on it. Its belts and machines freeze where they are and carry on when it is viewed again; nothing is lost or made twice. Over 5 minutes a stable tile's output is within 5% of the full sim (tested). Power and boosters are not in the rate model yet.
+- **Abstract travel (UC-009).** A unit on a rate-mode tile is a world-map node: it follows its terrain-legal route at cruise speed with no physics and materialises where it is when its tile is viewed or Contested. Travel time stays within `AbstractTravel.TolerancePercent` (15%) of the full sim.
+- **Snapshots (NF-008).** Every 5 minutes of play the sim keeps a state snapshot; a save carries the latest one, and loading restores it and replays only the later commands, falling back to a full replay if the hash doesn't match.
 
 ## World
 
