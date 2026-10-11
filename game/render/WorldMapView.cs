@@ -103,7 +103,7 @@ public partial class WorldMapView : Node2D
         else if (e.IsActionPressed(InputActions.WorldClaim))
         {
             if (_host.Sim.TryGetTile(SelectedTileId) is { } tile && _host.Selected.Count > 0)
-                _host.Sim.Enqueue(new MoveUnitsCommand(_host.LocalPlayer, [.. _host.Selected.Order()], tile.Id, tile.CircleX, tile.CircleY));
+                _host.Send(new MoveUnitsCommand(_host.LocalPlayer, [.. _host.Selected.Order()], tile.Id, tile.CircleX, tile.CircleY));
         }
         else if (e.IsActionPressed(InputActions.LogisticsToggle))
         {

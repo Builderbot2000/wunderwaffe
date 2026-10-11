@@ -111,7 +111,7 @@ public partial class BlueprintTool : Node2D
     public void StopFactory()
     {
         if (SelectedFactory is { } f)
-            _host.Sim.Enqueue(new SetFactoryBlueprintCommand(_host.LocalPlayer, _host.ViewedTile.Id, f.X, f.Y, null));
+            _host.Send(new SetFactoryBlueprintCommand(_host.LocalPlayer, _host.ViewedTile.Id, f.X, f.Y, null));
     }
 
     public void SelectFactory(PlacedBuilding? factory)
@@ -190,13 +190,13 @@ public partial class BlueprintTool : Node2D
                 break;
             case BlueprintMode.Place when mouse is { Pressed: true, ButtonIndex: MouseButton.Left }:
                 if (Ghost() is var (x, y) && Status.Good)
-                    _host.Sim.Enqueue(new PlaceBlueprintCommand(_host.LocalPlayer, tile.Id, Picked!.Blueprint, x, y, _rotation, _flip));
+                    _host.Send(new PlaceBlueprintCommand(_host.LocalPlayer, tile.Id, Picked!.Blueprint, x, y, _rotation, _flip));
                 Handled();
                 break;
             case BlueprintMode.Project when mouse is { Pressed: true, ButtonIndex: MouseButton.Left }:
                 if (Ghost() is var (ox, oy) && Status.Good && SelectedFactory is { } f)
                 {
-                    _host.Sim.Enqueue(new SetFactoryBlueprintCommand(_host.LocalPlayer, tile.Id, f.X, f.Y, Picked!.Blueprint, ox, oy, _rotation, _flip));
+                    _host.Send(new SetFactoryBlueprintCommand(_host.LocalPlayer, tile.Id, f.X, f.Y, Picked!.Blueprint, ox, oy, _rotation, _flip));
                     Notice?.Invoke($"Factory set to build {Picked.Name}", true);
                     Cancel();
                 }

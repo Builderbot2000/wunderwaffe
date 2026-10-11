@@ -128,7 +128,7 @@ public partial class BuildTool : Node2D
         var items = _host.Content.Items.Keys.Order(System.StringComparer.Ordinal).Select(k => (string?)k).Prepend(null).ToList();
         string? next = items[(items.IndexOf(sorter.Filter) + 1) % items.Count];
         if (Logistics.CheckFilter(_host.Sim, tile, _host.LocalPlayer, cell.X, cell.Y, next) == FilterResult.Ok)
-            _host.Sim.Enqueue(new SetFilterCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y, next));
+            _host.Send(new SetFilterCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y, next));
         GetViewport().SetInputAsHandled();
     }
 

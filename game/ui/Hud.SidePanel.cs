@@ -20,7 +20,7 @@ public partial class Hud
     {
         var tile = SelectedWorldTile();
         if (_host.Selected.Count > 0)
-            Sim.Enqueue(new MoveUnitsCommand(Me, [.. _host.Selected.Order()], tile.Id, tile.CircleX, tile.CircleY));
+            _host.Send(new MoveUnitsCommand(Me, [.. _host.Selected.Order()], tile.Id, tile.CircleX, tile.CircleY));
     }
 
     static string InventoryKey(TileState tile) => string.Join(",", tile.Inventory.Entries.Select(kv => kv.Key + kv.Value));

@@ -23,8 +23,8 @@ public static class DebugTools
         var sim = host.Sim;
         var tile = host.ViewedTile;
         int me = host.LocalPlayer;
-        sim.Enqueue(new DebugGrantCommand(me, tile.Id, "copper_ore", 1_000_000));
-        sim.Enqueue(new DebugGrantCommand(me, tile.Id, "iron_ore", 1_000_000));
+        host.Send(new DebugGrantCommand(me, tile.Id, "copper_ore", 1_000_000));
+        host.Send(new DebugGrantCommand(me, tile.Id, "iron_ore", 1_000_000));
 
         int placed = 0;
         for (int y = 0; y < tile.Grid.Height - 1 && placed < StressBuildings; y += 2)
@@ -34,7 +34,7 @@ public static class DebugTools
                 if (!tile.Grid.IsFree(x, y, 2, 2))
                     continue;
                 bool onOre = Placement.Check(sim, tile, me, "drill", x, y, 0, null, out _) != PlaceResult.NeedsDeposit;
-                sim.Enqueue(onOre
+                host.Send(onOre
                     ? new PlaceBuildingCommand(me, tile.Id, "drill", x, y)
                     : new PlaceBuildingCommand(me, tile.Id, "smelter", x, y, RecipeId: "smelt_iron"));
                 placed++;

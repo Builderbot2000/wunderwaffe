@@ -111,12 +111,12 @@ public partial class DebugDriver : Node
                 // Three framed cells with an engine on each end and the unit core between (commands: this is the setup).
                 // Unit parts cost steel.
                 foreach (var item in new[] { "steel", "iron_plate", "copper_plate" })
-                    sim.Enqueue(new DebugGrantCommand(me, tile.Id, item, 100));
+                    _host.Send(new DebugGrantCommand(me, tile.Id, item, 100));
                 for (int x = CoreX - 1; x <= CoreX + 1; x++)
-                    sim.Enqueue(new PlaceFrameCommand(me, tile.Id, x, CoreY));
-                sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "thruster", CoreX - 1, CoreY, 0));
-                sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "unit_core", CoreX, CoreY));
-                sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "thruster", CoreX + 1, CoreY, 0));
+                    _host.Send(new PlaceFrameCommand(me, tile.Id, x, CoreY));
+                _host.Send(new PlaceBuildingCommand(me, tile.Id, "thruster", CoreX - 1, CoreY, 0));
+                _host.Send(new PlaceBuildingCommand(me, tile.Id, "unit_core", CoreX, CoreY));
+                _host.Send(new PlaceBuildingCommand(me, tile.Id, "thruster", CoreX + 1, CoreY, 0));
                 break;
             case 20:
                 GD.Print($"[drive] built: {tile.Grid.BuildingCount} buildings, {tile.Grid.FrameCount} frames");

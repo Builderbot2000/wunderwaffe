@@ -164,7 +164,7 @@ public partial class UiTour : Node
     {
         var home = _host.Sim.Tiles[_host.Sim.StartTileId];
         var core = home.Grid.Buildings.First(b => b.Kind == Sim.Content.BuildingKind.UnitCore);
-        _host.Sim.Enqueue(new ActivateUnitCommand(_host.LocalPlayer, home.Id, core.X, core.Y));
+        _host.Send(new ActivateUnitCommand(_host.LocalPlayer, home.Id, core.X, core.Y));
     }
 
     void SelectScout()
@@ -199,14 +199,13 @@ public partial class UiTour : Node
     /// </summary>
     void ShowCombat()
     {
-        var sim = _host.Sim;
         var tile = _host.ViewedTile;
         int me = _host.LocalPlayer;
-        sim.Enqueue(new DebugDamageCommand(me, tile.Id, _smelter.X, _smelter.Y, 120));
-        sim.Enqueue(new DebugDamageCommand(me, tile.Id, _smelter.X - 4, _smelter.Y + 4, 1000));
-        sim.Enqueue(new DebugGrantCommand(me, tile.Id, "copper_plate", 20));
-        sim.Enqueue(new DebugGrantCommand(me, tile.Id, "steel", 5));
-        sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "laser_turret", _smelter.X + 2, _smelter.Y));
+        _host.Send(new DebugDamageCommand(me, tile.Id, _smelter.X, _smelter.Y, 120));
+        _host.Send(new DebugDamageCommand(me, tile.Id, _smelter.X - 4, _smelter.Y + 4, 1000));
+        _host.Send(new DebugGrantCommand(me, tile.Id, "copper_plate", 20));
+        _host.Send(new DebugGrantCommand(me, tile.Id, "steel", 5));
+        _host.Send(new PlaceBuildingCommand(me, tile.Id, "laser_turret", _smelter.X + 2, _smelter.Y));
         var at = GetViewport().GetCanvasTransform() * (new Vector2(_smelter.X - 3.5f, _smelter.Y + 4.5f) * Palette.CellPx);
         GetViewport().WarpMouse(at);
         Log("damaged the smelter, wrecked a belt cell, placed a laser turret");
@@ -294,7 +293,7 @@ public partial class UiTour : Node
         }
         if (spots.Count < 2)
             throw new InvalidOperationException("no ore near the middle of the tile");
-        sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "drill", spots[0].X, spots[0].Y));
+        _host.Send(new PlaceBuildingCommand(me, tile.Id, "drill", spots[0].X, spots[0].Y));
         // A 7x5 block of open ground nearest the middle: the smelter on top, a belt along the bottom.
         var g = tile.Grid;
         int cx = tile.CenterX - tile.OriginX, cy = tile.CenterY - tile.OriginY;
@@ -305,9 +304,9 @@ public partial class UiTour : Node
             .OrderBy(p => Math.Abs(p.X - cx) + Math.Abs(p.Y - cy))
             .First();
         _smelter = (open.X + 4, open.Y);
-        sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "smelter", _smelter.X, _smelter.Y, RecipeId: "smelt_iron"));
+        _host.Send(new PlaceBuildingCommand(me, tile.Id, "smelter", _smelter.X, _smelter.Y, RecipeId: "smelt_iron"));
         for (int x = open.X; x < open.X + 7; x++)
-            sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "conveyor", x, open.Y + 4, 0));
+            _host.Send(new PlaceBuildingCommand(me, tile.Id, "conveyor", x, open.Y + 4, 0));
         Log($"placed a drill at {spots[0]}, a smelter and a belt");
 
         var tool = GetTree().Root.FindChild("BuildTool", true, false) as BuildTool ?? throw new InvalidOperationException("no BuildTool");

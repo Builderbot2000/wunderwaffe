@@ -139,31 +139,31 @@ public partial class UnitTool : Node2D
             return false;
 
         if (e.IsActionPressed(InputActions.UnitHold))
-            sim.Enqueue(new HoldUnitsCommand(me, ids));
+            _host.Send(new HoldUnitsCommand(me, ids));
         else if (e.IsActionPressed(InputActions.UnitPatrol))
             _armed = Armed.Patrol;
         else if (e.IsActionPressed(InputActions.AttackMove))
             _armed = Armed.AttackMove;
         else if (e.IsActionPressed(InputActions.UnitRetreat))
-            sim.Enqueue(new RetreatUnitsCommand(me, ids));
+            _host.Send(new RetreatUnitsCommand(me, ids));
         else if (e.IsActionPressed(InputActions.UnitSquad))
-            sim.Enqueue(new CreateSquadCommand(me, $"Squad {sim.Squads.OwnedBy(me).Count() + 1}", ids));
+            _host.Send(new CreateSquadCommand(me, $"Squad {sim.Squads.OwnedBy(me).Count() + 1}", ids));
         else if (e.IsActionPressed(InputActions.UnitFormation) && SelectedSquad() is { } squad)
         {
             int next = (System.Array.IndexOf(Formations, squad.Formation) + 1) % Formations.Length;
-            sim.Enqueue(new SetFormationCommand(me, squad.Id, Formations[next]));
+            _host.Send(new SetFormationCommand(me, squad.Id, Formations[next]));
         }
         else if (e.IsActionPressed(InputActions.UnitStance))
         {
             var first = sim.UnitById(ids[0]);
             int next = first == null ? 0 : (System.Array.IndexOf(Stances, first.Stance) + 1) % Stances.Length;
             if (SelectedSquad() is { } s)
-                sim.Enqueue(new SetSquadStanceCommand(me, s.Id, Stances[next]));
+                _host.Send(new SetSquadStanceCommand(me, s.Id, Stances[next]));
             else
-                sim.Enqueue(new SetStanceCommand(me, ids, Stances[next]));
+                _host.Send(new SetStanceCommand(me, ids, Stances[next]));
         }
         else if (e.IsActionPressed(InputActions.UnitEscort) && _host.View == ViewMode.Tile && UnitUnderCursor() is { } charge)
-            sim.Enqueue(new SetStanceCommand(me, [.. ids.Where(id => id != charge.Id)], Stance.Escort, charge.Id));
+            _host.Send(new SetStanceCommand(me, [.. ids.Where(id => id != charge.Id)], Stance.Escort, charge.Id));
         else
             return false;
         GetViewport().SetInputAsHandled();
@@ -331,14 +331,14 @@ public partial class UnitTool : Node2D
             .Select(x => x.Unit).FirstOrDefault();
         if (enemy != null)
         {
-            _host.Sim.Enqueue(new AttackCommand(_host.LocalPlayer, ids, enemy.Id));
+            _host.Send(new AttackCommand(_host.LocalPlayer, ids, enemy.Id));
             return true;
         }
         var cell = HoveredCell();
         if (_host.Sim.ResolveCell(tile, cell.X, cell.Y) is { } at
             && at.Tile.Grid.BuildingAt(at.X, at.Y) is { } b && b.Owner != _host.LocalPlayer)
         {
-            _host.Sim.Enqueue(new AttackBuildingCommand(_host.LocalPlayer, ids, at.Tile.Id, at.X, at.Y));
+            _host.Send(new AttackBuildingCommand(_host.LocalPlayer, ids, at.Tile.Id, at.X, at.Y));
             return true;
         }
         return false;
@@ -354,7 +354,7 @@ public partial class UnitTool : Node2D
         {
             var (ft, fx, fy) = _rallyFrom;
             int squad = SelectedSquad()?.Id ?? 0;
-            sim.Enqueue(new SetRallyCommand(me, ft, fx, fy, tileId, x, y, squad));
+            _host.Send(new SetRallyCommand(me, ft, fx, fy, tileId, x, y, squad));
             return;
         }
         if (_host.Selected.Count == 0)
@@ -369,7 +369,7 @@ public partial class UnitTool : Node2D
                 : "The selected units can't move: no thruster");
             return;
         }
-        sim.Enqueue(armed switch
+        _host.Send(armed switch
         {
             Armed.Patrol => new PatrolUnitsCommand(me, ids, tileId, x, y),
             Armed.AttackMove => new AttackMoveCommand(me, ids, tileId, x, y),
