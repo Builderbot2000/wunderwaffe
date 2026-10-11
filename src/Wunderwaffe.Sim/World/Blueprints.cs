@@ -135,7 +135,8 @@ public static class Blueprints
     /// <summary>
     /// Whether the blueprint, turned and flipped, can be placed with its top-left at tile cell (x, y): every block
     /// passes <see cref="Placement.Check"/> (cost aside) without overlapping another, every frame cell passes
-    /// <see cref="UnitAssembly.CheckFrame"/> or is framed already, and the tile can pay the total. All or nothing.
+    /// <see cref="UnitAssembly.CheckFrame"/> or is framed already, and <see cref="Territory.Payer"/> finds a tile that can pay
+    /// the total. All or nothing.
     /// </summary>
     public static BlueprintResult Check(
         Simulation sim, TileState tile, int player, Blueprint blueprint, int x, int y, int rotation, bool flip, out BlueprintPlan plan)
@@ -172,7 +173,7 @@ public static class Blueprints
             int fx = x + f.X, fy = y + f.Y;
             if (tile.Grid.InBounds(fx, fy) && tile.Grid.HasFrame(fx, fy))
                 continue;
-            var result = UnitAssembly.CheckFrame(tile, player, fx, fy, ignoreCost: true);
+            var result = UnitAssembly.CheckFrame(sim, tile, player, fx, fy, ignoreCost: true);
             if (result != PlaceResult.Ok)
             {
                 problems.Add(new BlueprintProblem(-1, fx, fy, result));
@@ -184,7 +185,7 @@ public static class Blueprints
 
         if (problems.Count > 0)
             return BlueprintResult.Blocked;
-        return tile.Inventory.Has(cost) ? BlueprintResult.Ok : BlueprintResult.CannotAfford;
+        return Territory.Payer(sim, tile, player, cost) != null ? BlueprintResult.Ok : BlueprintResult.CannotAfford;
     }
 
     /// <summary>
@@ -234,7 +235,7 @@ public static class Blueprints
         if (result != BlueprintResult.Ok)
             return result;
 
-        tile.Inventory.TryTake(plan.Cost);
+        Territory.Payer(sim, tile, player, plan.Cost)!.Inventory.TryTake(plan.Cost);
         foreach (var (fx, fy) in plan.NewFrames)
             tile.Grid.SetFrame(fx, fy, true);
         foreach (var p in plan.Blocks)

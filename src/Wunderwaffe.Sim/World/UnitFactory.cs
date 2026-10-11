@@ -362,7 +362,7 @@ public static class UnitFactory
     static bool CanPlace(Simulation sim, TileState tile, PlacedBuilding factory, Blueprint bp, FactoryStep step) =>
         step.Block < 0
             ? tile.Grid.HasFrame(step.X, step.Y)
-              || (tile.Grid.BuildingAt(step.X, step.Y) == null && UnitAssembly.CheckFrame(tile, factory.Owner, step.X, step.Y, ignoreCost: true) == PlaceResult.Ok)
+              || (tile.Grid.BuildingAt(step.X, step.Y) == null && UnitAssembly.CheckFrame(sim, tile, factory.Owner, step.X, step.Y, ignoreCost: true) == PlaceResult.Ok)
             : Blueprints.CheckBlock(sim, tile, factory.Owner, bp.Blocks[step.Block], step.X, step.Y, out _, ignoreCost: true) == PlaceResult.Ok;
 
     static bool Has(SortedDictionary<string, int> buffer, IReadOnlyDictionary<string, int> cost) =>

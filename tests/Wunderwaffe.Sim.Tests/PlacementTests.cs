@@ -136,6 +136,6 @@ public class PlacementTests
         Assert.Equal(PlaceResult.OutOfBounds, Check(sim, coast, "conveyor", foreign.X, foreign.Y));
         Assert.Equal(PlaceResult.BadTerrain, Check(sim, coast, "conveyor", wet.X, wet.Y));
         Assert.Equal(PlaceResult.Ok, Check(sim, coast, "conveyor", dry.X, dry.Y));
-        Assert.Equal(PlaceResult.BadTerrain, UnitAssembly.CheckFrame(coast, Player, wet.X, wet.Y));
+        Assert.Equal(PlaceResult.BadTerrain, UnitAssembly.CheckFrame(sim, coast, Player, wet.X, wet.Y));
     }
 }

@@ -5,9 +5,6 @@ namespace Wunderwaffe.Sim.World;
 public enum PlaceResult
 {
     Ok,
-
-    /// <summary>Frames only: the player doesn't own the tile.</summary>
-    NotOwner,
     NoSuchBuilding,
     OutOfBounds,
     Blocked,

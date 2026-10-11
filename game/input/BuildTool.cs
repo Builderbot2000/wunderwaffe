@@ -127,7 +127,7 @@ public partial class BuildTool : Node2D
             var (x, y, _, _) = Footprint(cell);
             var tool = _tools[_selected];
             _preview = tool.IsFrame
-                ? UnitAssembly.CheckFrame(tile, _host.LocalPlayer, x, y)
+                ? UnitAssembly.CheckFrame(_host.Sim, tile, _host.LocalPlayer, x, y)
                 : Placement.Check(_host.Sim, tile, _host.LocalPlayer, tool.BuildingId, x, y, _rotation, tool.RecipeId, out _);
             if (!overUi && Godot.Input.IsMouseButtonPressed(MouseButton.Left) && cell != _lastActionCell && _preview == PlaceResult.Ok)
             {

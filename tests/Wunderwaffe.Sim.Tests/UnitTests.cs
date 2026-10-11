@@ -114,12 +114,12 @@ public class UnitTests
     }
 
     [Fact]
-    public void FramesNeedAnOwnedCellInsideTheTile()
+    public void FramesNeedPresenceAndACellInsideTheTile()
     {
         var sim = NewSim();
         var tile = Tile(sim, size: 10);
-        Assert.Equal(PlaceResult.OutOfBounds, UnitAssembly.CheckFrame(tile, Me, 10, 0));
-        Assert.Equal(PlaceResult.NotOwner, UnitAssembly.CheckFrame(tile, Them, 1, 1));
+        Assert.Equal(PlaceResult.OutOfBounds, UnitAssembly.CheckFrame(sim, tile, Me, 10, 0));
+        Assert.Equal(PlaceResult.NoPresence, UnitAssembly.CheckFrame(sim, tile, Them, 1, 1));
     }
 
     [Fact]

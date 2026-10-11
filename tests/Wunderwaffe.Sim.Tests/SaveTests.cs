@@ -61,7 +61,8 @@ public class SaveTests(ITestOutputHelper output)
         // NF-002: load restores identical state.
         var sim = Session();
         Assert.Equal(1, sim.PlayerOrNull(Me)!.Launched);
-        Assert.Equal(8, sim.Tiles[sim.StartTileId].Grid.Buildings.Count(b => b.DefId == "conveyor"));
+        // 10 belts, one removed, one destroyed, two from the blueprint.
+        Assert.Equal(10, sim.Tiles[sim.StartTileId].Grid.Buildings.Count(b => b.DefId == "conveyor"));
         string json = SaveFile.From(sim, "test").ToJson();
 
         var loaded = Replay.Load(TestContent.Load(), SaveFile.FromJson(json));

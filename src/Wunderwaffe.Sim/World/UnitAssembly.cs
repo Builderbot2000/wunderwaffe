@@ -6,6 +6,8 @@ namespace Wunderwaffe.Sim.World;
 public enum AssembleResult
 {
     Ok,
+
+    /// <summary>No presence on the tile (WM-015), or the core or a block on the frame is someone else's.</summary>
     NotOwner,
 
     /// <summary>The cell isn't a unit core.</summary>
@@ -59,34 +61,41 @@ public static class UnitAssembly
 {
     public const int MaxCells = 64;
 
+    /// <summary>
+    /// Laying a frame cell needs presence on the tile (WM-015), stays out of a blocked enemy circle, and is paid by
+    /// <see cref="Territory.Payer"/> (the tile, or a neighbour the player owns).
+    /// </summary>
     /// <param name="ignoreCost">Skip the cost check, for callers that pay a total themselves.</param>
-    public static PlaceResult CheckFrame(TileState tile, int player, int x, int y, bool ignoreCost = false)
+    public static PlaceResult CheckFrame(Simulation sim, TileState tile, int player, int x, int y, bool ignoreCost = false)
     {
-        if (tile.Owner != player)
-            return PlaceResult.NotOwner;
+        if (!Territory.HasPresence(sim, player, tile))
+            return PlaceResult.NoPresence;
         if (!tile.Grid.InBounds(x, y))
             return PlaceResult.OutOfBounds;
         if (tile.Grid.HasFrame(x, y))
             return PlaceResult.Blocked;
         if (!tile.Grid.Buildable(x, y))
             return PlaceResult.BadTerrain;
-        return ignoreCost || tile.Inventory.Has(Balance.FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
+        if (Territory.EnemyCircleBlocks(tile, player, x, y, 1, 1))
+            return PlaceResult.EnemyCircle;
+        return ignoreCost || Territory.Payer(sim, tile, player, Balance.FrameCost) != null ? PlaceResult.Ok : PlaceResult.CannotAfford;
     }
 
-    internal static void PlaceFrame(TileState tile, int player, int x, int y)
+    internal static void PlaceFrame(Simulation sim, TileState tile, int player, int x, int y)
     {
-        if (CheckFrame(tile, player, x, y) != PlaceResult.Ok)
+        if (CheckFrame(sim, tile, player, x, y) != PlaceResult.Ok)
             return;
-        tile.Inventory.TryTake(Balance.FrameCost);
+        Territory.Payer(sim, tile, player, Balance.FrameCost)!.Inventory.TryTake(Balance.FrameCost);
         tile.Grid.SetFrame(x, y, true);
     }
 
-    internal static void RemoveFrame(TileState tile, int player, int x, int y)
+    /// <summary>Frames are ownerless: anyone with presence may take one up; the refund goes to <see cref="Territory.RefundTo"/>.</summary>
+    internal static void RemoveFrame(Simulation sim, TileState tile, int player, int x, int y)
     {
-        if (tile.Owner != player || !tile.Grid.HasFrame(x, y))
+        if (!tile.Grid.HasFrame(x, y) || !Territory.HasPresence(sim, player, tile))
             return;
         tile.Grid.SetFrame(x, y, false);
-        tile.Inventory.Add(Balance.FrameCost);
+        Territory.RefundTo(sim, tile, player)?.Inventory.Add(Balance.FrameCost);
     }
 
     /// <summary>Everything an activation would take, found by walking the frame out from the core.</summary>
@@ -106,11 +115,14 @@ public static class UnitAssembly
     {
         plan = null;
         offending = [];
-        if (tile.Owner != player)
+        // Presence, not ownership (WM-015): a landed unit can lift off again from a tile nobody owns.
+        if (!Territory.HasPresence(sim, player, tile))
             return AssembleResult.NotOwner;
         var grid = tile.Grid;
         if (grid.BuildingAt(x, y) is not { Kind: BuildingKind.UnitCore } core)
             return AssembleResult.NoCore;
+        if (core.Owner != player)
+            return AssembleResult.NotOwner;
         if (!grid.HasFrame(core.X, core.Y))
             return AssembleResult.NoFrame;
 
@@ -139,7 +151,7 @@ public static class UnitAssembly
         {
             if (grid.BuildingAt(cx, cy) is not { } b || !counted.Add(b.Id))
                 continue;
-            var problem = BlockProblem(b, core, seen);
+            var problem = BlockProblem(b, core, player, seen);
             if (problem == AssembleResult.Ok)
             {
                 buildings.Add(b);
@@ -177,8 +189,10 @@ public static class UnitAssembly
         return AssembleResult.Ok;
     }
 
-    static AssembleResult BlockProblem(PlacedBuilding b, PlacedBuilding core, HashSet<(int, int)> frame)
+    static AssembleResult BlockProblem(PlacedBuilding b, PlacedBuilding core, int player, HashSet<(int, int)> frame)
     {
+        if (b.Owner != player)
+            return AssembleResult.NotOwner;
         for (int by = b.Y; by < b.Y + b.Height; by++)
         {
             for (int bx = b.X; bx < b.X + b.Width; bx++)

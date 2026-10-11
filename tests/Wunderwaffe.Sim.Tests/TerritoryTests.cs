@@ -399,4 +399,112 @@ public class TerritoryTests
         }
         Assert.Equal(sim.StartTileIds, Simulation.NewGame(TestContent.Load(), setup).StartTileIds);
     }
+
+    // --- seams with blueprints (D) and movement (E) ---
+
+    [Fact]
+    public void ALandedScoutLiftsOffAgainFromAnUnownedTile()
+    {
+        var sim = NewSim();
+        var home = sim.AddTile(0, 0, size: Size);
+        var east = sim.AddTile(1, 0, size: Size);
+        var north = sim.AddTile(1, 1, size: Size);
+        sim.SettleStartingTile(home, Me);
+        var core = home.Grid.Buildings.Single(b => b.DefId == "unit_core");
+        sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
+        sim.Step();
+        var scout = Assert.Single(sim.Units);
+        // Land outside the circle, so the tile stays unowned.
+        sim.Enqueue(new MoveUnitsCommand(Me, [scout.Id], east.Id, 3, 3));
+        sim.Step();
+        for (int i = 0; i < 60 * 60 && scout.Moving; i++)
+            sim.Step();
+        Assert.Equal(east.Id, scout.TileId);
+        sim.Enqueue(new DeployUnitCommand(Me, scout.Id));
+        sim.Step();
+        Assert.Empty(sim.Units);
+        Assert.Equal(TileState.Unowned, east.Owner);
+
+        var landed = east.Grid.Buildings.Single(b => b.DefId == "unit_core");
+        Assert.Equal(AssembleResult.Ok, UnitAssembly.CheckActivate(sim, east, Me, landed.X, landed.Y, out _));
+        Assert.Equal(AssembleResult.NotOwner, UnitAssembly.CheckActivate(sim, east, Them, landed.X, landed.Y, out _));
+        sim.Enqueue(new ActivateUnitCommand(Me, east.Id, landed.X, landed.Y));
+        sim.Step();
+        var again = Assert.Single(sim.Units);
+        sim.Enqueue(new MoveUnitsCommand(Me, [again.Id], north.Id, north.CircleX, north.CircleY));
+        sim.Step();
+        for (int i = 0; i < 60 * 60 && again.Moving; i++)
+            sim.Step();
+        Assert.Equal(north.Id, again.TileId);
+    }
+
+    [Fact]
+    public void FramesOnATileYouDontOwnArePaidAndRefundedNextDoor()
+    {
+        var (sim, home, east) = TwoTiles();
+        Plant(sim, east, Me, "conveyor", 2, 2);
+        long iron = home.Inventory.Get("iron_ore");
+        Assert.Equal(PlaceResult.NoPresence, UnitAssembly.CheckFrame(sim, east, Them, 5, 5));
+        Assert.Equal(PlaceResult.Ok, UnitAssembly.CheckFrame(sim, east, Me, 5, 5));
+        sim.Enqueue(new PlaceFrameCommand(Me, east.Id, 5, 5));
+        sim.Step();
+        Assert.True(east.Grid.HasFrame(5, 5));
+        Assert.True(home.Inventory.Get("iron_ore") < iron);
+        Assert.True(east.Inventory.Get("iron_ore") == 0);
+        sim.Enqueue(new RemoveFrameCommand(Me, east.Id, 5, 5));
+        sim.Step();
+        Assert.False(east.Grid.HasFrame(5, 5));
+        Assert.Equal(iron, home.Inventory.Get("iron_ore"));
+    }
+
+    [Fact]
+    public void ABlueprintOnATileYouDontOwnIsPaidNextDoor()
+    {
+        var (sim, home, east) = TwoTiles();
+        Plant(sim, east, Me, "conveyor", 2, 2);
+        long copper = home.Inventory.Get("copper_ore");
+        var belts = new Blueprint([new BlueprintBlock("conveyor", 0, 0, 0), new BlueprintBlock("conveyor", 1, 0, 0)], []);
+        Assert.Equal(BlueprintResult.Ok, Blueprints.Check(sim, east, Me, belts, 5, 5, 0, false, out var plan));
+        sim.Enqueue(new PlaceBlueprintCommand(Me, east.Id, belts, 5, 5));
+        sim.Step();
+        Assert.Equal(3, east.Grid.Buildings.Count(b => b.DefId == "conveyor"));
+        Assert.Equal(copper - plan.Cost["copper_ore"], home.Inventory.Get("copper_ore"));
+        Assert.Equal(BlueprintResult.Blocked, Blueprints.Check(sim, east, Them, belts, 8, 8, 0, false, out _));
+    }
+
+    [Fact]
+    public void TheStartingScoutPassesLiftOffValidationAndIsGround()
+    {
+        // D's UD-003 power rule and E's UD-004 locomotion rule: thrusters only, no power draw.
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
+        var home = sim.Tiles[sim.StartTileId];
+        var core = home.Grid.Buildings.Single(b => b.DefId == "unit_core");
+        Assert.Equal(AssembleResult.Ok, UnitAssembly.CheckActivate(sim, home, Me, core.X, core.Y, out _));
+        sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
+        sim.Step();
+        Assert.Equal(LocomotionClass.Ground, Assert.Single(sim.Units).Locomotion);
+    }
+
+    [Fact]
+    public void AScoutSentToACircleItCantReachKeepsStill()
+    {
+        // Every tile has a circle, ocean tiles too (WM-014); a ground scout can't get to one out at sea (UD-004).
+        var content = TestContent.Load();
+        for (ulong seed = 3037; seed < 3037 + 20; seed++)
+        {
+            var sim = Simulation.NewGame(content, GameSetup.Default with { Seed = seed });
+            var home = sim.Tiles[sim.StartTileId];
+            var core = home.Grid.Buildings.Single(b => b.DefId == "unit_core");
+            sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
+            sim.Step();
+            var scout = Assert.Single(sim.Units);
+            if (sim.Tiles.FirstOrDefault(t => UnitNav.Plan(sim, scout, t.Id, t.CircleX, t.CircleY) == null) is not { } sea)
+                continue;
+            Assert.Equal(MoveResult.Unreachable, UnitSim.Order(sim, Me, [scout.Id], sea.Id, sea.CircleX, sea.CircleY));
+            Assert.Null(scout.Order);
+            Assert.False(scout.Moving);
+            return;
+        }
+        Assert.Fail("no seed with a tile out of a ground scout's reach");
+    }
 }
