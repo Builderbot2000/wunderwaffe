@@ -7,5 +7,8 @@
   { "id": "export_port", "name": "Export Port", "kind": "export_port", "width": 1, "height": 1, "power": 0,  "hp": 80, "cost": { "copper_ore": 5 } },
   { "id": "import_port", "name": "Import Port", "kind": "import_port", "width": 1, "height": 1, "power": 0,  "hp": 80, "cost": { "copper_ore": 5 } },
   { "id": "unit_core", "name": "Unit Core", "kind": "unit_core", "width": 1, "height": 1, "power": 0, "hp": 300, "cost": { "copper_plate": 10, "steel": 5 } },
-  { "id": "thruster", "name": "Thruster", "kind": "thruster", "thrust": 60, "width": 1, "height": 1, "power": 0, "hp": 120, "cost": { "iron_plate": 10, "steel": 5 } }
+  { "id": "thruster", "name": "Thruster", "kind": "thruster", "thrust": 60, "width": 1, "height": 1, "power": 0, "hp": 120, "cost": { "iron_plate": 10, "steel": 5 } },
+  { "id": "wheels", "name": "Wheels", "kind": "locomotor", "locomotion": "ground", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": { "iron_plate": 5 } },
+  { "id": "hull", "name": "Hull", "kind": "locomotor", "locomotion": "naval", "width": 1, "height": 1, "power": 0, "hp": 150, "cost": { "iron_plate": 8 } },
+  { "id": "rotor", "name": "Rotor", "kind": "locomotor", "locomotion": "air", "width": 1, "height": 1, "power": 0, "hp": 60, "cost": { "steel": 5, "copper_plate": 5 } }
 ]

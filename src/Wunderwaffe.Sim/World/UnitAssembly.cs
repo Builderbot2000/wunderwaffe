@@ -165,7 +165,7 @@ public static class UnitAssembly
         var body = cells.Select(c => (c.X - core.X, c.Y - core.Y, mass[c])).ToList();
         var (gx, gy) = tile.ToGlobal(core.X, core.Y);
         int px = gx * Unit.CellScale + Unit.CellScale / 2, py = gy * Unit.CellScale + Unit.CellScale / 2;
-        sim.SpawnUnit(player, tile.Id, px, py, blocks, body, 0, 0);
+        var unit = sim.SpawnUnit(player, tile.Id, px, py, blocks, body, 0, 0);
         sim.Player(player).Launched++;
 
         // The buildings are the unit now: lift them off, keeping any items they held on the tile.
@@ -176,6 +176,7 @@ public static class UnitAssembly
         }
         foreach (var (cx, cy) in cells)
             tile.Grid.SetFrame(cx, cy, false);
+        UnitSim.OnUnitBuilt(sim, unit, tile.Id, core.Id);
         return AssembleResult.Ok;
     }
 

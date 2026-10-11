@@ -20,6 +20,25 @@ public readonly record struct UnitCell(int GX, int GY, int OffX, int OffY, int M
 public readonly record struct Thruster(int Thrust, int Dir);
 
 /// <summary>
+/// What a unit does on its own when it isn't following a player order (UC-004). Combat reads it to decide whether to
+/// fire, and asks <see cref="UnitSim.MayChase"/> before chasing.
+/// </summary>
+public enum Stance
+{
+    /// <summary>Fires at and chases anything it finds.</summary>
+    Aggressive,
+
+    /// <summary>Fires and chases, but only within <see cref="UnitSim.LeashCells"/> of its anchor, then goes back to it.</summary>
+    Defensive,
+
+    /// <summary>Never fires on its own.</summary>
+    HoldFire,
+
+    /// <summary>Follows <see cref="Unit.EscortId"/> and only fights near it.</summary>
+    Escort,
+}
+
+/// <summary>
 /// A mobile rigid body built from the blocks that stood on a tile's frame (see <see cref="UnitAssembly"/>). Position
 /// is the centre of mass in world sub-cells (<see cref="CellScale"/> to a cell; see <see cref="WorldMap"/>), velocity is
 /// sub-cells per tick and angle is a fraction of a turn (<see cref="Trig.Turn"/>). The tile it is on is the tile of the
@@ -89,6 +108,9 @@ public sealed class Unit
         }
         Thrusters = thrusters;
         TotalThrust = thrusters.Sum(t => t.Thrust);
+        World.Locomotion.Check(defs, blocks.Select(b => b.DefId), out var cls);
+        Locomotion = cls;
+        (AnchorX, AnchorY) = (X, Y);
 
         // The strongest engine (first on ties) is the one the unit turns toward its goal.
         if (thrusters.Count > 0)
@@ -131,6 +153,9 @@ public sealed class Unit
     public int TotalThrust { get; }
     public int MainDir { get; }
 
+    /// <summary>Which terrain it can cross (UD-004), from its blocks.</summary>
+    public LocomotionClass Locomotion { get; }
+
     /// <summary>Speed it settles at flying straight, in sub-cells per tick. 0 means it cannot move.</summary>
     public int MaxSpeed { get; }
 
@@ -159,6 +184,37 @@ public sealed class Unit
     internal (int Tile, int Next, int X, int Y)? Portal { get; set; }
 
     public bool Moving => Route != null;
+
+    /// <summary>
+    /// For each entry of <see cref="Route"/>, the terrain region (<see cref="UnitNav"/>) to enter in that tile, after
+    /// the one the unit started in at index 0. Same length as Route + 1.
+    /// </summary>
+    internal int[]? RouteRegions { get; set; }
+
+    /// <summary>The standing order (UC-001), or null when idle. Movement follows it; combat reads its kind and target.</summary>
+    public UnitOrder? Order { get; internal set; }
+
+    /// <summary>This unit's own goal for <see cref="Order"/> (its formation slot), in world sub-cells.</summary>
+    public int SlotX { get; internal set; }
+    public int SlotY { get; internal set; }
+
+    /// <summary>On a patrol, true while heading back to where the order was given.</summary>
+    public bool PatrolReturning { get; internal set; }
+
+    /// <summary>True while combat has it chasing a target (<see cref="UnitSim.Chase"/>) instead of following its order.</summary>
+    public bool Chasing { get; internal set; }
+
+    public Stance Stance { get; internal set; }
+
+    /// <summary>Where a defensive unit returns to, in world sub-cells: where it last stopped or was given its stance.</summary>
+    public int AnchorX { get; internal set; }
+    public int AnchorY { get; internal set; }
+
+    /// <summary>The unit an escort follows, or -1.</summary>
+    public int EscortId { get; internal set; } = -1;
+
+    /// <summary>The squad it belongs to (UC-002), or 0 for none.</summary>
+    public int SquadId { get; internal set; }
 
     /// <summary>Angular acceleration limit in angle units per tick squared, from the engines' turning torque.</summary>
     internal int TurnAccel => (int)Math.Max(1, TotalThrust * (long)ThrustScale * TurnArm * AnglePerRadian / Inertia);

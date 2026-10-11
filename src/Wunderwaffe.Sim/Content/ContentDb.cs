@@ -150,6 +150,8 @@ public sealed class ContentDb
                 errors.Add($"building '{b.Id}': ports must be 1x1");
             if (b.Hp <= 0)
                 errors.Add($"building '{b.Id}': hp must be > 0");
+            if ((b.Kind == BuildingKind.Locomotor) != (b.Locomotion != null))
+                errors.Add($"building '{b.Id}': a locomotor needs a locomotion class, and only locomotors have one");
         }
 
         foreach (var g in Goals)

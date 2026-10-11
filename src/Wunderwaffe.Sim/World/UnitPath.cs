@@ -6,9 +6,9 @@ namespace Wunderwaffe.Sim.World;
 internal readonly record struct PathWindow(int X, int Y, int W, int H);
 
 /// <summary>
-/// Path-finding for units over the tile they are on, plus the next tile when crossing into it. Buildings (except
-/// conveyors) are obstacles, grown by the unit's size so the path keeps its whole body clear; cells of other tiles are
-/// out of bounds. A* over the cell grid, then the path is straightened wherever there is a clear line,
+/// Path-finding for units over the tile they are on, plus the next tile when crossing into it (UC-007). Buildings
+/// (except conveyors) and terrain the unit's locomotion can't cross (UD-004) are obstacles, grown by the unit's size so
+/// the path keeps its whole body clear; cells of other tiles are out of bounds. A* over the cell grid, then the path is straightened wherever there is a clear line,
 /// so units fly in long straight runs instead of hugging cell corners. Integer costs and a fixed tie-break make it
 /// deterministic (NF-004).
 /// </summary>
@@ -37,20 +37,22 @@ internal static class UnitPath
     }
 
     /// <summary>
-    /// Cells of the window a unit with the given clearance can't put its centre in: those of other tiles, and those
-    /// within reach of a building on <paramref name="tile"/> or <paramref name="next"/>. Indexed from the window's corner.
+    /// Cells of the window a unit with the given clearance and locomotion can't put its centre in: those of other tiles,
+    /// those within reach of terrain it can't cross, and those within reach of a building on <paramref name="tile"/> or
+    /// <paramref name="next"/>. Indexed from the window's corner.
     /// </summary>
-    public static bool[] Blocked(Simulation sim, PathWindow win, TileState tile, TileState? next, int clearance)
+    public static bool[] Blocked(Simulation sim, PathWindow win, TileState tile, TileState? next, int clearance, LocomotionClass cls)
     {
-        int w = win.W, h = win.H;
+        int w = win.W, h = win.H, mapW = sim.Map.Width;
         int nextId = next?.Id ?? -1;
+        var region = UnitNav.Regions(sim, cls, clearance).Region;
         var blocked = new bool[w * h];
         for (int y = 0; y < h; y++)
         {
             for (int x = 0; x < w; x++)
             {
                 int id = sim.Map.TileAtCell(win.X + x, win.Y + y);
-                blocked[y * w + x] = id != tile.Id && id != nextId;
+                blocked[y * w + x] = (id != tile.Id && id != nextId) || region[(win.Y + y) * mapW + win.X + x] < 0;
             }
         }
         foreach (var t in next == null ? new[] { tile } : new[] { tile, next })
@@ -74,7 +76,8 @@ internal static class UnitPath
 
     /// <summary>
     /// Waypoints from <paramref name="start"/> (not included) to <paramref name="goal"/>, or null if there is no way.
-    /// A goal inside an obstacle is replaced by the nearest free cell.
+    /// A goal inside an obstacle is replaced by the nearest free cell. A start inside one (a unit pressed against a
+    /// building or shore) first heads straight for the nearest free cell.
     /// </summary>
     public static (int X, int Y)[]? Find(int w, int h, bool[] blocked, (int X, int Y) start, (int X, int Y) goal)
     {
@@ -82,6 +85,12 @@ internal static class UnitPath
             goal = free;
         else if (blocked[goal.Y * w + goal.X])
             return null;
+        if (blocked[start.Y * w + start.X])
+        {
+            if (NearestFree(w, h, blocked, start) is not { } exit)
+                return null;
+            return Find(w, h, blocked, exit, goal) is { } rest ? [exit, .. rest.Where(p => p != exit)] : null;
+        }
         if (start == goal)
             return [goal];
 
