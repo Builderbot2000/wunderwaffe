@@ -84,6 +84,9 @@ public static class ResourceRadius
 
         foreach (var u in sim.Units)
         {
+            // Abstract units (UC-009) resupply once they materialise.
+            if (sim.IsAbstract(u))
+                continue;
             Inventory? source = null;
             bool looked = false;
             for (int i = 0; i < u.Blocks.Count; i++)

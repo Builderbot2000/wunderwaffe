@@ -1,4 +1,6 @@
+using System.Linq;
 using Godot;
+using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game.Debug;
 
@@ -22,7 +24,11 @@ public partial class StressBench : Node
         if (host.Sim.Tick - StartTick < BenchTicks)
             return;
 
-        GD.Print($"stress: {host.ViewedTile.Grid.BuildingCount} buildings, " +
+        var sim = host.Sim;
+        int full = sim.Tiles.Count(t => t.Grid.BuildingCount > 0 && RateMode.IsFullSim(sim, t));
+        int rate = sim.Tiles.Count(t => t.Grid.BuildingCount > 0 && !RateMode.IsFullSim(sim, t));
+        GD.Print($"stress: {host.ViewedTile.Grid.BuildingCount} buildings on the viewed tile, " +
+                 $"{full} full-sim and {rate} rate-mode tiles with buildings, {sim.Units.Count} units, " +
                  $"{(host.TotalStepMs - _startMs) / BenchTicks:F4} ms/tick over {BenchTicks} ticks, " +
                  $"{Engine.GetFramesPerSecond()} fps");
         QueueFree();

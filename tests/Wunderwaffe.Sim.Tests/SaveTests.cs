@@ -14,7 +14,7 @@ public class SaveTests(ITestOutputHelper output)
     /// A small session through every command kind: a mining line, a destroyed belt, a unit lifted off and flown, all spread
     /// over a few in-game minutes.
     /// </summary>
-    static Simulation Session()
+    internal static Simulation Session()
     {
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         var home = sim.Tiles[sim.StartTileId];
@@ -154,6 +154,7 @@ public class SaveTests(ITestOutputHelper output)
             sim.Step();
 
         var save = SaveFile.FromJson(SaveFile.From(sim).ToJson());
+        Timing.PreferFastCores();
         var sw = Stopwatch.StartNew();
         Replay.Load(TestContent.Load(), save);
         double perHour = sw.Elapsed.TotalSeconds * 6;

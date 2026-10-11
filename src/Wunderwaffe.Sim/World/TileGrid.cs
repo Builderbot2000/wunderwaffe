@@ -371,6 +371,70 @@ public sealed class TileGrid
                 _cells[cy * Width + cx] = value;
         }
     }
+    // ---- Snapshots (NF-008): put a grid's changing state back exactly, building ids and revision included. ----
+
+    /// <summary>
+    /// Removes every building, frame, platform and wreck and forgets their ids, so a snapshot can add its own back.
+    /// </summary>
+    internal void ClearForRestore()
+    {
+        Array.Clear(_cells);
+        Array.Clear(_frames);
+        Array.Clear(_platforms);
+        _buildings.Clear();
+        _buildings.Add(null);
+        foreach (var list in new[] { _belts, _machines, _exportPorts, _importPorts, _combat, _suppliers, _factories, _storages, _relays })
+            list.Clear();
+        _wrecks.Clear();
+        _wrecks.Add(null);
+        _wreckCells = null;
+        WreckCount = 0;
+        BuildingCount = 0;
+        FrameCount = 0;
+        PlatformCount = 0;
+    }
+
+    /// <summary>Adds a building under a given id, higher than any added since <see cref="ClearForRestore"/>.</summary>
+    internal PlacedBuilding Restore(int id, BuildingDef def, int owner, int x, int y, int w, int h, int rotation, RecipeDef? recipe, int hp)
+    {
+        while (_buildings.Count < id)
+            _buildings.Add(null);
+        var b = new PlacedBuilding(id, def, owner, x, y, w, h, rotation, recipe, hp);
+        _buildings.Add(b);
+        KindList(b.Kind)?.Add(b);
+        if (b.SupplyRadius > 0)
+            _suppliers.Add(b);
+        Fill(b, b.Id);
+        BuildingCount++;
+        return b;
+    }
+
+    /// <summary>Puts a wreck back under its id, higher than any restored before it.</summary>
+    internal void RestoreWreck(Wreck wreck)
+    {
+        while (_wrecks.Count < wreck.Id)
+            _wrecks.Add(null);
+        _wreckCells ??= new int[Width * Height];
+        _wrecks.Add(wreck);
+        FillWreck(wreck, wreck.Id);
+        WreckCount++;
+    }
+
+    /// <summary>Ids handed out so far for wrecks: the next wreck gets this one.</summary>
+    internal int NextWreckId => _wrecks.Count;
+
+    /// <summary>Ids handed out so far: the next building added gets this one.</summary>
+    internal int NextBuildingId => _buildings.Count;
+
+    /// <summary>Pads the id list so the next building added gets <paramref name="next"/>, as it would have in the saved game.</summary>
+    internal void RestoreIds(int next, int nextWreck, int revision)
+    {
+        while (_buildings.Count < next)
+            _buildings.Add(null);
+        while (_wrecks.Count < nextWreck)
+            _wrecks.Add(null);
+        Revision = revision;
+    }
 
     // ---- Wrecks (CB-006): a layer of their own, so the entity sim, pathing and collisions never see them. ----
 

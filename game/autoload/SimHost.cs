@@ -147,8 +147,19 @@ public partial class SimHost : Node
         if (View != ViewMode.World)
             ToggleCount++;
         View = ViewMode.World;
-        Send(new SetViewedTileCommand(LocalPlayer, -1));
+        SyncView();
         ViewChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Tells the sim which tile the local player looks at (FB-013): only viewed or Contested tiles run the full entity
+    /// sim, the rest rate mode. It is lockstep input, so it goes through a command, and only when it changes.
+    /// </summary>
+    void SyncView()
+    {
+        int viewed = View == ViewMode.Tile ? _viewedTileId : -1;
+        if (Sim.PlayerOrNull(LocalPlayer)?.ViewedTile != viewed)
+            Send(new SetViewedTileCommand(LocalPlayer, viewed));
     }
 
     /// <summary>Opens one of the local player's tiles. Returns false for tiles they don't own.</summary>
@@ -161,8 +172,7 @@ public partial class SimHost : Node
         if (View != ViewMode.Tile)
             ToggleCount++;
         View = ViewMode.Tile;
-        // Lockstep input too: the sim runs viewed tiles in full detail (scaling's rate mode).
-        Send(new SetViewedTileCommand(LocalPlayer, tile.Id));
+        SyncView();
         ViewChanged?.Invoke();
         return true;
     }
@@ -203,6 +213,13 @@ public partial class SimHost : Node
     {
         var sim = Simulation.NewGame(Content, setup);
         Begin(sim, ViewMode.World, seat, new Lockstep(sim, seat, isHost, clientSeats));
+        GoTo(GameScene);
+    }
+
+    /// <summary>Debug: opens an already built sim (the stress scene, which has no <see cref="GameSetup"/>, so no saves).</summary>
+    public void StartWith(Simulation sim, ViewMode view)
+    {
+        Begin(sim, view);
         GoTo(GameScene);
     }
 
@@ -276,6 +293,7 @@ public partial class SimHost : Node
         _viewedTileId = home.Id;
         ToggleCount = 0;
         View = view;
+        SyncView();
         GetTree().Paused = false;
     }
 
@@ -298,9 +316,10 @@ public partial class SimHost : Node
         if (drive < 0 && !stress)
             return false;
 
-        StartNew(GameSetup.Default, ViewMode.Tile);
         if (stress)
-            DebugTools.StressFill(this);
+            DebugTools.StressWorld(this);
+        else
+            StartNew(GameSetup.Default, ViewMode.Tile);
         // Plays a scripted unit session through the input path (needs a window).
         if (drive >= 0)
             DebugDriver.Attach(this, drive + 1 < args.Length ? args[drive + 1] : null);

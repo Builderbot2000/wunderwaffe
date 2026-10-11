@@ -67,7 +67,7 @@ public sealed partial class Simulation(ContentDb content)
     {
         if (setup.Problem() is { } problem)
             throw new ArgumentOutOfRangeException(nameof(setup), problem);
-        var sim = new Simulation(content) { Setup = setup };
+        var sim = new Simulation(content) { Setup = setup, RateModeEnabled = true };
         sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, setup.Players, richnessPercent: setup.RichnessPercent);
         for (int p = 0; p < setup.Players; p++)
             sim.SettleStartingTile(sim.Tiles[sim.StartTileIds[p]], p);
@@ -131,6 +131,7 @@ public sealed partial class Simulation(ContentDb content)
     /// <summary>One tick: queued commands, claim timers, then each tile's entities, then units, then goals.</summary>
     public void Step()
     {
+        MaybeSnapshot();
         foreach (var command in _pending)
         {
             _log.Add(new LoggedCommand(Tick, command));
@@ -140,11 +141,15 @@ public sealed partial class Simulation(ContentDb content)
 
         Expansion.Step(this);
         foreach (var tile in _tiles)
-            TileEntities.Step(this, tile);
+        {
+            if (FullSim(tile))
+                TileEntities.Step(this, tile);
+        }
         Combat.Step(this);
         UnitFactory.Step(this);
         UnitUpkeep.Step(this);
         UnitPhysics.Step(this);
+        RateMode.Step(this);
         Progression.Step(this);
         Victory.Step(this);
         Alerts.Step(this);

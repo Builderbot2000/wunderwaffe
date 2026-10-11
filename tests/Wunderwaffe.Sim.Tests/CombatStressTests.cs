@@ -61,6 +61,7 @@ public class CombatStressTests(ITestOutputHelper output)
         int units = sim.Units.Count;
         Assert.True(units > 250, $"{units} units");
 
+        Timing.PreferFastCores();
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();

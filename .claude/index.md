@@ -13,8 +13,8 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `GameSetup.cs` | Record (Width, Height, Seed, Players=1) in nominal tiles; `Default`, `ParseSeed` (text → FNV hash). |
 | `Content/Defs.cs` | JSON records: `ItemDef`, `RecipeDef` (empty inputs = extraction), `BuildingDef` (`Hp` per block, +`Footprint(rotation)`), `BuildingKind` enum (`Platform` = water floor layer), `OnWater`, combat sub-records `WeaponDef`/`ShieldDef`/`RepairDef` + `Resist`/`SupplyRadius`/`Storage` (`DamageTaken`), `UnlockCondition` (goal conditions: `produce`/`claim`/`ship`/`launch`), `GoalDef`, `TerrainDef` (bands, deposit weights, `Ground`/`Naval` passability), `BuildingDef.Locomotion` (locomotor blocks). |
 | `Content/ContentDb.cs` | Loads + validates all JSON (`FromJson`, throws `ContentException` with every error). Lookups: `Items`, `Recipes`, `Buildings`, `BuildingList` (menu order), `Goals`, `TerrainList`, `RecipesByBuilding`, `DefaultTerrain`, `RiverTerrain`, `Classify(elev, moist)`. |
-| `Core/Command.cs` | Every player action as a JSON-polymorphic record with `Apply(sim)`: place/remove building, place/remove frame, activate/deploy/move units, attack/attack_building/attack_move, debug grant/damage/destroy. Claims have no command (circle timers). No tech tree, so no unlock command. `LoggedCommand`. |
-| `Core/SaveFile.cs` | `SaveFile` (setup + log + hash, `CurrentVersion`), `Replay` (sliced re-simulation, `Matches`), `SaveException`. |
+| `Core/Command.cs` | Every player action as a JSON-polymorphic record with `Apply(sim)`: place/remove building, place/remove frame, activate/deploy/move units, attack/attack_building/attack_move, debug grant/damage/destroy, `view_tile` (rate mode, lockstep input). Claims have no command (circle timers). No tech tree, so no unlock command. `LoggedCommand`. |
+| `Core/SaveFile.cs` | `SaveFile` (setup + log + hash, `CurrentVersion`), `Replay` (sliced re-simulation, `Matches`; starts from the save's `Snapshot` when it hash-checks, else full replay, `FromSnapshot`), `SaveException`. |
 | `Core/StateHash.cs` | FNV-1a over tiles, buildings, entity state, players, units. Must cover all sim state. |
 | `Core/Inventory.cs` | Sorted item counts (long); `Add`, `Has`, `TryTake` (all or nothing). Throws on underflow. |
 | `Core/Rng.cs` | SplitMix64, seeded; `Next`, `Range`. |
@@ -28,7 +28,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Expansion.cs` | Circle claims (WM-006): `CaptureTicks`, `CircleOccupants` (cached by `Revision`), `Progress`, `Step` (tick phase 2), `Claim` (wipes rivals in the circle). |
 | `World/Territory.cs` | `HasPresence` (WM-015), `EnemyCircleBlocks`, `Payer`/`RefundTo` (own tile else owned neighbour), `IsContested`/`ContestedTiles` (WM-004), `DestroyBuilding` (stand-in for combat's). |
 | `World/Progression.cs` | Goal chain progress: `Progress`, `IsMet`, `CurrentGoal`, `Step` (end of tick). No tech tree (TT-001). |
-| `World/PlayerState.cs` | Per-player counters (`Produced`, `Shipped`, `Launched`), goal completion ticks. |
+| `World/PlayerState.cs` | Per-player counters (`Produced`, `Shipped`, `Launched`), goal completion ticks, `ViewedTile` (set by `SetViewedTileCommand` "view_tile", lockstep input; drives rate mode). |
 | `World/WorldMap.cs` | Global grid: terrain, elevation, tile id per cell; adjacency (`MinBorderCells`=3), `BorderCells(from,to)`, `Grow` for hand-built worlds. |
 | `World/TileGenerator.cs` | Deposit patches on a tile, weighted by terrain (`GenerateDeposits`, `exclude` for regional items, `richnessPercent`). |
 | `World/Direction.cs` | N/E/S/W, `Dx`/`Dy`, `FromRotation` (0=east, clockwise), `Opposite`. |
@@ -44,7 +44,8 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
 | `Api/GameQuery.cs` | NF-009 read-only observation API for one player (`new GameQuery(sim, player)`): match, players, tiles, cells, buildings, units, goal, events, checks (`CheckPlace`, `CheckClaim`, `CheckActivate`), `Revision`, planner wrappers. Returns `Views` records. The GUI, AI and external drivers all read through it. Also `BuildingTypes`/`Recipes` (catalogue). |
-| `Api/Views.cs` | Plain records `GameQuery` returns (`MatchView`, `PlayerView`, `TileSummary`, `TileInfo`, `CellView`, `BuildingView`, `UnitInfo`, `GoalView`, `Spot`, `BeltStep`). Copies, JSON-serialisable. |
+| `Api/Views.cs` | Plain records `GameQuery` returns (`MatchView`, `PlayerView`, `TileSummary`, `TileInfo`, `CellView`, `BuildingView`, `UnitInfo`, `GoalView`, `Spot`, `BeltStep`, silo views `TravelView`/`SquadView`/`UnitOrderView`/`FactoryView`/`PowerView`/`ProductionView`/`HistoryView`/`LocomotionView`). Copies, JSON-serialisable. |
+| `Api/GameQuery.<Silo>.cs` | Thin wrappers over each silo's public queries: `Blueprints` (D: record, `CheckBlueprint`, stats, `BlueprintLocomotion`, `CheckProject`, `Factory`), `Movement` (E: `Travel`, `Squads`, squad/formation/rally checks, `UnitOrders`), `Combat` (F: DPS, weapon status/range, wrecks, `LinkDisrupted`, `SupplyCovers`), `Factory` (B: power, boosts, `CheckFilter`, `Production`/`ProductionHistory`), `Territory` (A). No `out` params or tuples: `JsonDriver` serves them by reflection. |
 | `Api/Planner.cs` | Read-only layout searches: `FindSpot`, `RouteBelt` (may merge into a belt already ending at the target), `PlanLine` (drill or first stage, stages, belt; optional zone), `FindFrame`, `OutletOf`. Never places; avoids cross-feeding neighbours. |
 | `Api/JsonDriver.cs` | NF-009 text interface: JSON lines `new`/`query` (any `GameQuery` member by reflection, case-insensitive args)/`queries`/`command` (save-file command JSON, own seat only)/`step`; `Run(stdin, stdout)`; errors come back as `{"ok":false}`. |
 | `Ai/AiPlayer.cs` | MP-002 AI seat: stateless `Think` reads `GameQuery`, returns ordinary commands. Priority list Clean/Economy/Steel/Units/Expand/Outposts/Attack. `Expand` is the claim seam (A's scout flow replaces it), `Attack` the combat seam (F). |
@@ -71,6 +72,13 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Boosters.cs` | FB-016 / OQ-25: `BoostStats`, `Boosters.StatsOf`/`Bonus(sim, tile, host, stat)`/`Of`; a booster boosts every matching host it touches, per-type caps from buildings.json, gantry chains count only in a straight line outward. |
 | `World/Logistics.cs` | FB-004: sorter filter (`CheckFilter` → `FilterResult`, `SetFilter` for the filter command), `BridgeLink`. Junction/router/sorter/bridge/storage stepping lives in `TileEntities`. |
 | `World/ProductionStats.cs` | FB-011 / IO-005: `TileState.Stats`, 10 s buckets over 10 minutes of made/used per item and sent per partner tile; `MadePerMinute`/`UsedPerMinute`/`SentPerMinute`, `MadeHistory`/`UsedHistory`, totals. Hashed. |
+| `Simulation.Scaling.cs` | Partial (C): `RateModeEnabled` (on for `NewGame`, off for hand-built test sims), per-tile `TileRateState`, abstract nodes (`Abstract`, `IsAbstract`), `SnapshotIntervalTicks`/`LatestSnapshot` (taken at tick start), snapshot restore helpers. |
+| `Core/Snapshot.cs` | NF-008 state snapshot (`Capture`, `Restore`): tiles, buildings + entity state, rate accumulators, players, units, abstract nodes. Every new piece of sim state needs a field here too, or snapshot loads fall back to full replay. |
+| `World/RateMode.cs` | FB-012..014 tick phase 6: steps rate-mode tiles at their rates (stalls when an import buffer or export link can't cover a tick), runs `AbstractTravel`, then picks each tile's mode for the next tick (viewed by any player or `ContestedTiles` → full). `IsFullSim`, `RatesOf`. Belts/machines freeze in rate mode (never touches `Working`/`IdleTicks`), so switching is lossless. Records made/used/sent in `ProductionStats`. |
+| `World/RateModel.cs` | Solves per-item rates from the building/belt graph (OQ-14), per group of port-linked tiles, iterating until imports/exports agree, so shortfalls propagate (FB-014). Machines at boosted speed/output and their power network's steady-state satisfaction (`Rebalance`; generators by fuel burnt, batteries ignored). Fixed point: `One` = 1 item/tick (`Shift`=24). |
+| `World/TileRates.cs` | `FlowKind` (Core, Produced, Draw, Export, Used), `Flow` (sorted, hashed, saved), `TileRates` (`Flows`, `RateOf`, `Total`). |
+| `World/AbstractTravel.cs` | UC-009: units on rate-mode tiles become `AbstractNode`s moving along planned waypoints at cruise speed with no physics; materialise on promotion. `Eta`, `TolerancePercent`. |
+| `World/StressScene.cs` | NF-001 benchmark world (8 viewed full-sim tiles x 2,000 buildings + 200 rate-mode factories), shared by `StressTests` and `--stress`; `Fill` (optional `send`: the game passes `SimHost.Send`). |
 
 ## game/ (Godot project; namespaces `Wunderwaffe.Game[.Input/.Render/.Screens/.Debug]`)
 
@@ -79,7 +87,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `project.godot` | Main scene `scenes/title.tscn`, autoload `SimHost`, 1920x1080 canvas_items stretch. |
 | `scenes/title.tscn` | Root Control with `TitleScreen`. |
 | `scenes/main.tscn` | Match scene; node order matters for input (PauseMenu first sees Esc last). Wires `[Export]`s: UnitTool→BuildTool, Camera→WorldMapView, Hud→BuildTool/WorldMapView/UnitTool/PauseMenu/BlueprintTool, BlueprintTool→BuildTool. |
-| `autoload/SimHost.cs` | `SimHost.Instance`. Owns `Content`, `Sim`, tick loop (`_Process`, max 8 ticks/frame), `ViewMode` (Tile/World) + `ViewedTile`, `Selected` units, `WatchView`/`ShowOnlyIn` helpers, new/save/load (`BeginLoad` replays over frames), quit, CLI flags (`--tour`, `--stress`, `--drive`), F3/F4/Tab. `LocalPlayer` (seat), `Send(command)` (the only way the game issues commands: sim alone, `Lockstep` online), `Lockstep`/`IsMultiplayer`, AI seats (`AiDirector`, host only), `view_tile` sent on view changes, `FocusCell` (camera jump), `Net` child, `StartMultiplayer`, `--net-smoke`. |
+| `autoload/SimHost.cs` | `SimHost.Instance`. Owns `Content`, `Sim`, tick loop (`_Process`, max 8 ticks/frame), `ViewMode` (Tile/World) + `ViewedTile`, `Selected` units, `WatchView`/`ShowOnlyIn` helpers, new/save/load (`BeginLoad` replays over frames), quit, CLI flags (`--tour`, `--stress`, `--drive`), F3/F4/Tab. `LocalPlayer` (seat), `Send(command)` (the only way the game issues commands: sim alone, `Lockstep` online), `Lockstep`/`IsMultiplayer`, AI seats (`AiDirector`, host only), `SyncView` sends `view_tile` on every view change (through `Send`); `StartWith` opens a prebuilt sim (stress scene), `FocusCell` (camera jump), `Net` child, `StartMultiplayer`, `--net-smoke`. |
 | `input/InputActions.cs` | Action names + default key bindings (registered in code). UI-005: `All`, `Name`, `Keys`, `KeyText`, `Rebind`/`Set`/`ResetAll`, `Changed`; bindings are physical key + modifier bits. |
 | `input/BuildTool.cs` | Build palette (`Tools`, one per building or per recipe for multi-recipe crafters, + frame), selection, `BuildRotation`, placement/removal on mouse, ghost and port-zone drawing, `Preview`, `HoveredZone`, `PickedIsPort`, `HoveredCell`. |
 | `input/UnitTool.cs` | Unit selection (click/box, Shift adds), move/patrol orders (tile and world map), H hold, X retreat, Q squad, T formation, V stance, E escort, Y rally, Ctrl/Alt+1-9 control groups (UI-only), G = lift off / land (land also on the world map), `Status` text, `Notice` (unreachable moves, via `UnitNav.Plan`). Active when no building is picked. |
@@ -104,7 +112,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `ui/PauseMenu.cs` | Esc menu (pauses tree alone; never online, OQ-32, and no loading there), save/load/settings/quit; `LoadMenu` (save list, shared with title). |
 | `ui/GameSettings.cs` | `user://settings.cfg`: fullscreen, vsync, world-map snapshot interval; settings panel. `AlertFilter` flags (`Alerts`, `SetAlert`). UI-005: `UiScale` (root content scale), `Colours`, key bindings (section `keys`, changed actions only); settings panel opens `KeyBindingsPanel`. |
 | `ui/SaveSlots.cs` | `user://saves/*.json` listing (`SaveInfo`), new path, delete. |
-| `debug/DebugTools.cs` | `Cheat` (F4, items only), `StressFill` (F3 / `--stress`). |
+| `debug/DebugTools.cs` | `Cheat` (F4, items only), `StressFill` (F3, the viewed tile), `StressWorld` (`--stress`, opens `StressScene`). |
 | `debug/StressBench.cs` | Node that prints ms/tick over 600 ticks after a stress fill; quits if headless. |
 | `debug/DebugDriver.cs` | `--drive`: scripted unit session through injected input, screenshot. |
 | `debug/UiTour.cs` | `--tour`: scripted click-through of all screens with screenshots; cleans up its saves and its blueprint. |
@@ -119,7 +127,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `ui/Hud.Match.cs` | MP-001 end screen (winner, reason, per-player stats); MP-003 status line (waiting, leaver, desync). |
 | `debug/NetSmoke.cs` | `--net-smoke host` / `--net-smoke join`: two headless instances play 1200 ticks over ENet with an AI and report tick, hash, desync. |
 | `ui/KeyBindingsPanel.cs` | UI-005 rebinding screen: every `InputActions.All` action, click then press a key (Esc cancels), reset to defaults. |
-| `ui/Hud.Stats.cs` | P: production panel for the viewed tile (FB-011): per item made/used per minute + `HistoryGraph`. |
+| `ui/Hud.Stats.cs` | O: production panel for the viewed tile (FB-011): per item made/used per minute + `HistoryGraph`. |
 | `ui/HistoryGraph.cs` | Small line chart of one item's 10-minute made/used history. |
 
 ## tests/Wunderwaffe.Sim.Tests (xUnit, real `game/data` content)
@@ -128,7 +136,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 |---|---|
 | `Harness.cs` | `NewSim` (empty sim, real content), `Tile` (hand-built, stocked), `Open`, `Place`, `Ore`, `Belt`, `Run`. Players `Me`=0, `Them`=1. |
 | `TestContent.cs` | Loads the real JSON from the output dir; `Load(edit)` with buildings.json edited. |
-| `TimingCollection.cs` | Non-parallel collection for wall-time tests. |
+| `TimingCollection.cs` | Non-parallel collection for wall-time tests; `Timing.PreferFastCores` (opts the test host out of Windows power throttling, which parked it on E-cores at 2-2.5x the tick time). |
 | `ContentTests.cs` | Content loads; validation errors. |
 | `PlacementTests.cs` | Bounds, overlap, deposits, recipe choice, rotation, terrain. |
 | `EntityTests.cs` | Machines, belts (speed, throughput, corners, merging, spacing), dumping, removal returns items. |
@@ -139,7 +147,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `UnitTests.cs` | Frames, lift-off, physics, pathing, borders, collisions, landing. |
 | `SaveTests.cs` | Save/replay round trip, every command kind serialises, divergence detection. |
 | `SimulationTests.cs` | Determinism, starting tile. |
-| `StressTests.cs` | NF-001 tick budget with thousands of buildings. |
+| `StressTests.cs` | NF-001 tick budget with thousands of buildings, and the `StressScene` (8 full + 200 rate-mode tiles) under 4 ms/tick. `Timing.PreferFastCores`, warm-up, best of several windows. |
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats (scout lift-off, landing in the coal circle): content changes that break the loop fail here. |
 | `TerritoryTests.cs` | Presence, paying from a neighbour (buildings, frames, blueprints), circle claims and wipes, enemy circles, landing and lifting off again from an unowned tile, Contested, cores, platforms, circle placement, fair starts, starting scout vs UD-003/UD-004, unreachable circles. |
 | `BlueprintTests.cs` | Recording, identical rebuild (UD-001), transforms, all-or-nothing placement, lift-off validation, stats, Wunderwaffe class, upkeep. |
@@ -153,6 +161,9 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `AiTests.cs` | AI plays the whole goal chain alone (NF-009 driver through commands + queries), two AIs replay from the log, no stall over a long match. |
 | `LockstepTests.cs` | Lockstep over a laggy in-memory JSON network: same commands on the same ticks (with a host AI), desync reported to all, seat spoofing and cheats refused. |
 | `JsonDriverTests.cs` | An external client plays the whole demo loop through JSON strings only; bad requests get errors. |
+| `RateModeTests.cs` | Rate mode vs full sim within 5% over 5 min, rates from the graph, promotion/demotion (view, Contested) loses nothing, import shortfalls propagate along a chain, power shortfall, boosters, fuel generator and stats. |
+| `AbstractTravelTests.cs` | Abstract nodes, travel time vs physics, materialising when viewed or Contested. |
+| `SnapshotTests.cs` | Snapshot restore matches, latest snapshot + later commands match a full replay, 30-minute determinism (`Category=Long`, a few seconds). |
 
 ## Other
 

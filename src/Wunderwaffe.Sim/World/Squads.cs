@@ -83,7 +83,7 @@ public sealed class Squads
 
     public IEnumerable<Squad> All => _squads.Values;
     public IEnumerable<Rally> Rallies => _rallies.Values;
-    internal int NextId => _nextId;
+    internal int NextId { get => _nextId; set => _nextId = value; }
 
     public Squad? ById(int id) => _squads.GetValueOrDefault(id);
 
@@ -103,6 +103,14 @@ public sealed class Squads
     }
 
     internal void Remove(Squad s) => _squads.Remove(s.Id);
+
+    /// <summary>Adds a squad under a given id, for snapshot restore (NF-008).</summary>
+    internal Squad AddRestored(int id, int owner, string name)
+    {
+        var s = new Squad(id, owner, name);
+        _squads.Add(id, s);
+        return s;
+    }
 
     internal void SetRally(Rally r) => _rallies[(r.TileId, r.BuildingId)] = r;
 
