@@ -154,6 +154,7 @@ public class SaveTests(ITestOutputHelper output)
             sim.Step();
 
         var save = SaveFile.FromJson(SaveFile.From(sim).ToJson());
+        Timing.PreferFastCores();
         var sw = Stopwatch.StartNew();
         Replay.Load(TestContent.Load(), save);
         double perHour = sw.Elapsed.TotalSeconds * 6;

@@ -7,7 +7,8 @@ namespace Wunderwaffe.Sim.Tests;
 
 /// <summary>
 /// NF-001 budget checks: viewed tiles run the full entity sim, the rest rate mode (FB-012). Wall time is noisy when
-/// other work shares the machine, so each check warms up and keeps the best of several windows.
+/// other work shares the machine, so each check opts out of efficiency cores (<see cref="Timing.PreferFastCores"/>),
+/// warms up and keeps the best of several windows.
 /// </summary>
 [Collection(TimingCollection.Name)]
 public class StressTests(ITestOutputHelper output)
@@ -29,6 +30,7 @@ public class StressTests(ITestOutputHelper output)
     /// </summary>
     static double MsPerTick(Simulation sim, int ticks = 120, int windows = 5)
     {
+        Timing.PreferFastCores();
         for (int i = 0; i < ticks; i++)
             sim.Step();
         Settle();

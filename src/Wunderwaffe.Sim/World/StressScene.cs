@@ -75,7 +75,7 @@ public static class StressScene
 
     /// <summary>
     /// A small factory on a 16-cell tile: copper drill into the core, iron drill through a smelter into it, and either an
-    /// iron drill shipping east (exporters) or an import port belting into the core.
+    /// iron drill wired to the core's power and shipping east (exporters) or an import port belting into the core.
     /// </summary>
     static void SmallFactory(Simulation sim, TileState t, bool exporter)
     {
@@ -90,6 +90,7 @@ public static class StressScene
             Ore(t, "iron_ore", 11, 4);
             Place(sim, t, "drill", 11, 4);
             Place(sim, t, "export_port", 13, 4);
+            Place(sim, t, "wire", 10, 5);              // Joins it to the copper drill, so to the core's power.
         }
         else
         {
