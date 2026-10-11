@@ -12,7 +12,8 @@ namespace Wunderwaffe.Game.Input;
 /// right-click sends the selection to that cell, and a cell past the tile's border sends it into the tile there.
 /// World map: right-click sends the selection to the clicked spot. G over a unit core lifts the
 /// framed blocks around it off as a unit; G with units selected lands them. The selection is shared between both
-/// views, in <see cref="SimHost.Selected"/>.
+/// views, in <see cref="SimHost.Selected"/>. Combat (CB-001): right-click on an enemy unit or building attacks it, and
+/// T arms an attack-move for the next right-click.
 /// </summary>
 public partial class UnitTool : Node2D
 {
@@ -26,6 +27,7 @@ public partial class UnitTool : Node2D
     SimHost _host = null!;
     Vector2? _dragStart;
     Vector2 _dragNow;
+    bool _attackMove;
 
     public string Status { get; private set; } = "";
 
@@ -45,8 +47,16 @@ public partial class UnitTool : Node2D
             return;
         }
 
+        if (e.IsActionPressed(InputActions.AttackMove) && _host.Selected.Count > 0)
+        {
+            _attackMove = true;
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (e.IsActionPressed(InputActions.Cancel) && _host.Selected.Count > 0)
         {
+            _attackMove = false;
             _host.Selected.Clear();
             GetViewport().SetInputAsHandled();
             return;
@@ -76,7 +86,8 @@ public partial class UnitTool : Node2D
                 }
                 break;
             case InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right }:
-                OrderToCursor();
+                if (!AttackAtCursor())
+                    OrderToCursor();
                 break;
         }
     }
@@ -103,6 +114,8 @@ public partial class UnitTool : Node2D
         var sim = _host.Sim;
         int mine = sim.Units.Count(u => u.Owner == _host.LocalPlayer);
         string line = $"Units {mine}  selected {_host.Selected.Count}";
+        if (_attackMove && _host.Selected.Count > 0)
+            line += "\nAttack-move: right-click where to go";
         if (_host.View != ViewMode.Tile || BuildTool.HasTool)
             return line;
 
@@ -172,8 +185,46 @@ public partial class UnitTool : Node2D
         Send(tile.Id, cell.X - tile.OriginX, cell.Y - tile.OriginY);
     }
 
-    void Send(int tileId, int x, int y) =>
-        _host.Sim.Enqueue(new MoveUnitsCommand(_host.LocalPlayer, [.. _host.Selected.Order()], tileId, x, y));
+    void Send(int tileId, int x, int y)
+    {
+        int[] ids = [.. _host.Selected.Order()];
+        _host.Sim.Enqueue(_attackMove
+            ? new AttackMoveCommand(_host.LocalPlayer, ids, tileId, x, y)
+            : new MoveUnitsCommand(_host.LocalPlayer, ids, tileId, x, y));
+        _attackMove = false;
+    }
+
+    /// <summary>
+    /// Right-click on an enemy unit or building under the cursor sends the selection to attack it (CB-001). False if
+    /// there is nothing hostile there, so the click is a plain move.
+    /// </summary>
+    bool AttackAtCursor()
+    {
+        if (_host.Selected.Count == 0 || _attackMove)
+            return false;
+        int[] ids = [.. _host.Selected.Order()];
+        var tile = _host.ViewedTile;
+        var mouse = GetGlobalMousePosition();
+        var enemy = _host.Sim.Units
+            .Where(u => u.Owner != _host.LocalPlayer && UnitView.InView(tile, u))
+            .Select(u => (Unit: u, Dist: UnitView.PixelPos(tile, u.X, u.Y).DistanceTo(mouse)))
+            .Where(x => x.Dist <= x.Unit.Radius * (float)Palette.CellPx / Unit.CellScale)
+            .OrderBy(x => x.Dist).ThenBy(x => x.Unit.Id)
+            .Select(x => x.Unit).FirstOrDefault();
+        if (enemy != null)
+        {
+            _host.Sim.Enqueue(new AttackCommand(_host.LocalPlayer, ids, enemy.Id));
+            return true;
+        }
+        var cell = HoveredCell();
+        if (_host.Sim.ResolveCell(tile, cell.X, cell.Y) is { } at
+            && at.Tile.Grid.BuildingAt(at.X, at.Y) is { } b && b.Owner != _host.LocalPlayer)
+        {
+            _host.Sim.Enqueue(new AttackBuildingCommand(_host.LocalPlayer, ids, at.Tile.Id, at.X, at.Y));
+            return true;
+        }
+        return false;
+    }
 
     Vector2I HoveredCell() => TileView.CellAt(GetGlobalMousePosition());
 

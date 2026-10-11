@@ -20,6 +20,7 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(AttackCommand), "attack")]
 [JsonDerivedType(typeof(AttackBuildingCommand), "attack_building")]
 [JsonDerivedType(typeof(AttackMoveCommand), "attack_move")]
+[JsonDerivedType(typeof(DebugDamageCommand), "debug_damage")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -152,4 +153,14 @@ public sealed record AttackMoveCommand(int Player, int[] UnitIds, int TileId, in
 {
     internal override void Apply(Simulation sim) =>
         CombatOrders.Issue(sim, Player, UnitIds, CombatOrderKind.AttackMove, TileId, X, Y);
+}
+
+/// <summary>Debug only: damages the building on a cell, as an untyped hit (it may be destroyed). Must be disabled in multiplayer.</summary>
+public sealed record DebugDamageCommand(int Player, int TileId, int X, int Y, int Amount) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile && tile.Grid.BuildingAt(X, Y) is { } b && Amount > 0)
+            Combat.DamageBuilding(sim, tile, b, Amount, "debug");
+    }
 }

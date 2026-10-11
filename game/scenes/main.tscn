@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://render/TileView.cs" id="1_view"]
 [ext_resource type="Script" path="res://input/BuildTool.cs" id="2_build"]
@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://input/UnitTool.cs" id="7_unittool"]
 [ext_resource type="Script" path="res://render/MachineStatusView.cs" id="8_status"]
 [ext_resource type="Script" path="res://ui/PauseMenu.cs" id="9_pause"]
+[ext_resource type="Script" path="res://render/CombatView.cs" id="10_combat"]
 
 [node name="Main" type="Node2D"]
 
@@ -26,6 +27,9 @@ script = ExtResource("5_world")
 
 [node name="UnitView" type="Node2D" parent="."]
 script = ExtResource("6_units")
+
+[node name="CombatView" type="Node2D" parent="."]
+script = ExtResource("10_combat")
 
 [node name="BuildTool" type="Node2D" parent="."]
 script = ExtResource("2_build")

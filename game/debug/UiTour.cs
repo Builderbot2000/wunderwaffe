@@ -54,6 +54,8 @@ public partial class UiTour : Node
         Step(10, "hover shot", () => Shot("05b_hover"));
         Step(1, "port zones", ShowPortZones);
         Step(10, "port zones shot", () => { Shot("05c_port_zones"); Key(Godot.Key.Escape); });
+        Step(1, "combat", ShowCombat);
+        Step(10, "combat shot", () => Shot("05d_combat"));
         Step(5, "world again", () => { Key(Godot.Key.Tab); });
         Step(10, "select coal tile", SelectCoalNeighbour);
         Step(10, "world tile panel", () => { Shot("07_world_coal"); Press("Claim"); });
@@ -140,6 +142,25 @@ public partial class UiTour : Node
         Log($"{zones.Count} I/O zones: {string.Join(", ", zones.Select(z => $"tile {z.Neighbor} ({z.Cells} cells)"))}");
         if (zones.Count > 0)
             GetViewport().WarpMouse(GetViewport().GetCanvasTransform() * (zones[0].Label * Palette.CellPx));
+    }
+
+    /// <summary>
+    /// Combat overlays with no enemy around: a debug hit damages the smelter (health bar) and destroys a belt cell
+    /// (wreck), a laser turret goes next to the smelter, and the cursor hovers the wreck.
+    /// </summary>
+    void ShowCombat()
+    {
+        var sim = _host.Sim;
+        var tile = _host.ViewedTile;
+        int me = _host.LocalPlayer;
+        sim.Enqueue(new DebugDamageCommand(me, tile.Id, _smelter.X, _smelter.Y, 120));
+        sim.Enqueue(new DebugDamageCommand(me, tile.Id, _smelter.X - 4, _smelter.Y + 4, 1000));
+        sim.Enqueue(new DebugGrantCommand(me, tile.Id, "copper_plate", 20));
+        sim.Enqueue(new DebugGrantCommand(me, tile.Id, "steel", 5));
+        sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "laser_turret", _smelter.X + 2, _smelter.Y));
+        var at = GetViewport().GetCanvasTransform() * (new Vector2(_smelter.X - 3.5f, _smelter.Y + 4.5f) * Palette.CellPx);
+        GetViewport().WarpMouse(at);
+        Log("damaged the smelter, wrecked a belt cell, placed a laser turret");
     }
 
     void HoverSmelter()

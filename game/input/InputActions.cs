@@ -23,6 +23,8 @@ public static class InputActions
     public const string WorldEnter = "world_enter";
     public const string WorldClaim = "world_claim";
     public const string UnitToggle = "unit_toggle";
+    /// <summary>Arms an attack-move: the next right-click sends the selection there, fighting on the way (CB-001).</summary>
+    public const string AttackMove = "attack_move";
     public const int Slots = 10;
 
     /// <summary>Slots 1-9 are the number keys; the tenth is 0.</summary>
@@ -44,6 +46,7 @@ public static class InputActions
         Add(WorldEnter, Key.Enter, Key.KpEnter);
         Add(WorldClaim, Key.C);
         Add(UnitToggle, Key.G);
+        Add(AttackMove, Key.T);
         for (int i = 0; i < Slots; i++)
             Add(Slot(i), i == 9 ? Key.Key0 : Key.Key1 + i);
     }

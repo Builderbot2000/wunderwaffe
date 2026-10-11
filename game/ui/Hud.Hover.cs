@@ -15,6 +15,7 @@ public partial class Hud
         var cell = BuildTool.HoveredCell();
         bool show = GetViewport().GuiGetHoveredControl() == null && tile.Grid.InBounds(cell.X, cell.Y) && (
             tile.Grid.BuildingAt(cell.X, cell.Y) is { } b ? DescribeBuilding(tile, b)
+            : tile.Grid.WreckAt(cell.X, cell.Y) is { } wreck ? DescribeWreck(wreck)
             : tile.Grid.DepositAt(cell.X, cell.Y) is { } ore && DescribeDeposit(ore));
         if (!show && !BuildTool.HasTool && (_host.Selected.Count > 0 || UnitTool.Status.Contains('\n')))
             show = SetHover(UnitTool.Status);
@@ -74,6 +75,9 @@ public partial class Hud
             case BuildingKind.Thruster:
                 Line("A unit part. Lay frame under it, then hover the unit core with no building picked and press G to lift off.");
                 break;
+            case BuildingKind.Weapon or BuildingKind.Wall or BuildingKind.Shield or BuildingKind.Repair or BuildingKind.Storage:
+                DescribeCombat(tile, b, def, Line);
+                break;
             case BuildingKind.Machine when b.Machine is { Recipe: { } recipe } m:
                 Line(GameText.Recipe(Content, recipe), Ui.Text);
                 var (status, color) = m.Status switch
@@ -90,6 +94,44 @@ public partial class Hud
                     AddBuffer("Out", m.Output);
                 break;
         }
+        if (b.Hp < def.Hp)
+            Line($"Damaged: {b.Hp} / {def.Hp} hp", Ui.Warn);
+        return true;
+    }
+
+    /// <summary>Weapons, walls, shields, repair and storage (FB-010, CB-004, CB-005, FB-018).</summary>
+    void DescribeCombat(TileState tile, PlacedBuilding b, BuildingDef def, System.Action<string, Color?> line)
+    {
+        if (def.Weapon is { } w)
+        {
+            line($"{Combat.Dps(def)} {w.Type} damage a second, range {w.Range}.", Ui.Text);
+            if (w.Ammo != null)
+                line($"Loaded {b.Combat!.Ammo} / {w.Magazine} {GameText.ItemName(Content, w.Ammo)}. Belts and the resource radius of a core or depot load it.", null);
+            var (text, color) = Combat.StatusOf(b) switch
+            {
+                WeaponStatus.Firing => ("Firing", Ui.Good),
+                WeaponStatus.NoAmmo => ("Out of ammo: it can't fire", Ui.Bad),
+                WeaponStatus.NoPower => ("No power: it can't fire", Ui.Bad),
+                _ => ("No enemy in range", Ui.Muted),
+            };
+            line(text, color);
+        }
+        if (def.Shield is { } s)
+            line($"Shield radius {s.Radius}: {b.Combat!.Charge} / {s.Capacity} charge, regains {s.Regen} a second.", Ui.Text);
+        if (def.Repair is { } r)
+            line($"Repairs your buildings and units within {r.Radius} cells, {r.Rate} hp a second, paying {GameText.Cost(Content, r.Cost)} per {r.Per} hp.", Ui.Text);
+        if (b.SupplyRadius > 0)
+            line($"Shares this tile's stock (ammo) with your units within {b.SupplyRadius} cells.", Ui.Text);
+        if (def.Resist is { Count: > 0 } resist)
+            line("Resists " + string.Join(", ", resist.Select(kv => $"{kv.Key} {kv.Value}%")), null);
+    }
+
+    bool DescribeWreck(Wreck wreck)
+    {
+        Ui.Clear(_hover);
+        _hover.AddChild(Ui.Label($"Wreck of {Content.Buildings[wreck.DefId].Name}", 20));
+        _hover.AddChild(Ui.Label($"Blocks building but not units. Pick any building and right-click it to salvage {Wunderwaffe.Sim.Balance.WreckRefundPercent}% of its cost.",
+            Ui.SmallFont, Ui.Muted, SideWidth - 24));
         return true;
     }
 

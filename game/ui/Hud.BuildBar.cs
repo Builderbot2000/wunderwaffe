@@ -108,6 +108,8 @@ public partial class Hud
                 return $"can't build on {Content.TerrainList[tile.Grid.TerrainAt(cell.X, cell.Y)].Name.ToLowerInvariant()}";
             case PlaceResult.NotOwner:
                 return "not your tile";
+            case PlaceResult.Wreck:
+                return "a wreck is in the way: right-click it with a building picked to salvage it";
             default:
                 return result.ToString();
         }

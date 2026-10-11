@@ -200,6 +200,7 @@ public partial class WorldMapView : Node2D
             DrawRegional(tile, new Vector2(box.End.X + 4, box.Position.Y));
         }
         DrawLinks();
+        DrawDisrupted();
         DrawUnits();
     }
 
@@ -235,6 +236,25 @@ public partial class WorldMapView : Node2D
                 int n = group.Count();
                 _overlay.DrawString(ThemeDB.FallbackFont, (a + b) / 2 + perp * 20, n == 1 ? "1 port" : $"{n} ports",
                     HorizontalAlignment.Left, -1, FontSize - 4, Colors.White);
+            }
+        }
+    }
+
+    /// <summary>A red broken line between tiles whose port link lost a port to combat (IO-006).</summary>
+    void DrawDisrupted()
+    {
+        var sim = _host.Sim;
+        var red = new Color(1f, 0.3f, 0.25f);
+        foreach (var tile in sim.Tiles)
+        {
+            foreach (var n in sim.Neighbors(tile))
+            {
+                if (n.Id < tile.Id || !Combat.LinkDisrupted(sim, tile, n))
+                    continue;
+                Vector2 a = Center(tile), b = Center(n);
+                _overlay.DrawDashedLine(a, b, red, 3, 10);
+                _overlay.DrawString(ThemeDB.FallbackFont, (a + b) / 2 + new Vector2(6, -6), "Disrupted",
+                    HorizontalAlignment.Left, -1, FontSize - 2, red);
             }
         }
     }
