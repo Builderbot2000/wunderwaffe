@@ -114,6 +114,28 @@ public class RateModeTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void TouchingMachinesThatCantFeedEachOtherDontStopTheFlow()
+    {
+        // Two smelters side by side are no loop: neither takes plates, so their plates still reach the core, whose id is
+        // lower than the belts'.
+        var sim = RateSim();
+        var t = Tile(sim, 0, 0);
+        Place(sim, t, "core", 12, 12);
+        for (int y = 8; y <= 10; y += 2)
+        {
+            Ore(t, "iron_ore", 5, y);
+            Place(sim, t, "drill", 5, y);
+            Place(sim, t, "smelter", 7, y, recipe: "smelt_iron");   // (7..8, 8..11): the two touch.
+        }
+        Belt(sim, t, 9, 8, 5, 1);                                   // South (9, 8..12)...
+        Belt(sim, t, 9, 13, 3);                                     // ...then east (9..11, 13) into the core.
+        sim.Step();
+        var rates = RateMode.RatesOf(sim, t);
+        Assert.True(rates.RateOf(FlowKind.Core, "iron_plate") > 0);
+        Assert.Equal(rates.Total(FlowKind.Produced, "iron_plate"), rates.RateOf(FlowKind.Core, "iron_plate"));
+    }
+
+    [Fact]
     public void RatesComeFromTheGraph()
     {
         // OQ-14: a drill makes 1 per 60 ticks; a smelter needs 2 ore per plate; a belt carries 4/32 items a tick.

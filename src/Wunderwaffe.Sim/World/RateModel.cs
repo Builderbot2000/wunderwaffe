@@ -182,11 +182,16 @@ public static class RateModel
                 _out[i] = [.. targets];
             }
 
-            // Drop links nothing can cross (a belt facing back into its source, a drill next to a drill), so they don't
-            // make false loops in the order.
+            // Drop links nothing can cross (a belt facing back into its source, a drill next to a drill, two touching
+            // smelters), so they don't make false loops in the order.
             for (int i = 0; i < n; i++)
-                _out[i] = _out[i].Where(e => _kind[e.Target] is NodeKind.Core or NodeKind.Export or NodeKind.Crafter
-                    || (_kind[e.Target] == NodeKind.Conveyor && _ahead[e.Target] != i)).ToArray();
+                _out[i] = _out[i].Where(e => _kind[e.Target] switch
+                {
+                    NodeKind.Core or NodeKind.Export => true,
+                    NodeKind.Crafter => Feeds(i, e.Target),
+                    NodeKind.Conveyor => _ahead[e.Target] != i,
+                    _ => false,
+                }).ToArray();
             (_order, _cyclic) = TopologicalOrder(n);
 
             var nets = grid.Power.Networks;
@@ -263,6 +268,19 @@ public static class RateModel
                     order.Add(i);
             }
             return ([.. order], cyclic);
+        }
+
+        /// <summary>Whether a machine makes something crafter <paramref name="t"/> needs; belts and ports may carry anything.</summary>
+        bool Feeds(int i, int t)
+        {
+            if (_kind[i] is not (NodeKind.Extractor or NodeKind.Crafter))
+                return true;
+            for (int k = 0; k < _k; k++)
+            {
+                if (_make[i * _k + k] > 0 && _need[t * _k + k] > 0)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>Whether <paramref name="t"/> takes item <paramref name="k"/> from <paramref name="src"/>, as <c>TileEntities.TryInsert</c> decides.</summary>
