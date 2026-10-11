@@ -92,6 +92,8 @@ public class RateModeTests(ITestOutputHelper output)
 
         var fullBefore = Stock(fullHome);
         var rateBefore = Stock(rateHome);
+        long Sent(TileState t) => t.Stats.TotalSent.Sum(p => p.Total);
+        long fullSent = Sent(fullEast), rateSent = Sent(rateEast);
         Run(full, 5 * Minute);
         Run(rate, 5 * Minute);
         var fullGain = Delta(fullBefore, Stock(fullHome));
@@ -104,6 +106,11 @@ public class RateModeTests(ITestOutputHelper output)
             Assert.True(f > 0, $"{item}: the full sim made none");
             Assert.InRange(r, f * 95 / 100, f * 105 / 100);
         }
+        // The stats see what a rate-mode tile sends (FB-011).
+        fullSent = Sent(fullEast) - fullSent;
+        rateSent = Sent(rateEast) - rateSent;
+        output.WriteLine($"sent: full {fullSent}, rate {rateSent}");
+        Assert.InRange(rateSent, fullSent * 95 / 100, fullSent * 105 / 100);
     }
 
     [Fact]
@@ -288,5 +295,126 @@ public class RateModeTests(ITestOutputHelper output)
         var rates = RateMode.RatesOf(sim, home);
         Assert.InRange(rates.RateOf(FlowKind.Core, "iron_plate"), RateModel.One / 120 - 2, RateModel.One / 120);
         Assert.Equal(0, rates.RateOf(FlowKind.Core, "iron_ore"));
+    }
+
+    /// <summary>
+    /// Builds the same one-tile factory twice, watches both for a minute, then leaves one in rate mode and checks that
+    /// over 5 minutes each measured figure is within 5% of the watched one's.
+    /// </summary>
+    void MatchesTheFullSim(Func<Simulation, TileState> build, params (string Name, Func<TileState, long> Measure)[] figures)
+    {
+        Simulation full = new(TestContent.Load()) { RateModeEnabled = true }, rate = new(TestContent.Load()) { RateModeEnabled = true };
+        TileState fullTile = build(full), rateTile = build(rate);
+        foreach (var (sim, tile) in new[] { (full, fullTile), (rate, rateTile) })
+        {
+            sim.Step();
+            View(sim, 0, tile);
+            Run(sim, Minute);
+        }
+        Assert.Equal(full.StateHash(), rate.StateHash());
+        View(rate, 0, null);
+        Run(full, 1);
+        Assert.False(RateMode.IsFullSim(rate, rateTile));
+
+        var before = figures.Select(f => (f.Measure(fullTile), f.Measure(rateTile))).ToArray();
+        Run(full, 5 * Minute);
+        Run(rate, 5 * Minute);
+        for (int i = 0; i < figures.Length; i++)
+        {
+            long f = figures[i].Measure(fullTile) - before[i].Item1, r = figures[i].Measure(rateTile) - before[i].Item2;
+            output.WriteLine($"{figures[i].Name}: full {f}, rate {r}");
+            Assert.True(f > 0, $"{figures[i].Name}: the full sim made none");
+            Assert.InRange(r, f * 95 / 100, f * 105 / 100);
+        }
+    }
+
+    /// <summary>
+    /// Twenty drills (40 power) on one core (20), ten on each of two belts into the core; wires join both rows to it.
+    /// </summary>
+    static TileState TwentyDrillsOnOneCore(Simulation sim)
+    {
+        var t = Tile(sim, size: 44);
+        Place(sim, t, "core", 0, 8);                    // (0..2, 8..10).
+        Belt(sim, t, 22, 8, 20, West);                  // (22..3, 8) into the core.
+        Belt(sim, t, 22, 10, 20, West);                 // (22..3, 10) into the core.
+        Place(sim, t, "wire", 2, 7);
+        Place(sim, t, "wire", 2, 11);
+        for (int i = 0; i < 10; i++)
+        {
+            Ore(t, "iron_ore", 3 + 2 * i, 6);
+            Place(sim, t, "drill", 3 + 2 * i, 6);
+            Ore(t, "iron_ore", 3 + 2 * i, 11);
+            Place(sim, t, "drill", 3 + 2 * i, 11);
+        }
+        return t;
+    }
+
+    [Fact]
+    public void APowerShortfallSlowsRateModeLikeTheFullSim()
+    {
+        // FB-014 / FB-005: at half power every drill makes one ore per 120 ticks instead of 60, in both modes.
+        var sim = new Simulation(TestContent.Load()) { RateModeEnabled = true };
+        var t = TwentyDrillsOnOneCore(sim);
+        sim.Step();
+        Assert.InRange(RateMode.RatesOf(sim, t).RateOf(FlowKind.Core, "iron_ore"), 20 * (RateModel.One / 120) - 40, 20 * RateModel.One / 120);
+
+        MatchesTheFullSim(TwentyDrillsOnOneCore, ("iron_ore", t => Items(t, "iron_ore")), ("made", t => t.Stats.MadeTotal("iron_ore")));
+    }
+
+    /// <summary>A copper drill straight into the core, with an overdrive coil (+25% speed) and a yield sieve (+20% output).</summary>
+    static TileState BoostedDrill(Simulation sim)
+    {
+        var t = Tile(sim);
+        Place(sim, t, "core", 0, 0);                    // (0..2, 0..2); powers the drill it touches.
+        Ore(t, "copper_ore", 3, 0);
+        Place(sim, t, "drill", 3, 0);
+        Place(sim, t, "overdrive_coil", 5, 0);
+        Place(sim, t, "yield_sieve", 3, 2);
+        return t;
+    }
+
+    [Fact]
+    public void BoostersScaleRateModeOutput()
+    {
+        // FB-016: 125% speed is a batch every 48 ticks, and +20% output makes 1.2 ore a batch: one ore per 40 ticks.
+        var sim = new Simulation(TestContent.Load()) { RateModeEnabled = true };
+        var t = BoostedDrill(sim);
+        sim.Step();
+        Assert.InRange(RateMode.RatesOf(sim, t).RateOf(FlowKind.Core, "copper_ore"), RateModel.One / 40 - 2, RateModel.One / 40);
+
+        MatchesTheFullSim(BoostedDrill, ("copper_ore", t => Items(t, "copper_ore")));
+    }
+
+    /// <summary>
+    /// A copper drill feeding a fuel press feeding a fuel generator, all touching a core (20 power) and each other; the
+    /// drill and press also dump into the core.
+    /// </summary>
+    static TileState FuelLine(Simulation sim)
+    {
+        var t = Tile(sim);
+        Place(sim, t, "core", 0, 2);                    // (0..2, 2..4).
+        Ore(t, "copper_ore", 0, 0);
+        Place(sim, t, "drill", 0, 0);
+        Place(sim, t, "fuel_press", 2, 0, recipe: "press_fuel");
+        Place(sim, t, "fuel_generator", 4, 0);
+        return t;
+    }
+
+    [Fact]
+    public void AFuelGeneratorBurnsFuelInRateModeAndTheStatsSeeIt()
+    {
+        // FB-014: a generator's fuel is a flow it uses up; the stats record what a rate-mode tile makes and uses.
+        var sim = new Simulation(TestContent.Load()) { RateModeEnabled = true };
+        var t = FuelLine(sim);
+        sim.Step();
+        var rates = RateMode.RatesOf(sim, t);
+        Assert.True(rates.RateOf(FlowKind.Used, "fuel") > 0);
+        Assert.Equal(rates.RateOf(FlowKind.Used, "copper_ore"), 2 * rates.RateOf(FlowKind.Produced, "fuel"));
+
+        MatchesTheFullSim(FuelLine,
+            ("copper_ore", t => Items(t, "copper_ore")),
+            ("fuel made", t => t.Stats.MadeTotal("fuel")),
+            ("fuel used", t => t.Stats.UsedTotal("fuel")),
+            ("ore used", t => t.Stats.UsedTotal("copper_ore")));
     }
 }

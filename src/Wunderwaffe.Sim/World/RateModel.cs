@@ -10,6 +10,10 @@ namespace Wunderwaffe.Sim.World;
 /// between its targets as the round-robin dump does, and nodes left with more than they pass on are tightened and the
 /// passes rerun, which is the steady-state back-up. Tiles linked by ports are solved together, each round reading its
 /// partners' last results, so a shortfall in one tile reaches the tiles that depend on it (FB-014).
+/// Machines run at their boosted speed and output (FB-016) and at their power network's steady-state satisfaction
+/// (FB-005): after a pass at full power, each network's supply (cores, generators as busy as their fuel lets them) is
+/// set against its demand (each consumer as busy as its throughput needs at that satisfaction), the satisfaction that
+/// balances them slows its consumers, and the passes rerun. Batteries only smooth peaks, so the steady state ignores them.
 /// Integer fixed point only; rates are items per tick times <see cref="One"/>.
 /// </summary>
 public static class RateModel
@@ -24,6 +28,7 @@ public static class RateModel
 
     const int TileRounds = 32;
     const int FixRounds = 12;
+    const int PowerRounds = 4;
 
     /// <summary>Leftovers smaller than this are rounding, not back-up.</summary>
     const long Slack = One / 100_000;
@@ -61,12 +66,25 @@ public static class RateModel
         readonly long[] _batchCap;
         readonly int[] _need;
         readonly int[] _make;
+
+        // Machines (FB-005, FB-016): recipe ticks, progress per tick at full power after speed boosters, output percent
+        // after output boosters, power network index (-1 if none), boosted draw if it draws, supply while it burns.
+        readonly int[] _ticks, _fullSpeed, _outPct, _net, _powerDraw, _powerMake;
+
+        // Per power network: what its other members supply and draw whatever the machines do, in power units, and the
+        // steady-state satisfaction in permille.
+        readonly long[] _fixedSupply, _fixedDemand;
+        readonly int[] _sat;
+
+        // Per machine: batches per tick done in the last forward pass, and its busy share at full power (permille).
+        readonly long[] _done;
+        readonly long[] _busy;
         readonly int[] _order;
         readonly bool _cyclic;
 
         readonly long[] _cap, _inflow, _tight, _taken, _offer;
         readonly SortedDictionary<int, long[]> _linkCap = [], _supply = [], _remaining = [];
-        readonly long[] _core, _produced, _draw;
+        readonly long[] _core, _produced, _used, _draw;
         readonly SortedDictionary<int, long[]> _outTo = [], _capTo = [];
 
         public TileGraph(Simulation sim, TileState tile, string[] items)
@@ -75,6 +93,8 @@ public static class RateModel
             _items = items;
             _k = items.Length;
             var grid = tile.Grid;
+            // Networks and boosted machine stats as the full sim sees them; derived state only, rebuilt on Revision.
+            grid.Power.Refresh(grid);
             _nodes = [.. grid.Buildings];
             int n = _nodes.Length;
             var index = new Dictionary<int, int>(n);
@@ -89,6 +109,14 @@ public static class RateModel
             _batchCap = new long[n];
             _need = new int[n * _k];
             _make = new int[n * _k];
+            _ticks = new int[n];
+            _fullSpeed = new int[n];
+            _outPct = new int[n];
+            _net = new int[n];
+            _powerDraw = new int[n];
+            _powerMake = new int[n];
+            _done = new long[n];
+            _busy = new long[n];
             for (int i = 0; i < n; i++)
             {
                 var b = _nodes[i];
@@ -107,9 +135,14 @@ public static class RateModel
                 };
                 if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort)
                     _partner[i] = PortRules.PartnerOf(grid, b);
-                if (recipe != null)
+                _net[i] = grid.Power.NetworkOf(b)?.Id ?? -1;
+                if (recipe != null && b.Machine is { } m)
                 {
-                    _batchCap[i] = One / recipe.Ticks;
+                    _ticks[i] = recipe.Ticks;
+                    _fullSpeed[i] = MachineState.ProgressPerTick * m.SpeedPercent / 100;
+                    _outPct[i] = 100 + m.OutputBonus;
+                    _powerDraw[i] = m.Draws ? m.BoostedDraw : 0;
+                    _powerMake[i] = m.MaxSupply;
                     foreach (var (id, c) in recipe.Inputs)
                         _need[i * _k + Array.IndexOf(items, id)] = c;
                     foreach (var (id, c) in recipe.Outputs)
@@ -155,6 +188,21 @@ public static class RateModel
                 _out[i] = _out[i].Where(e => _kind[e.Target] is NodeKind.Core or NodeKind.Export or NodeKind.Crafter
                     || (_kind[e.Target] == NodeKind.Conveyor && _ahead[e.Target] != i)).ToArray();
             (_order, _cyclic) = TopologicalOrder(n);
+
+            var nets = grid.Power.Networks;
+            _fixedSupply = new long[nets.Count];
+            _fixedDemand = new long[nets.Count];
+            _sat = new int[nets.Count];
+            foreach (var net in nets)
+            {
+                foreach (var b in net.Members)
+                {
+                    if (_kind[index[b.Id]] is NodeKind.Extractor or NodeKind.Crafter)
+                        continue;
+                    _fixedSupply[net.Id] += PowerNet.SupplyOf(b);
+                    _fixedDemand[net.Id] += PowerNet.DrawOf(b);
+                }
+            }
             _cap = new long[n * _k];
             _inflow = new long[n * _k];
             _tight = new long[n * _k];
@@ -162,6 +210,7 @@ public static class RateModel
             _offer = new long[n * _k];
             _core = new long[_k];
             _produced = new long[_k];
+            _used = new long[_k];
             _draw = new long[_k];
         }
 
@@ -247,6 +296,21 @@ public static class RateModel
                 _supply[p] = linked && other!._outTo.TryGetValue(Tile.Id, out var sup) ? sup : new long[_k];
             }
 
+            Array.Fill(_sat, 1000);
+            SetBatchCaps();
+            Settle();
+            for (int round = 0; round < PowerRounds && Rebalance(round == 0); round++)
+                Settle();
+
+            var oldOut = _outTo.ToDictionary(kv => kv.Key, kv => (long[])kv.Value.Clone());
+            var oldCap = _capTo.ToDictionary(kv => kv.Key, kv => (long[])kv.Value.Clone());
+            Collect();
+            return !Same(oldOut, _outTo) || !Same(oldCap, _capTo);
+        }
+
+        /// <summary>Backward and forward passes until nothing more backs up.</summary>
+        void Settle()
+        {
             Array.Fill(_tight, Big);
             for (int round = 0; round < FixRounds; round++)
             {
@@ -255,11 +319,75 @@ public static class RateModel
                 if (!Tighten())
                     break;
             }
+        }
 
-            var oldOut = _outTo.ToDictionary(kv => kv.Key, kv => (long[])kv.Value.Clone());
-            var oldCap = _capTo.ToDictionary(kv => kv.Key, kv => (long[])kv.Value.Clone());
-            Collect();
-            return !Same(oldOut, _outTo) || !Same(oldCap, _capTo);
+        /// <summary>
+        /// Batches per tick a machine can do at <paramref name="sat"/> permille power, as the full sim steps it: progress
+        /// per tick rounds down, and a batch takes whole ticks.
+        /// </summary>
+        long CapAt(int i, int sat)
+        {
+            long rate = (long)_fullSpeed[i] * sat / 1000;
+            return rate <= 0 ? 0 : One / ((_ticks[i] * (long)MachineState.ProgressPerTick + rate - 1) / rate);
+        }
+
+        void SetBatchCaps()
+        {
+            for (int i = 0; i < _nodes.Length; i++)
+            {
+                if (_ticks[i] > 0)
+                    _batchCap[i] = CapAt(i, _powerDraw[i] > 0 ? _sat[_net[i]] : 1000);
+            }
+        }
+
+        /// <summary>
+        /// Works out each network's steady-state satisfaction from the last forward pass. True if any changed, so the
+        /// passes run again at the new speeds. A consumer busy u permille of the time at full power is busy u/s at s, so
+        /// demand rises as satisfaction falls; s is the largest value with supply/demand(s) at least s, found by
+        /// stepping down from 1000. How busy consumers want to be is read once, from the pass at full power
+        /// (<paramref name="atFullPower"/>): a slowed consumer is busy all the time, which would hide what it wants.
+        /// Generators' supply is reread every round, since a slowed fuel line burns less.
+        /// </summary>
+        bool Rebalance(bool atFullPower)
+        {
+            if (_sat.Length == 0)
+                return false;
+            var supply = new long[_sat.Length];
+            for (int n = 0; n < _sat.Length; n++)
+                supply[n] = _fixedSupply[n] * 1000;
+            for (int i = 0; i < _nodes.Length; i++)
+            {
+                if (_ticks[i] == 0 || _net[i] < 0)
+                    continue;
+                if (_powerMake[i] > 0 && _batchCap[i] > 0)
+                    supply[_net[i]] += _powerMake[i] * Math.Min(1000, _done[i] * 1000 / _batchCap[i]);
+                if (atFullPower && _powerDraw[i] > 0 && _batchCap[i] > 0)
+                    _busy[i] = Math.Min(1000, _done[i] * 1000 / _batchCap[i]);
+            }
+
+            bool changed = false;
+            for (int n = 0; n < _sat.Length; n++)
+            {
+                int s = 1000;
+                for (int step = 0; step < 1000; step++)
+                {
+                    long demand = _fixedDemand[n] * 1000;
+                    for (int i = 0; i < _nodes.Length; i++)
+                    {
+                        if (_net[i] == n && _powerDraw[i] > 0 && _busy[i] > 0)
+                            demand += _powerDraw[i] * (s == 0 ? 1000 : Math.Min(1000, _busy[i] * 1000 / s));
+                    }
+                    int next = demand <= supply[n] ? 1000 : (int)(supply[n] * 1000 / demand);
+                    if (next >= s)
+                        break;
+                    s = next;
+                }
+                changed |= s != _sat[n];
+                _sat[n] = s;
+            }
+            if (changed)
+                SetBatchCaps();
+            return changed;
         }
 
         static bool Same(Dictionary<int, long[]> a, SortedDictionary<int, long[]> b) =>
@@ -321,7 +449,7 @@ public static class RateModel
             {
                 int make = _make[i * _k + k];
                 if (make > 0)
-                    best = Math.Min(best, Outlet(i, k) / make);
+                    best = Math.Min(best, Outlet(i, k) * 100 / (make * _outPct[i]));
             }
             return best;
         }
@@ -333,6 +461,7 @@ public static class RateModel
             Array.Clear(_taken);
             Array.Clear(_offer);
             Array.Clear(_produced);
+            Array.Clear(_used);
             _remaining.Clear();
             foreach (var (p, cap) in _linkCap)
                 _remaining[p] = (long[])cap.Clone();
@@ -369,14 +498,16 @@ public static class RateModel
                         long done = batches;
                         for (int k = 0; k < _k; k++)
                         {
-                            int make = _make[i * _k + k];
-                            if (make > 0)
-                                done = Math.Min(done, Distribute(i, k, batches * make) / make);
+                            long made = Made(i, k, batches);
+                            if (made > 0 && Distribute(i, k, made) is var got && got < made)
+                                done = Math.Min(done, got * 100 / (_make[i * _k + k] * _outPct[i]));
                         }
+                        _done[i] = done;
                         for (int k = 0; k < _k; k++)
                         {
                             _taken[i * _k + k] = done * _need[i * _k + k];
-                            _produced[k] += done * _make[i * _k + k];
+                            _used[k] += done * _need[i * _k + k];
+                            _produced[k] += Made(i, k, done);
                         }
                         break;
                     }
@@ -396,6 +527,9 @@ public static class RateModel
                 }
             }
         }
+
+        /// <summary>Items of k a machine makes in <paramref name="batches"/>, with its output boost (FB-016).</summary>
+        long Made(int i, int k, long batches) => batches * _make[i * _k + k] * _outPct[i] / 100;
 
         /// <summary>Offers <paramref name="amount"/> of item k to node i's targets; returns what they took.</summary>
         long Distribute(int i, int k, long amount)
@@ -557,6 +691,7 @@ public static class RateModel
             Add(FlowKind.Core, 0, _core);
             Add(FlowKind.Produced, 0, _produced);
             Add(FlowKind.Draw, 0, _draw);
+            Add(FlowKind.Used, 0, _used);
             for (int i = 0; i < _nodes.Length; i++)
             {
                 if (_kind[i] == NodeKind.Export)

@@ -14,6 +14,9 @@ public enum FlowKind
 
     /// <summary>Sent through one export port (<see cref="Flow.PortId"/>) to the neighbouring tile.</summary>
     Export,
+
+    /// <summary>Taken in by the tile's machines as recipe inputs, a fuel generator's fuel included; for the stats.</summary>
+    Used,
 }
 
 /// <summary>
@@ -36,7 +39,7 @@ public readonly record struct Flow(FlowKind Kind, int PortId, string Item, long 
 
 /// <summary>
 /// A tile's computed steady state (OQ-14): what reaches its core, what its machines make, what it draws from its
-/// import ports and what each export port sends. Worked out from the belt and building graph by <see cref="RateModel"/>,
+/// import ports, what its machines use and what each export port sends. Worked out from the belt and building graph by <see cref="RateModel"/>,
 /// never measured, so it is a pure function of the grids of the tiles linked to it by ports.
 /// </summary>
 public sealed class TileRates

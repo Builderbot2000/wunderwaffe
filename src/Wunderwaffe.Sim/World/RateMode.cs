@@ -30,6 +30,8 @@ internal sealed class TileRateState
 /// and out of its import ports' buffers. Its belts and machines keep what they held, frozen, and carry on from there
 /// when it is promoted again, so nothing is lost or made twice. If an import buffer can't cover a tick's draw or an
 /// export link is full, the tile waits that tick, which is how a shortfall the rates didn't foresee backs it up.
+/// Machines' own state (<c>Working</c>, <c>IdleTicks</c>, progress) is never touched here, so the power totals B keeps
+/// from it stay right. What the tile makes, uses and sends goes into its <see cref="ProductionStats"/> as in the full sim.
 /// Runs as tick phase 6, after unit physics: steps rate tiles, moves abstract units (<see cref="AbstractTravel"/>),
 /// then decides each tile's mode for the next tick.
 /// </summary>
@@ -63,6 +65,7 @@ public static class RateMode
     /// <summary>One tick of a rate-mode tile.</summary>
     static void Advance(Simulation sim, TileState tile, TileRateState state)
     {
+        tile.Stats.Advance(sim.Tick);
         var rates = Ensure(sim, tile);
         if (!ReferenceEquals(state.AccKeys, rates.Flows))
             Remap(state, rates.Flows);
@@ -106,6 +109,7 @@ public static class RateMode
                 tile.Inventory.Add(f.Item, n);
                 break;
             case FlowKind.Produced:
+                tile.Stats.RecordMade(f.Item, n);
                 if (tile.Owner != TileState.Unowned)
                     sim.Player(tile.Owner).AddProduced(new Dictionary<string, int> { [f.Item] = n });
                 break;
@@ -130,6 +134,10 @@ public static class RateMode
                 var link = tile.Grid.BuildingById(f.PortId)!.Export!;
                 for (int i = 0; i < n; i++)
                     link.InFlight.Enqueue(new Shipment(sim.Tick + PortRules.TransitTicksPerTile, f.Item));
+                tile.Stats.RecordSent(PortRules.PartnerOf(tile.Grid, tile.Grid.BuildingById(f.PortId)!), n);
+                break;
+            case FlowKind.Used:
+                tile.Stats.RecordUsed(f.Item, n);
                 break;
         }
     }
