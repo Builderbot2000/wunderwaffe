@@ -8,8 +8,8 @@ using Wunderwaffe.Sim.World;
 namespace Wunderwaffe.Game.Screens;
 
 /// <summary>
-/// Left panel: on a tile, its inventory; on the world map, the selected tile's profile, deposits and either its
-/// inventory and ports (yours) or what claiming it costs. Rebuilt only when what it shows changes (<c>_sideKey</c>).
+/// Left panel, world map only: the selected tile's profile, deposits and either its inventory and ports (yours) or
+/// what claiming it costs. Rebuilt only when what it shows changes (<c>_sideKey</c>).
 /// </summary>
 public partial class Hud
 {
@@ -24,50 +24,6 @@ public partial class Hud
     }
 
     static string InventoryKey(TileState tile) => string.Join(",", tile.Inventory.Entries.Select(kv => kv.Key + kv.Value));
-
-    void RefreshTileSide()
-    {
-        var tile = _host.ViewedTile;
-        var nets = ShownNetworks(tile);
-        string key = "t" + tile.Id + InventoryKey(tile)
-            + string.Join(";", nets.Select(n => $"{n.Supply}/{n.Demand}/{n.Stored / Simulation.TicksPerSecond}"));
-        if (key == _sideKey)
-            return;
-        _sideKey = key;
-        Ui.Clear(_sideInfo);
-        AddPower(nets);
-        AddInventory(tile);
-    }
-
-    /// <summary>Networks worth a line: those that make, use or store power, busiest first.</summary>
-    static List<PowerNetwork> ShownNetworks(TileState tile) => PowerNet.Networks(tile)
-        .Where(n => n.Supply > 0 || n.Demand > 0 || n.Capacity > 0)
-        .OrderByDescending(n => n.Demand).ThenBy(n => n.Id).ToList();
-
-    const int MaxNetworkLines = 4;
-
-    /// <summary>Each power network's balance (FB-005, UI-002): made, used, batteries, and how much of the demand is met.</summary>
-    void AddPower(List<PowerNetwork> nets)
-    {
-        if (nets.Count == 0)
-            return;
-        _sideInfo.AddChild(Ui.Heading("Power"));
-        foreach (var n in nets.Take(MaxNetworkLines))
-        {
-            var row = Ui.Row(6);
-            var text = $"{n.Members.Count} blocks · makes {n.Supply} · uses {n.Demand}";
-            if (n.Capacity > 0)
-                text += $" · stored {n.Stored / Simulation.TicksPerSecond}/{n.Capacity / Simulation.TicksPerSecond}";
-            var label = Ui.Label(text, Ui.SmallFont, Ui.Text);
-            label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            row.AddChild(label);
-            var color = n.Satisfaction >= 1000 ? Ui.Good : n.Satisfaction > 0 ? Ui.Warn : Ui.Bad;
-            row.AddChild(Ui.Label($"{n.Satisfaction / 10}%", Ui.SmallFont, color));
-            _sideInfo.AddChild(row);
-        }
-        if (nets.Count > MaxNetworkLines)
-            _sideInfo.AddChild(Ui.Label($"and {nets.Count - MaxNetworkLines} more networks", Ui.SmallFont, Ui.Muted));
-    }
 
     void AddInventory(TileState tile)
     {

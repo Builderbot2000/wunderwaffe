@@ -9,7 +9,7 @@ namespace Wunderwaffe.Game.Screens;
 
 /// <summary>
 /// Right column, under the objective: cross-tile alerts (UI-003) from the sim's event list, newest first, with a
-/// filter per kind of alert. Read at the slow refresh (5 Hz), so an alert shows within a second of the event. Clicking
+/// filter per kind of alert (behind the Filter button, since it is rarely changed). Read at the slow refresh (5 Hz), so an alert shows within a second of the event. Clicking
 /// one jumps to its tile or unit (UI-001).
 /// </summary>
 public partial class Hud
@@ -36,6 +36,11 @@ public partial class Hud
         var heading = Ui.Heading("Alerts");
         heading.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         head.AddChild(heading);
+        var filters = Ui.Row(6);
+        filters.Visible = false;
+        var toggleFilters = Ui.Button("Filter", () => filters.Visible = !filters.Visible);
+        toggleFilters.AddThemeFontSizeOverride("font_size", Ui.SmallFont - 2);
+        head.AddChild(toggleFilters);
         foreach (var (filter, name, _) in AlertGroups)
         {
             var toggle = new Button
@@ -50,9 +55,10 @@ public partial class Hud
                 _alertsShownSeq = -1;
                 RefreshAlerts();
             };
-            head.AddChild(toggle);
+            filters.AddChild(toggle);
         }
         col.AddChild(head);
+        col.AddChild(filters);
         _alertList = Ui.Column(4);
         col.AddChild(_alertList);
         parent.AddChild(Ui.Panel(col));

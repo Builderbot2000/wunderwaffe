@@ -150,6 +150,8 @@ public sealed class ContentDb
                 errors.Add($"building '{b.Id}': ports must be 1x1");
             if (b.Hp <= 0)
                 errors.Add($"building '{b.Id}': hp must be > 0");
+            if (!BuildingDef.Menus.Contains(b.Menu))
+                errors.Add($"building '{b.Id}': menu must be one of {string.Join(", ", BuildingDef.Menus)}");
             ValidateCombat(b, errors);
             if (b.Kind == BuildingKind.Platform && (!b.OnWater || b.Width != 1 || b.Height != 1))
                 errors.Add($"building '{b.Id}': a platform must be 1x1 and onWater");

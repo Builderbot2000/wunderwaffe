@@ -153,6 +153,7 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// <param name="Discharge">Batteries: most power given back each tick.</param>
 /// <param name="Range">Bridges: the farthest cell ahead the next bridge may stand on.</param>
 /// <param name="Booster">Boosters: what it does to its hosts.</param>
+/// <param name="Menu">Build menu tab, one of <see cref="BuildingDef.Menus"/>.</param>
 public sealed record BuildingDef(
     string Id,
     string Name,
@@ -180,8 +181,12 @@ public sealed record BuildingDef(
     int PowerCapacity = 0,
     int Discharge = 0,
     int Range = 0,
-    BoosterDef? Booster = null)
+    BoosterDef? Booster = null,
+    string Menu = "")
 {
+    /// <summary>Build menu tabs, in the order the HUD shows them (and Shift+1.. picks them).</summary>
+    public static readonly string[] Menus = ["production", "logistics", "power", "units", "combat", "boosters"];
+
     /// <summary>
     /// Takes part in a tile's power network (FB-005): draws, supplies, stores or conducts. Thrusters only use power
     /// on a unit, so they are inert on a tile; a landed unit core keeps supplying, so a scout powers an outpost on a

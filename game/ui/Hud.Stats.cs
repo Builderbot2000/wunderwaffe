@@ -26,16 +26,15 @@ public partial class Hud
         col.AddChild(head);
         _statsBody = Ui.Column(6);
         col.AddChild(_statsBody);
-        _statsPanel = Ui.Pin(Ui.Panel(col, 640), LayoutPreset.Center);
+        _statsPanel = AddLeft(Ui.Panel(col, 640));
         head.AddChild(Ui.Button("Close  O", () => _statsPanel.Visible = false));
         _statsPanel.Visible = false;
-        AddChild(_statsPanel);
     }
 
     /// <summary>Opens or closes the panel; O in the tile view.</summary>
     public void ToggleStats()
     {
-        _statsPanel.Visible = !_statsPanel.Visible && _host.View == ViewMode.Tile;
+        ShowLeftPanel(_statsPanel, !_statsPanel.Visible && _host.View == ViewMode.Tile);
         RefreshStats();
     }
 

@@ -12,14 +12,16 @@ namespace Wunderwaffe.Game.Screens;
 /// The in-game HUD (UI-001, UI-002), built in code. This file has the layout, overlays and per-frame refresh; each panel's
 /// contents live in a partial next to it:
 /// <list type="bullet">
+/// <item><c>Hud.TopBar.cs</c>: title, stock or totals, power, clock and menu buttons (top, full width).</item>
 /// <item><c>Hud.Objectives.cs</c>: current goal and toasts (top right).</item>
-/// <item><c>Hud.SidePanel.cs</c>: the viewed tile's inventory, or the selected world tile with claim/open (left).</item>
+/// <item><c>Hud.SidePanel.cs</c>: the selected world tile with claim/open (left, world map).</item>
 /// <item><c>Hud.BuildBar.cs</c>: build bar and what the picked building would do (bottom centre).</item>
 /// <item><c>Hud.Hover.cs</c>: what's under the cursor (bottom left).</item>
-/// <item><c>Hud.World.cs</c>: resource summary and armies (UI-001).</item>
+/// <item><c>Hud.World.cs</c>: armies (UI-001).</item>
 /// <item><c>Hud.Alerts.cs</c>: cross-tile alerts with a filter, click to jump (UI-003).</item>
 /// <item><c>Hud.Match.cs</c>: end screen (MP-001) and multiplayer status (MP-003).</item>
-/// <item><c>Hud.Stats.cs</c>: the viewed tile's production statistics (O, centred).</item>
+/// <item><c>Hud.Stats.cs</c>, <c>Hud.Blueprints.cs</c>: production statistics (O), blueprint library (B) and factory
+/// panel, which open in the left column on the tile view, where nothing else is.</item>
 /// </list>
 /// F1 opens the controls, F2 the performance line.
 /// </summary>
@@ -29,10 +31,10 @@ public partial class Hud : Control
     const int SideWidth = 400;
     const int RightWidth = 420;
     /// <summary>
-    /// Build bar width: 13 buttons a row, so at 1920x1080 its panel (centred) clears the hover panel on the left and
+    /// Build bar width: a tab's ten buttons, so at 1920x1080 its panel (centred) clears the hover panel on the left and
     /// the hints and buttons on the right, which are held to <see cref="RightWidth"/>.
     /// </summary>
-    const int BuildBarWidth = 936;
+    const int BuildBarWidth = 10 * ToolButtonWidth + 9 * 6;
 
     [Export] public BuildTool BuildTool = null!;
     [Export] public WorldMapView WorldMap = null!;
@@ -47,12 +49,15 @@ public partial class Hud : Control
 
     Label _title = null!, _clock = null!, _stats = null!;
     VBoxContainer _sideInfo = null!;
+    Control _sidePanel = null!;
+    /// <summary>Left column under the top bar: world tile panel and armies, or the tile view's panels (B, O, factory).</summary>
+    VBoxContainer _left = null!;
     Button _claim = null!, _enter = null!;
     Label _goalStep = null!, _goalName = null!, _goalText = null!, _goalCount = null!;
     ProgressBar _goalBar = null!;
     VBoxContainer _toasts = null!;
     Control _buildArea = null!;
-    readonly List<Button> _toolButtons = [];
+    readonly Dictionary<int, Button> _toolButtons = [];
     PanelContainer _placePanel = null!;
     Label _placeLine = null!;
     PanelContainer _hoverPanel = null!;
@@ -74,6 +79,7 @@ public partial class Hud : Control
         MouseFilter = MouseFilterEnum.Ignore;
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 
+        BuildTopBar();
         BuildLeft();
         BuildRight();
         BuildBottom();
@@ -102,7 +108,7 @@ public partial class Hud : Control
         if (tile && IsInstanceValid(_welcome))
             _welcome!.QueueFree();
         _buildArea.Visible = tile;
-        _claim.GetParent<Control>().Visible = !tile;
+        _sidePanel.Visible = !tile;
         if (!tile)
             _statsPanel.Visible = false;
         _sideKey = "";
@@ -113,22 +119,9 @@ public partial class Hud : Control
 
     void BuildLeft()
     {
-        var col = Ui.Pin(Ui.Column(8), LayoutPreset.TopLeft);
-        col.CustomMinimumSize = new Vector2(SideWidth, 0);
-        AddChild(col);
-
-        var top = Ui.Column(2);
-        var row = Ui.Row();
-        _title = Ui.Label("", 20, Ui.Text);
-        _title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _clock = Ui.Label("", Ui.FontSize, Ui.Muted);
-        row.AddChild(_title);
-        row.AddChild(_clock);
-        top.AddChild(row);
-        _stats = Ui.Label("", Ui.SmallFont, Ui.Muted);
-        _stats.Visible = false;
-        top.AddChild(_stats);
-        col.AddChild(Ui.Panel(top));
+        _left = Ui.Pin(Ui.Column(8), LayoutPreset.TopLeft);
+        _left.CustomMinimumSize = new Vector2(SideWidth, 0);
+        AddChild(_left);
 
         var side = Ui.Column(8);
         _sideInfo = Ui.Column(4);
@@ -139,9 +132,19 @@ public partial class Hud : Control
         buttons.AddChild(_claim);
         buttons.AddChild(_enter);
         side.AddChild(buttons);
-        col.AddChild(Ui.Panel(side));
-        BuildMatch(top);
-        BuildWorldHud(top, col);
+        _sidePanel = AddLeft(Ui.Panel(side, SideWidth));
+        BuildArmies();
+    }
+
+    /// <summary>
+    /// Adds a panel to the left column. Each keeps its own width (the column is as wide as its widest panel), and
+    /// panels in it never overlap the others.
+    /// </summary>
+    T AddLeft<T>(T panel) where T : Control
+    {
+        panel.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
+        _left.AddChild(panel);
+        return panel;
     }
 
     void BuildRight()
@@ -149,6 +152,7 @@ public partial class Hud : Control
         var col = Ui.Pin(Ui.Column(10), LayoutPreset.TopRight);
         col.CustomMinimumSize = new Vector2(RightWidth, 0);
         AddChild(col);
+        _right = col;
 
         var goal = Ui.Column(6);
         _goalStep = Ui.Heading("");
@@ -172,11 +176,18 @@ public partial class Hud : Control
 
     void BuildBottom()
     {
-        // Build bar and placement line, bottom centre.
+        // Hints, placement line and build bar, bottom centre. The bar shows on the tile view only.
         var area = Ui.Pin(Ui.Column(6), LayoutPreset.CenterBottom);
         area.Alignment = BoxContainer.AlignmentMode.End;
-        _buildArea = area;
         AddChild(area);
+
+        _hints = Ui.Label("", Ui.SmallFont, Ui.Muted);
+        _hints.HorizontalAlignment = HorizontalAlignment.Center;
+        _hints.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+        // No panel behind it, so an outline keeps it readable over the map.
+        _hints.AddThemeConstantOverride("outline_size", 6);
+        _hints.AddThemeColorOverride("font_outline_color", Colors.Black);
+        area.AddChild(_hints);
 
         _placeLine = Ui.Label("", Ui.FontSize);
         _placeLine.HorizontalAlignment = HorizontalAlignment.Center;
@@ -187,6 +198,7 @@ public partial class Hud : Control
 
         var barPanel = Ui.Panel(BuildToolButtons());
         barPanel.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+        _buildArea = barPanel;
         area.AddChild(barPanel);
 
         // Hover info, bottom left.
@@ -194,20 +206,6 @@ public partial class Hud : Control
         _hoverPanel = Ui.Pin(Ui.Panel(_hover, SideWidth), LayoutPreset.BottomLeft);
         _hoverPanel.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_hoverPanel);
-
-        // Hints and menu buttons, bottom right.
-        var right = Ui.Pin(Ui.Column(6), LayoutPreset.BottomRight);
-        right.Alignment = BoxContainer.AlignmentMode.End;
-        _hints = Ui.Label("", Ui.SmallFont, Ui.Muted, RightWidth);
-        _hints.HorizontalAlignment = HorizontalAlignment.Right;
-        right.AddChild(_hints);
-        var buttons = Ui.Row(6);
-        buttons.Alignment = BoxContainer.AlignmentMode.End;
-        buttons.AddChild(Ui.Button("Blueprints  B", ToggleLibrary));
-        buttons.AddChild(Ui.Button("Help  F1", () => Toggle(_help)));
-        buttons.AddChild(Ui.Button("Menu  Esc", PauseMenu.Open));
-        right.AddChild(buttons);
-        AddChild(right);
     }
 
     void BuildOverlays()
@@ -247,6 +245,13 @@ public partial class Hud : Control
         return panel;
     }
 
+    /// <summary>Opens <paramref name="panel"/> (library or production stats) and closes the other: one at a time.</summary>
+    void ShowLeftPanel(Control panel, bool show)
+    {
+        _library.Visible = _statsPanel.Visible = false;
+        panel.Visible = show;
+    }
+
     void Toggle(Control c)
     {
         bool show = !c.Visible;
@@ -262,7 +267,7 @@ public partial class Hud : Control
         "    The map is a blurred picture of each tile, refreshed every few toggles (Settings)",
         "",
         "Tile",
-        "    1-9, 0 or the build bar picks a building · R rotates · Esc drops it",
+        "    Shift+1-6 or the tabs open a build menu tab · 1-9, 0 or its buttons pick a building · R rotates · Esc drops it",
         "    Left-click / drag places · right-click / drag removes (full refund)",
         "    Drills sit on ore. Belts carry items the way they face; machines push output into anything next to them.",
         "    Ports go in the I/O zones along the tile's borders: one zone per neighbour, on the side facing it.",
@@ -273,7 +278,7 @@ public partial class Hud : Control
         "    Boosters touching a building improve it (hover to see). I sets the hovered sorter's item. O shows production.",
         "",
         "Units",
-        "    Lay frame (0) under a unit core and thrusters, hover the core with no building picked and press G",
+        "    Lay frame (Units tab, 1) under a unit core and thrusters, hover the core with no building picked and press G",
         "    Left-click / drag selects units · right-click moves them · past the border goes to the next tile",
         "    G with units selected lands them",
         "    K over a unit core records its design · B opens the blueprint library · R turns and F mirrors a picked blueprint",
@@ -310,6 +315,7 @@ public partial class Hud : Control
     public override void _Process(double delta)
     {
         _clock.Text = Ui.Clock(Sim.Tick);
+        PlaceColumns();
         if (_showStats)
             _stats.Text = $"{Engine.GetFramesPerSecond()} fps · sim {_host.StepMs:F3} ms/tick · tick {Sim.Tick}";
         UpdateBuildBar();
@@ -333,21 +339,19 @@ public partial class Hud : Control
     {
         RefreshGoal();
         RefreshAlerts();
-        RefreshWorldHud();
+        RefreshTopBar();
+        RefreshArmies();
         RefreshBlueprints();
         if (_host.View == ViewMode.Tile)
         {
-            _title.Text = _host.ViewedTile.Name;
-            RefreshTileSide();
             RefreshHover();
             RefreshStats();
             _hints.Text = BuildTool.HasTool
                 ? "R rotate · drag to place a line · right-click removes · Esc drops the building"
-                : "Tab world map · 1-9 pick a building · O production · drag to select units";
+                : "Tab world map · Shift+1-6 build tab · 1-9 pick a building · O production · drag to select units";
         }
         else
         {
-            _title.Text = "World map";
             RefreshWorldSide();
             _hoverPanel.Visible = _host.Selected.Count > 0 && SetHover(UnitTool.Status);
             _hints.Text = "Double-click your tile to open it · C claims · L logistics overlay · Tab back";

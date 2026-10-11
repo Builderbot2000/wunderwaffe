@@ -88,7 +88,7 @@ public class CombatTests
     public void AWeaponWithoutAWeaponBlockIsRejected()
     {
         string buildings = """
-            [{ "id": "gun", "name": "Gun", "kind": "weapon", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {}, "resist": { "acid": 10 } }]
+            [{ "id": "gun", "name": "Gun", "menu": "production", "kind": "weapon", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {}, "resist": { "acid": 10 } }]
             """;
         var ex = Assert.Throws<Content.ContentException>(() => Content.ContentDb.FromJson("[]", "[]", buildings));
         Assert.Contains(ex.Errors, e => e.Contains("'weapon' block"));

@@ -31,7 +31,7 @@ static class TestContent
 
     /// <summary>A plain 3x3 host in the <c>factory</c> category, standing in for the unit factory in booster tests.</summary>
     public const string TestFactory =
-        """{ "id": "test_factory", "name": "Test Factory", "kind": "core", "category": "factory", "width": 3, "height": 3, "power": 0, "hp": 100, "cost": {} }""";
+        """{ "id": "test_factory", "name": "Test Factory", "menu": "production", "kind": "core", "category": "factory", "width": 3, "height": 3, "power": 0, "hp": 100, "cost": {} }""";
 
     /// <summary>
     /// The real content with buildings.json edited by <paramref name="editBuildings"/>, which must change it; without

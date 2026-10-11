@@ -2,13 +2,13 @@
   {
     "id": "mine",
     "name": "Start mining",
-    "description": "Pick the drill (1), place it on copper ore and run conveyors (2) from it into your core. Belts face the way you rotate them (R).",
+    "description": "Pick the Drill (Production tab, 1), place it on copper ore and run Conveyors (Logistics tab, 1) from it into your core. Belts face the way you rotate them (R).",
     "condition": { "type": "produce", "item": "copper_ore", "amount": 50 }
   },
   {
     "id": "smelt",
     "name": "Smelt iron",
-    "description": "Belt iron ore into a Smelter: Iron Plate (4) and its plates on to the core.",
+    "description": "Belt iron ore into a Smelter making Iron Plate (Production tab, 3) and its plates on to the core.",
     "condition": { "type": "produce", "item": "iron_plate", "amount": 100 }
   },
   {
@@ -26,19 +26,19 @@
   {
     "id": "link",
     "name": "Link your tiles",
-    "description": "On the new tile, mine coal (buildings there are paid from your home tile until it has stock of its own) and belt it into an export port (6) placed in the I/O zone bordering your home tile. On your home tile, put an import port (7) in the zone bordering the coal tile: ports pair by zone, whichever way they face.",
+    "description": "On the new tile, mine coal (buildings there are paid from your home tile until it has stock of its own) and belt it into an Export Port (Logistics tab, 2) placed in the I/O zone bordering your home tile. On your home tile, put an Import Port (Logistics tab, 3) in the zone bordering the coal tile: ports pair by zone, whichever way they face.",
     "condition": { "type": "ship", "amount": 30 }
   },
   {
     "id": "steel",
     "name": "Make steel",
-    "description": "A Steel Mill (5) costs copper plates too: smelt some with a Smelter: Copper Plate (3). Feed the mill iron plates and coal. Unit cores and thrusters need steel.",
+    "description": "A Steel Mill (Production tab, 4) costs copper plates too: smelt some with a Smelter making Copper Plate (Production tab, 2). Feed the mill iron plates and coal. Unit cores and thrusters need steel.",
     "condition": { "type": "produce", "item": "steel", "amount": 20 }
   },
   {
     "id": "launch",
     "name": "Build a unit",
-    "description": "Lay unit frame (0), put a unit core (8) and thrusters (9) on it, then hover the core with no building picked and press G.",
+    "description": "Lay Unit Frame (Units tab, 1), put a Unit Core (2) and Thrusters (3) on it, then hover the core with no building picked and press G.",
     "condition": { "type": "launch", "amount": 2 }
   }
 ]

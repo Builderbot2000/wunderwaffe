@@ -21,10 +21,10 @@ public class ProgressionTests
 
     const string Buildings = """
         [
-          { "id": "core", "name": "Core", "kind": "core", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": {} },
-          { "id": "drill", "name": "Drill", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
-          { "id": "furnace", "name": "Furnace", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
-          { "id": "wall", "name": "Wall", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} }
+          { "id": "core", "name": "Core", "menu": "production", "kind": "core", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": {} },
+          { "id": "drill", "name": "Drill", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
+          { "id": "furnace", "name": "Furnace", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
+          { "id": "wall", "name": "Wall", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} }
         ]
         """;
 

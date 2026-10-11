@@ -71,7 +71,7 @@ public class PlacementTests
     public void RotationSwapsFootprint()
     {
         var content = Content.ContentDb.FromJson(
-            "[]", "[]", """[ { "id": "wall", "name": "Wall", "width": 1, "height": 3, "power": 0, "hp": 10, "cost": {} } ]""");
+            "[]", "[]", """[ { "id": "wall", "name": "Wall", "menu": "production", "width": 1, "height": 3, "power": 0, "hp": 10, "cost": {} } ]""");
         var sim = new Simulation(content);
         var tile = sim.AddTile(0, 0, Player, size: 10);
 

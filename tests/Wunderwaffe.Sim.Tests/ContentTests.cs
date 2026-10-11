@@ -9,7 +9,7 @@ public class ContentTests
           { "id": "plate", "name": "Plate", "tier": 2 },
           { "id": "exotic", "name": "Exotic", "tier": 4 } ]
         """;
-    const string Buildings = """[ { "id": "smelter", "name": "Smelter", "width": 2, "height": 2, "power": 0, "hp": 100, "cost": {} } ]""";
+    const string Buildings = """[ { "id": "smelter", "name": "Smelter", "menu": "production", "width": 2, "height": 2, "power": 0, "hp": 100, "cost": {} } ]""";
 
     [Fact]
     public void GameContentLoads()
@@ -43,7 +43,7 @@ public class ContentTests
     [Fact]
     public void RejectsBuildingsWithoutHitPoints()
     {
-        const string buildings = """[ { "id": "wall", "name": "Wall", "width": 1, "height": 1, "power": 0, "cost": {} } ]""";
+        const string buildings = """[ { "id": "wall", "name": "Wall", "menu": "production", "width": 1, "height": 1, "power": 0, "cost": {} } ]""";
         var ex = Assert.Throws<ContentException>(() => ContentDb.FromJson(Items, "[]", buildings));
         Assert.Contains(ex.Errors, e => e.Contains("hp must be > 0"));
     }

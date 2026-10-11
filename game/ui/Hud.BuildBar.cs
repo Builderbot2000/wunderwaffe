@@ -5,48 +5,71 @@ using Godot;
 using Wunderwaffe.Game.Input;
 using Wunderwaffe.Game.Render;
 using Wunderwaffe.Sim;
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game.Screens;
 
 /// <summary>
-/// Bottom centre, tile view only: one button per <see cref="BuildTool.Tools"/> entry (tinted when unaffordable), and a line saying what the picked building would do at the cursor.
+/// Bottom centre, tile view only: a row of tabs (<see cref="BuildingDef.Menus"/>), the open tab's buttons (tinted when
+/// unaffordable, numbered by hotkey), and a line saying what the picked building would do at the cursor.
 /// </summary>
 public partial class Hud
 {
+    const int ToolButtonWidth = 92;
+
+    readonly List<Button> _menuButtons = [];
+    readonly List<Control> _menuRows = [];
+
     Container BuildToolButtons()
     {
-        // Wraps into rows between the side panels once there are more tools than fit one row.
-        var bar = new HFlowContainer { CustomMinimumSize = new Vector2(BuildBarWidth, 0), MouseFilter = MouseFilterEnum.Ignore };
-        bar.AddThemeConstantOverride("h_separation", 6);
-        bar.AddThemeConstantOverride("v_separation", 6);
-        for (int i = 0; i < BuildTool.Tools.Count; i++)
+        var col = Ui.Column(6);
+        col.MouseFilter = MouseFilterEnum.Ignore;
+        var tabs = Ui.Row(6);
+        col.AddChild(tabs);
+        for (int m = 0; m < BuildingDef.Menus.Length; m++)
         {
-            var tool = BuildTool.Tools[i];
-            int index = i;
-            string key = i < InputActions.Slots ? ((i + 1) % 10).ToString() : "";
-            var icon = tool.IconId == null ? null : Sprites.Get(tool.IconId);
-            var b = new Button
-            {
-                // No sprite yet: the name stands in, so the button isn't blank.
-                Text = icon != null ? key : $"{key} {tool.Label}".Trim(),
-                Icon = icon,
-                AutowrapMode = TextServer.AutowrapMode.Word,
-                ClipText = true,
-                ExpandIcon = true,
-                IconAlignment = HorizontalAlignment.Center,
-                VerticalIconAlignment = VerticalAlignment.Top,
-                ToggleMode = true,
-                FocusMode = FocusModeEnum.None,
-                CustomMinimumSize = new Vector2(66, 74),
-            };
-            b.AddThemeFontSizeOverride("font_size", Ui.SmallFont);
-            b.AddThemeConstantOverride("icon_max_width", 40);
-            b.Pressed += () => BuildTool.Select(index);
-            _toolButtons.Add(b);
-            bar.AddChild(b);
+            int menu = m;
+            var tab = Ui.Button($"{InputActions.MenuName(m)}  ⇧{m + 1}", () => BuildTool.OpenMenu(menu));
+            tab.ToggleMode = true;
+            tab.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            tab.AddThemeFontSizeOverride("font_size", Ui.SmallFont);
+            _menuButtons.Add(tab);
+            tabs.AddChild(tab);
+
+            var row = Ui.Row(6);
+            row.CustomMinimumSize = new Vector2(BuildBarWidth, 0);
+            var slots = BuildTool.ToolsIn(m);
+            for (int i = 0; i < slots.Count; i++)
+                row.AddChild(ToolButton(slots[i], i < InputActions.Slots ? ((i + 1) % 10).ToString() : ""));
+            _menuRows.Add(row);
+            col.AddChild(row);
         }
-        return bar;
+        return col;
+    }
+
+    Button ToolButton(int index, string key)
+    {
+        var tool = BuildTool.Tools[index];
+        var icon = tool.IconId == null ? null : Sprites.Get(tool.IconId);
+        var b = new Button
+        {
+            Text = $"{key}  {tool.Short}".Trim(),
+            Icon = icon,
+            AutowrapMode = TextServer.AutowrapMode.Word,
+            ClipText = true,
+            ExpandIcon = true,
+            IconAlignment = HorizontalAlignment.Center,
+            VerticalIconAlignment = VerticalAlignment.Top,
+            ToggleMode = true,
+            FocusMode = FocusModeEnum.None,
+            CustomMinimumSize = new Vector2(ToolButtonWidth, 84),
+        };
+        b.AddThemeFontSizeOverride("font_size", Ui.SmallFont);
+        b.AddThemeConstantOverride("icon_max_width", 36);
+        b.Pressed += () => BuildTool.Select(index);
+        _toolButtons[index] = b;
+        return b;
     }
 
     void UpdateBuildBar()
@@ -54,13 +77,18 @@ public partial class Hud
         if (_host.View != ViewMode.Tile)
             return;
         var tile = _host.ViewedTile;
-        for (int i = 0; i < _toolButtons.Count; i++)
+        for (int m = 0; m < _menuButtons.Count; m++)
+        {
+            _menuButtons[m].SetPressedNoSignal(m == BuildTool.Menu);
+            _menuRows[m].Visible = m == BuildTool.Menu;
+        }
+        foreach (int i in BuildTool.ToolsIn(BuildTool.Menu))
         {
             var tool = BuildTool.Tools[i];
             var b = _toolButtons[i];
             b.SetPressedNoSignal(i == BuildTool.SelectedIndex);
             bool afford = tile.Inventory.Has(ToolCost(tool));
-            b.Modulate = afford ? Colors.White : new Color(1f, 0.7f, 0.7f, 0.75f);
+            b.Modulate = afford ? Colors.White : new Color(1f, 0.55f, 0.55f, 0.6f);
             b.TooltipText = ToolTooltip(tool);
         }
 

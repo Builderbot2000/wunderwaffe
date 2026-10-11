@@ -139,7 +139,7 @@ A unit is a group of buildings standing on **frame** (key `0` in the build palet
 - Goal conditions: `produce` (an item, counted when a batch finishes, extraction included), `claim` (tiles owned), `ship` (items arriving through import ports), `launch` (units lifted off). Counters are per player, empire-wide (TT-005).
 - `goals.json` is the guided objective chain, completed in order. `DemoLoopTests` plays the whole chain with real content and no cheats, so a content change that breaks the loop fails the tests.
 - Building `upkeep` (optional): items a minute the block costs while on a unit. `radius` and `blockCap`: unit factories only, both > 0.
-- Build-menu order (and hotkeys 1-9, 0) is `buildings.json` order; crafters with several recipes get one slot per recipe, and the unit frame is last.
+- The build menu has tabs (Production, Logistics, Power, Units, Combat, Boosters; each building's `menu` in `buildings.json`, **Shift+1-6** opens one). Within a tab, order (and hotkeys 1-9, 0) is `buildings.json` order, with cores and platforms last; crafters with several recipes get one slot per recipe, and the unit frame leads the Units tab.
 
 ## Commands
 

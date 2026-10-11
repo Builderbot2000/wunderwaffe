@@ -18,7 +18,7 @@ public partial class Hud
 
     void BuildMatch(Control top)
     {
-        _netLine = Ui.Label("", Ui.SmallFont, Ui.Warn, SideWidth - 24);
+        _netLine = Ui.Label("", Ui.SmallFont, Ui.Warn);
         _netLine.Visible = false;
         top.AddChild(_netLine);
 

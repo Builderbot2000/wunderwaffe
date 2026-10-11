@@ -49,21 +49,19 @@ public partial class Hud
         };
         scroll.AddChild(_libraryList);
         col.AddChild(scroll);
-        _library = Ui.Pin(Ui.Panel(col, LibraryWidth), LayoutPreset.CenterRight);
+        _library = AddLeft(Ui.Panel(col, LibraryWidth));
         _library.Visible = false;
-        AddChild(_library);
 
         _factoryInfo = Ui.Column(6);
-        _factoryPanel = Ui.Pin(Ui.Panel(_factoryInfo, SideWidth), LayoutPreset.CenterLeft);
+        _factoryPanel = AddLeft(Ui.Panel(_factoryInfo, SideWidth));
         _factoryPanel.Visible = false;
-        AddChild(_factoryPanel);
 
         BlueprintTool.Notice += (text, good) => Toast(text, good ? Ui.Good : Ui.Warn);
     }
 
     void ToggleLibrary()
     {
-        _library.Visible = !_library.Visible;
+        ShowLeftPanel(_library, !_library.Visible && _host.View == ViewMode.Tile);
         _libraryRevision = -1;
         RefreshBlueprints();
     }
@@ -207,7 +205,7 @@ public partial class Hud
                 AddFactoryItems("Needs", missing);
         }
         var buttons = Ui.Row(6);
-        buttons.AddChild(Ui.Button("Pick blueprint", () => { _library.Visible = true; _libraryRevision = -1; RefreshBlueprints(); }));
+        buttons.AddChild(Ui.Button("Pick blueprint", () => { ShowLeftPanel(_library, true); _libraryRevision = -1; RefreshBlueprints(); }));
         if (f.Projected != null)
             buttons.AddChild(Ui.Button("Stop", BlueprintTool.StopFactory));
         _factoryInfo.AddChild(buttons);

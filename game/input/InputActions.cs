@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Wunderwaffe.Sim.Content;
 
 namespace Wunderwaffe.Game.Input;
 
@@ -56,8 +57,11 @@ public static class InputActions
     public const string LogisticsToggle = "world_logistics";
     public const int Slots = 10;
 
-    /// <summary>Slots 1-9 are the number keys; the tenth is 0.</summary>
+    /// <summary>Slots 1-9 are the number keys; the tenth is 0. They pick from the open build menu tab.</summary>
     public static string Slot(int i) => $"build_slot_{i + 1}";
+
+    /// <summary>Shift+1.. opens build menu tab <paramref name="i"/> (<c>BuildingDef.Menus</c>).</summary>
+    public static string MenuSlot(int i) => $"build_menu_{i + 1}";
 
     public static void Register()
     {
@@ -92,6 +96,8 @@ public static class InputActions
         Add(LogisticsToggle, Key.L);
         for (int i = 0; i < Slots; i++)
             Add(Slot(i), i == 9 ? Key.Key0 : Key.Key1 + i);
+        for (int i = 0; i < BuildingDef.Menus.Length; i++)
+            Add(MenuSlot(i), (Key)((long)(Key.Key1 + i) | (long)KeyModifierMask.MaskShift));
     }
 
     static readonly List<string> _order = [];
@@ -110,12 +116,20 @@ public static class InputActions
         [CycleFilter] = "Sorter filter", [StatsToggle] = "Production stats", [LogisticsToggle] = "Logistics overlay",
     };
 
+    /// <summary>"Production" for <c>BuildingDef.Menus[0]</c>, and so on.</summary>
+    public static string MenuName(int i)
+    {
+        string id = BuildingDef.Menus[i];
+        return char.ToUpperInvariant(id[0]) + id[1..];
+    }
+
     /// <summary>Every action registered here, in registration order.</summary>
     public static IReadOnlyList<string> All => _order;
 
     public static string Name(string action) =>
         Names.TryGetValue(action, out var name) ? name
         : action.StartsWith("build_slot_") ? $"Build slot {action["build_slot_".Length..]}"
+        : action.StartsWith("build_menu_") ? $"Build tab: {MenuName(int.Parse(action["build_menu_".Length..]) - 1)}"
         : action.Replace('_', ' ');
 
     /// <summary>The action's keys, as physical key codes with modifier bits.</summary>

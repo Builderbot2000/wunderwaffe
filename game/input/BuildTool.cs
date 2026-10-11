@@ -20,8 +20,11 @@ public partial class BuildTool : Node2D
 
     const int ZoneFontSize = 14;
 
-    /// <summary>One build-menu entry: a building, a crafter with a chosen recipe, or the unit frame.</summary>
-    public sealed record Tool(string BuildingId, string? RecipeId, string Label)
+    /// <summary>
+    /// One build-menu entry: a building, a crafter with a chosen recipe, or the unit frame. <paramref name="Short"/> is
+    /// the button text; <paramref name="Menu"/> is its tab, an index into <see cref="BuildingDef.Menus"/>.
+    /// </summary>
+    public sealed record Tool(string BuildingId, string? RecipeId, string Label, string Short, int Menu)
     {
         /// <summary>The unit frame, painted like a building but laid under them.</summary>
         public bool IsFrame => BuildingId == FrameId;
@@ -31,14 +34,25 @@ public partial class BuildTool : Node2D
     }
 
     readonly List<Tool> _tools = [];
+    readonly List<int>[] _menus = [.. BuildingDef.Menus.Select(_ => new List<int>())];
     SimHost _host = null!;
     int _selected = -1;
+    int _menu;
     int _rotation;
     Vector2I _lastActionCell = new(-1, -1);
     PlaceResult _preview;
 
-    /// <summary>The build menu, in hotkey order: 1-9, then 0.</summary>
+    /// <summary>Every build-menu entry, tab by tab.</summary>
     public IReadOnlyList<Tool> Tools => _tools;
+
+    /// <summary>The open tab, an index into <see cref="BuildingDef.Menus"/>.</summary>
+    public int Menu => _menu;
+
+    /// <summary>Indices into <see cref="Tools"/> on tab <paramref name="menu"/>, in hotkey order: 1-9, then 0.</summary>
+    public IReadOnlyList<int> ToolsIn(int menu) => _menus[menu];
+
+    /// <summary>Opens tab <paramref name="menu"/>; the picked building, if any, stays picked.</summary>
+    public void OpenMenu(int menu) => _menu = menu;
 
     public int SelectedIndex => _selected;
     public Tool? Selected => _selected >= 0 ? _tools[_selected] : null;
@@ -54,8 +68,15 @@ public partial class BuildTool : Node2D
     /// <summary>True while a building is picked. Otherwise the mouse belongs to <see cref="UnitTool"/>.</summary>
     public bool HasTool => _selected >= 0;
 
-    /// <summary>Picks tool <paramref name="i"/>, or drops it if it's already picked. -1 drops whatever is picked.</summary>
-    public void Select(int i) => _selected = i < 0 || i >= _tools.Count || _selected == i ? -1 : i;
+    /// <summary>
+    /// Picks tool <paramref name="i"/> and opens its tab, or drops it if it's already picked. -1 drops whatever is picked.
+    /// </summary>
+    public void Select(int i)
+    {
+        _selected = i < 0 || i >= _tools.Count || _selected == i ? -1 : i;
+        if (_selected >= 0)
+            _menu = _tools[_selected].Menu;
+    }
 
     /// <summary>True while the cursor is over a HUD panel, which takes the click instead of the map.</summary>
     bool OverUi() => GetViewport().GuiGetHoveredControl() != null;
@@ -68,42 +89,55 @@ public partial class BuildTool : Node2D
     }
 
     /// <summary>
-    /// One slot per building, in buildings.json order, or per recipe for crafters that need one chosen. The frame keeps
-    /// hotkey 0, the tenth slot. Cores and platforms (WM-016, FB-017) come last, since they are rarely built.
+    /// One entry per building, in buildings.json order within its tab, or per recipe for crafters that need one chosen.
+    /// The frame leads the units tab. Cores and platforms (WM-016, FB-017) come last in theirs, since they are rarely built.
     /// </summary>
     void BuildPalette(Simulation sim)
     {
         var content = sim.Content;
         static bool Rare(BuildingDef d) => d.Kind is BuildingKind.Core or BuildingKind.Platform;
-        foreach (var def in content.BuildingList.Where(d => !Rare(d)))
+        var tools = new List<Tool> { new(FrameId, null, "Unit Frame", "Unit Frame", System.Array.IndexOf(BuildingDef.Menus, "units")) { IconId = Sprites.Frame } };
+        foreach (var def in content.BuildingList.OrderBy(Rare))
         {
+            int menu = System.Array.IndexOf(BuildingDef.Menus, def.Menu);
             var crafting = content.RecipesByBuilding.GetValueOrDefault(def.Id)?
                 .Where(r => r.Inputs.Count > 0).ToList() ?? [];
-            if (crafting.Count > 1)
+            if (crafting.Count <= 1)
             {
-                foreach (var r in crafting)
-                {
-                    string output = r.Outputs.Keys.First();
-                    _tools.Add(new Tool(def.Id, r.Id, $"{def.Name}: {content.Items[output].Name}") { IconId = output });
-                }
+                tools.Add(new Tool(def.Id, null, def.Name, def.Name, menu) { IconId = def.Id });
+                continue;
             }
-            else
+            foreach (var r in crafting)
             {
-                _tools.Add(new Tool(def.Id, null, def.Name) { IconId = def.Id });
+                string output = r.Outputs.Keys.First();
+                // Two recipes for one item (fuel from ore or coal) are told apart by what they use.
+                string name = content.Items[output].Name;
+                if (crafting.Count(o => o.Outputs.Keys.First() == output) > 1)
+                    name += " from " + string.Join(" + ", r.Inputs.Keys.Select(id => content.Items[id].Name));
+                tools.Add(new Tool(def.Id, r.Id, $"{def.Name}: {name}", name, menu) { IconId = output });
             }
         }
-        // The frame keeps hotkey 0, the tenth slot; buildings past the ninth are picked from the build bar.
-        _tools.Insert(System.Math.Min(InputActions.Slots - 1, _tools.Count), new Tool(FrameId, null, "Unit Frame") { IconId = Sprites.Frame });
-        foreach (var def in content.BuildingList.Where(Rare))
-            _tools.Add(new Tool(def.Id, null, def.Name) { IconId = def.Id });
+        // Tab by tab, so the tools' indices run in the bar's order.
+        foreach (var t in tools.OrderBy(t => t.Menu))
+        {
+            _menus[t.Menu].Add(_tools.Count);
+            _tools.Add(t);
+        }
     }
 
     public override void _UnhandledInput(InputEvent e)
     {
-        for (int i = 0; i < InputActions.Slots && i < _tools.Count; i++)
+        // Exact matches, so Ctrl/Alt+number (control groups) and Shift+number (tabs) don't also pick a building.
+        var slots = _menus[_menu];
+        for (int i = 0; i < InputActions.Slots && i < slots.Count; i++)
         {
-            if (e.IsActionPressed(InputActions.Slot(i)))
-                Select(i);
+            if (e.IsActionPressed(InputActions.Slot(i), false, true))
+                Select(slots[i]);
+        }
+        for (int i = 0; i < _menus.Length; i++)
+        {
+            if (e.IsActionPressed(InputActions.MenuSlot(i), false, true))
+                OpenMenu(i);
         }
         if (e.IsActionPressed(InputActions.Cancel) && _selected >= 0)
         {
