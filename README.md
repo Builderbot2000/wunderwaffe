@@ -69,7 +69,17 @@ A unit is a group of buildings standing on **frame** (key `0` in the build palet
 - **Collisions:** each cell is a circle. Units are pushed out of buildings (conveyors excepted) on any tile and out of each other, inelastically. Units path-find over the tile they are on and the next one (A* with clearance for the unit's size, straightened where there is a clear line, replanned when buildings change); with no way round they stop at the obstacle.
 - **Tiles:** unit positions are world coordinates, so the tile a unit is on is just the tile of the cell under its centre, and crossing a border is no jump. `MoveUnitsCommand` finds a route of tiles by breadth-first search; for each border the unit aims for the cell of the next tile, along the shared border, that makes the shortest trip, and plans its path over both tiles' buildings. Units can cross unowned and enemy tiles. At the edge of the world they stop at the border. Units collide with units on either side of a border.
 - **Landing:** `DeployUnitCommand` puts the blocks and frame back on the tile, turned to the nearest quarter turn of the unit's heading, if the cells are free, buildable, inside the tile, and on a tile the player owns.
+- **Validation (UD-003):** lift-off also needs onboard power covering what the blocks draw (batteries, generators) and a way to move (a thruster today). Hovering a unit core outlines the blocks that stop it.
+- **Stats (UD-002):** cells, mass, HP, power draw/supply, cost, build time and DPS are derived from the blocks (`UnitStats`). A unit of more than 48 frame cells is a **Wunderwaffe** (WW-001): same rules, flagged in the UI.
+- **Upkeep (UD-013):** a block may declare `upkeep` (items a minute); a unit pays the sum once a minute from the owned tile it is over (later: onboard storage, then any friendly resource radius). If it can't pay it is *unsupplied*: its engines stall (it drops move orders) until a payment succeeds; it retries every second.
 - **Controls** (no building picked): left-click or drag a box to select your units (Shift adds), right-click to move them, and right-click past the tile's border to send them into the tile there. On the world map, right-click sends the selection to the clicked spot. With a building picked, left places and right removes, as before.
+
+## Blueprints and unit factories
+
+- **Library (FB-009):** `user://blueprints.json`, shared by every match. **B** opens it: rename, tag, duplicate, delete; blocks can't be edited (rebuild and record again). **K** over a unit core records the design on its frame (only if it would lift off, UD-001); **Capture area** records every whole building and frame cell in a dragged box (the tile core is skipped).
+- **Placing:** **Place** picks a blueprint as ghosts: **R** turns, **F** mirrors, left-click places all of it in one action and pays the total; nothing is placed if any block doesn't fit or the tile can't afford it. Extractors pick their recipe from the ore they land on; crafters keep theirs.
+- **Unit factory (UD-006):** a 3x3 building with radius 6 and a block cap of 16 (boosters raise both, FB-016). Click it to select it, then **Build in factory** on a library entry and click where it should build, within its radius (distance from the factory's footprint, square). It refuses blueprints over its cap (frame cells for a unit, buildings otherwise) or outside its radius. Belts (or machines next to it) feed it the items the rest of the build still needs. It places one block at a time once that block is paid: frame, then systems, then armament (WW-004), each taking 0.1 s per item of cost. When the last block of a unit is placed it lifts the unit off and starts another. A building blueprint stays where it is built, so the factory shows *Blocked* until you remove it. Removing the factory returns its buffer.
+- **Megafactory (WW-002):** no separate building; a Wunderwaffe-sized blueprint needs a factory with enough boosters for its cap.
 
 ## Content notes
 
@@ -81,6 +91,7 @@ A unit is a group of buildings standing on **frame** (key `0` in the build palet
 - Building `hp`: hit points of one placed block, kept while it rides on a unit. Must be > 0. Nothing deals damage yet.
 - Goal conditions: `produce` (an item, counted when a batch finishes, extraction included), `claim` (tiles owned), `ship` (items arriving through import ports), `launch` (units lifted off). Counters are per player, empire-wide (TT-005).
 - `goals.json` is the guided objective chain, completed in order. `DemoLoopTests` plays the whole chain with real content and no cheats, so a content change that breaks the loop fails the tests.
+- Building `upkeep` (optional): items a minute the block costs while on a unit. `radius` and `blockCap`: unit factories only, both > 0.
 - Build-menu order (and hotkeys 1-9, 0) is `buildings.json` order; crafters with several recipes get one slot per recipe, and the unit frame is last.
 
 ## Commands

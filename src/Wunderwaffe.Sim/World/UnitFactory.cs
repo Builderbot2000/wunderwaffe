@@ -204,7 +204,8 @@ public static class UnitFactory
         return ProjectResult.Ok;
     }
 
-    static List<FactoryStep> StepsOf(ContentDb content, Blueprint bp, int ox, int oy)
+    /// <summary>The build order for a projection; snapshots rebuild <see cref="FactoryState.Steps"/> with it.</summary>
+    internal static List<FactoryStep> StepsOf(ContentDb content, Blueprint bp, int ox, int oy)
     {
         var steps = bp.Frames
             .Select(c => new FactoryStep(BuildStage.Frame, -1, ox + c.X, oy + c.Y, Balance.FrameCost, UnitStats.BuildTicksOf(Balance.FrameCost)))
