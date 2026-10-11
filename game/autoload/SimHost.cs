@@ -230,9 +230,10 @@ public partial class SimHost : Node
         if (drive < 0 && !stress)
             return false;
 
-        StartNew(GameSetup.Default, ViewMode.Tile);
+        // The NF-001 stress scene wants about 200 tiles: the largest world.
+        StartNew(stress ? GameSetup.Default with { Width = GameSetup.MaxSize, Height = GameSetup.MaxSize } : GameSetup.Default, ViewMode.Tile);
         if (stress)
-            DebugTools.StressFill(this);
+            DebugTools.StressWorld(this);
         // Plays a scripted unit session through the input path (needs a window).
         if (drive >= 0)
             DebugDriver.Attach(this, drive + 1 < args.Length ? args[drive + 1] : null);
