@@ -22,13 +22,16 @@ public sealed class AiDirector
 
     public IReadOnlyList<AiPlayer> Players => _players;
 
-    /// <summary>The AI commands for the tick about to run (<see cref="Simulation.Tick"/>), seat by seat.</summary>
-    public IReadOnlyList<Command> Collect(Simulation sim)
+    /// <summary>
+    /// The AI commands for the <paramref name="ticks"/> ticks about to run from <see cref="Simulation.Tick"/>, seat by
+    /// seat: every AI due on one of them thinks now. Lockstep asks once per turn, single player once per tick.
+    /// </summary>
+    public IReadOnlyList<Command> Collect(Simulation sim, int ticks = 1)
     {
         var commands = new List<Command>();
         foreach (var ai in _players)
         {
-            if (ai.Due(sim.Tick))
+            if (ai.DueWithin(sim.Tick, ticks))
                 commands.AddRange(ai.Think(sim));
         }
         return commands;

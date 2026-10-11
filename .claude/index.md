@@ -51,6 +51,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `Simulation.Match.cs` | Partial: `Winner`, `EndTick`, `EndReason`, `IsOver` (MP-001). |
 | `World/Victory.cs` | MP-001: `Step` after `Progression.Step` (elimination when a player has no core, domination at `TilesToWin`), `HasCore`, `IsEliminated`. |
 | `World/Alerts.cs` | Derived alerts: once a second raises `InputsStarved` per tile (`StarvedOn`). |
+| `Net/Lockstep.cs` | MP-003 transport-free lockstep: `NetMsg` (JSON, tags `input`/`turn`/`ack`/`desync`), `Lockstep` (turns of `TurnTicks`, host seals bundles `DelayTurns` ahead, `HostInputs` for AI, acks gate the host to `MaxLeadTurns`, hash every `HashEveryTurns` → `Desync`). Clients may only send their own seat, no `debug_grant`. |
 
 ## game/ (Godot project; namespaces `Wunderwaffe.Game[.Input/.Render/.Screens/.Debug]`)
 
@@ -109,6 +110,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `StressTests.cs` | NF-001 tick budget with thousands of buildings. |
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats: content changes that break the loop fail here. |
 | `AiTests.cs` | AI plays the whole goal chain alone (NF-009 driver through commands + queries), two AIs replay from the log, no stall over a long match. |
+| `LockstepTests.cs` | Lockstep over a laggy in-memory JSON network: same commands on the same ticks (with a host AI), desync reported to all, seat spoofing and cheats refused. |
 
 ## Other
 

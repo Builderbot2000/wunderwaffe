@@ -45,6 +45,17 @@ public sealed class AiPlayer(int player)
     /// <summary>True on the ticks this AI decides on.</summary>
     public bool Due(long tick) => tick % ThinkEvery == Player % ThinkEvery;
 
+    /// <summary>True if <see cref="Due"/> on any of the <paramref name="ticks"/> ticks from <paramref name="tick"/>.</summary>
+    public bool DueWithin(long tick, int ticks)
+    {
+        for (long t = tick; t < tick + ticks; t++)
+        {
+            if (Due(t))
+                return true;
+        }
+        return false;
+    }
+
     /// <summary>What to do now: zero or more commands to enqueue before the next step.</summary>
     public IReadOnlyList<Command> Think(Simulation sim)
     {
