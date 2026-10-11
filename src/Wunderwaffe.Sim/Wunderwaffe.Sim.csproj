@@ -8,4 +8,9 @@
     <RootNamespace>Wunderwaffe.Sim</RootNamespace>
   </PropertyGroup>
 
+  <!-- Combat tests set hit points and loaded ammo directly. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Wunderwaffe.Sim.Tests" />
+  </ItemGroup>
+
 </Project>

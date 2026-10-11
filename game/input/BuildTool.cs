@@ -67,11 +67,15 @@ public partial class BuildTool : Node2D
         _host.ShowOnlyIn(this, ViewMode.Tile, () => _lastActionCell = new(-1, -1));
     }
 
-    /// <summary>One slot per building, in buildings.json order, or per recipe for crafters that need one chosen.</summary>
+    /// <summary>
+    /// One slot per building, in buildings.json order, or per recipe for crafters that need one chosen. The frame keeps
+    /// hotkey 0, the tenth slot. Cores and platforms (WM-016, FB-017) come last, since they are rarely built.
+    /// </summary>
     void BuildPalette(Simulation sim)
     {
         var content = sim.Content;
-        foreach (var def in content.BuildingList.Where(b => b.Id != Simulation.CoreBuildingId))
+        static bool Rare(BuildingDef d) => d.Kind is BuildingKind.Core or BuildingKind.Platform;
+        foreach (var def in content.BuildingList.Where(d => !Rare(d)))
         {
             var crafting = content.RecipesByBuilding.GetValueOrDefault(def.Id)?
                 .Where(r => r.Inputs.Count > 0).ToList() ?? [];
@@ -88,7 +92,10 @@ public partial class BuildTool : Node2D
                 _tools.Add(new Tool(def.Id, null, def.Name) { IconId = def.Id });
             }
         }
-        _tools.Add(new Tool(FrameId, null, "Unit Frame") { IconId = Sprites.Frame });
+        // The frame keeps hotkey 0, the tenth slot; buildings past the ninth are picked from the build bar.
+        _tools.Insert(System.Math.Min(InputActions.Slots - 1, _tools.Count), new Tool(FrameId, null, "Unit Frame") { IconId = Sprites.Frame });
+        foreach (var def in content.BuildingList.Where(Rare))
+            _tools.Add(new Tool(def.Id, null, def.Name) { IconId = def.Id });
     }
 
     public override void _UnhandledInput(InputEvent e)
@@ -105,8 +112,24 @@ public partial class BuildTool : Node2D
         }
         if (e.IsActionPressed(InputActions.Rotate))
             _rotation = (_rotation + 1) & 3;
+        if (e.IsActionPressed(InputActions.CycleFilter))
+            CycleSorterFilter();
         if (e is InputEventMouseButton { Pressed: true })
             _lastActionCell = new(-1, -1);
+    }
+
+    /// <summary>Sets the hovered sorter to let the next item through: none, then each item in id order (FB-004).</summary>
+    void CycleSorterFilter()
+    {
+        var tile = _host.ViewedTile;
+        var cell = HoveredCell();
+        if (tile.Grid.BuildingAt(cell.X, cell.Y)?.Sorter is not { } sorter)
+            return;
+        var items = _host.Content.Items.Keys.Order(System.StringComparer.Ordinal).Select(k => (string?)k).Prepend(null).ToList();
+        string? next = items[(items.IndexOf(sorter.Filter) + 1) % items.Count];
+        if (Logistics.CheckFilter(_host.Sim, tile, _host.LocalPlayer, cell.X, cell.Y, next) == FilterResult.Ok)
+            _host.Sim.Enqueue(new SetFilterCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y, next));
+        GetViewport().SetInputAsHandled();
     }
 
     public override void _Process(double delta)
@@ -121,7 +144,7 @@ public partial class BuildTool : Node2D
             var (x, y, _, _) = Footprint(cell);
             var tool = _tools[_selected];
             _preview = tool.IsFrame
-                ? UnitAssembly.CheckFrame(tile, _host.LocalPlayer, x, y)
+                ? UnitAssembly.CheckFrame(_host.Sim, tile, _host.LocalPlayer, x, y)
                 : Placement.Check(_host.Sim, tile, _host.LocalPlayer, tool.BuildingId, x, y, _rotation, tool.RecipeId, out _);
             if (!overUi && Godot.Input.IsMouseButtonPressed(MouseButton.Left) && cell != _lastActionCell && _preview == PlaceResult.Ok)
             {

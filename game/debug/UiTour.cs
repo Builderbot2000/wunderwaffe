@@ -27,6 +27,7 @@ public partial class UiTour : Node
     // Where Build put the smelter. Tiles are irregular, so it goes on the first open ground near the middle.
     (int X, int Y) _smelter = (44, 40);
     HashSet<string> _savesBefore = [];
+    string? _blueprintId;
 
     public static void Attach(SimHost host, string dir)
     {
@@ -54,16 +55,40 @@ public partial class UiTour : Node
         Step(10, "hover shot", () => Shot("05b_hover"));
         Step(1, "port zones", ShowPortZones);
         Step(10, "port zones shot", () => { Shot("05c_port_zones"); Key(Godot.Key.Escape); });
+        Step(1, "combat", ShowCombat);
+        Step(10, "combat shot", () => Shot("05d_combat"));
+        Step(5, "blueprint library", () => { RecordBlueprint(); Press("Blueprints"); });
+        Step(10, "library shot", () => { Shot("05d_blueprints"); Press("Place"); HoverBelow(); });
+        Step(10, "ghost shot", () => { Shot("05e_blueprint_ghost"); Key(Godot.Key.Escape); });
+        Step(5, "production stats", () => Key(Godot.Key.O));
+        Step(10, "production stats shot", () =>
+        {
+            var panel = GetTree().Root.FindChild("Hud", true, false) is Hud ? Find(GetTree().Root, "Close  O") : null;
+            Log(panel != null ? "production stats open" : "FAIL: O didn't open the production stats");
+            Shot("05d_production");
+            Key(Godot.Key.O);
+        });
         Step(5, "world again", () => { Key(Godot.Key.Tab); });
         Step(10, "select coal tile", SelectCoalNeighbour);
-        Step(10, "world tile panel", () => { Shot("07_world_coal"); Press("Claim"); });
-        Step(10, "claimed", () =>
+        Step(1, "lift off scout", LiftOffScout);
+        Step(10, "select scout", SelectScout);
+        Step(10, "world tile panel", () => { Shot("07_world_coal"); Press("Send units"); });
+        Step(30, "scout sent", () =>
         {
-            int tiles = _host.Sim.Tiles.Count(t => t.Owner == _host.LocalPlayer);
-            Log(tiles == 2 ? "claimed the coal tile" : $"FAIL: own {tiles} tiles after Claim");
-            Shot("07b_claimed");
+            // WM-006: the scout flies to the coal tile's victory circle; landing there and holding it claims the tile.
+            var scout = _host.Sim.Units.FirstOrDefault(u => u.Owner == _host.LocalPlayer);
+            Log(scout is { Moving: true } ? "scout on its way to the coal tile's circle" : "FAIL: the scout didn't take the order");
+            Shot("07b_scout_sent");
         });
-        Step(1, "back to tile", () => Key(Godot.Key.Tab));
+        Step(1, "logistics overlay", () => Key(Godot.Key.L));
+        Step(5, "logistics overlay off", () =>
+        {
+            var map = GetTree().Root.FindChild("WorldMapView", true, false) as WorldMapView ?? throw new InvalidOperationException("no WorldMapView");
+            Log(map.ShowLogistics ? "FAIL: L didn't hide the logistics overlay" : "logistics overlay toggles");
+            Shot("07c_logistics_off");
+            Key(Godot.Key.L);
+        });
+        Step(1, "back to tile", () => { _host.Selected.Clear(); Key(Godot.Key.Tab); });
         Step(5, "pause", () => { Key(Godot.Key.Escape); });
         Step(5, "paused", () => { _pausedTick = _host.Sim.Tick; Shot("08_pause"); });
         Step(20, "still paused", () =>
@@ -85,6 +110,8 @@ public partial class UiTour : Node
             // Leave the player's saves folder as it was.
             foreach (var save in SaveSlots.List().Where(s => !_savesBefore.Contains(s.Path)))
                 SaveSlots.Delete(save.Path);
+            if (_blueprintId != null)
+                BlueprintLibrary.Delete(_blueprintId);
             GetTree().Quit();
         });
     }
@@ -130,6 +157,28 @@ public partial class UiTour : Node
         Log($"selected coal tile {coal.Id}");
     }
 
+    /// <summary>Lifts off the starting scout, as G over its unit core would; <see cref="SelectScout"/> then clicks it.</summary>
+    void LiftOffScout()
+    {
+        var home = _host.Sim.Tiles[_host.Sim.StartTileId];
+        var core = home.Grid.Buildings.First(b => b.Kind == Sim.Content.BuildingKind.UnitCore);
+        _host.Sim.Enqueue(new ActivateUnitCommand(_host.LocalPlayer, home.Id, core.X, core.Y));
+    }
+
+    void SelectScout()
+    {
+        _host.Selected.Clear();
+        if (_host.Sim.Units.LastOrDefault(u => u.Owner == _host.LocalPlayer) is { } scout)
+        {
+            _host.Selected.Add(scout.Id);
+            Log($"lifted off scout {scout.Id}");
+        }
+        else
+        {
+            Log("FAIL: the starting scout didn't lift off");
+        }
+    }
+
     /// <summary>Picks the export port, which shows the tile's I/O zones, and hovers the first zone's label.</summary>
     void ShowPortZones()
     {
@@ -140,6 +189,43 @@ public partial class UiTour : Node
         Log($"{zones.Count} I/O zones: {string.Join(", ", zones.Select(z => $"tile {z.Neighbor} ({z.Cells} cells)"))}");
         if (zones.Count > 0)
             GetViewport().WarpMouse(GetViewport().GetCanvasTransform() * (zones[0].Label * Palette.CellPx));
+    }
+
+    /// <summary>
+    /// Combat overlays with no enemy around: a debug hit damages the smelter (health bar) and destroys a belt cell
+    /// (wreck), a laser turret goes next to the smelter, and the cursor hovers the wreck.
+    /// </summary>
+    void ShowCombat()
+    {
+        var sim = _host.Sim;
+        var tile = _host.ViewedTile;
+        int me = _host.LocalPlayer;
+        sim.Enqueue(new DebugDamageCommand(me, tile.Id, _smelter.X, _smelter.Y, 120));
+        sim.Enqueue(new DebugDamageCommand(me, tile.Id, _smelter.X - 4, _smelter.Y + 4, 1000));
+        sim.Enqueue(new DebugGrantCommand(me, tile.Id, "copper_plate", 20));
+        sim.Enqueue(new DebugGrantCommand(me, tile.Id, "steel", 5));
+        sim.Enqueue(new PlaceBuildingCommand(me, tile.Id, "laser_turret", _smelter.X + 2, _smelter.Y));
+        var at = GetViewport().GetCanvasTransform() * (new Vector2(_smelter.X - 3.5f, _smelter.Y + 4.5f) * Palette.CellPx);
+        GetViewport().WarpMouse(at);
+        Log("damaged the smelter, wrecked a belt cell, placed a laser turret");
+    }
+
+    /// <summary>Records the smelter and its belt as a blueprint, as Capture area would (removed again at the end).</summary>
+    void RecordBlueprint()
+    {
+        var bp = Blueprints.FromArea(_host.ViewedTile, _smelter.X - 4, _smelter.Y, 7, 5)
+                 ?? throw new InvalidOperationException("nothing to record around the smelter");
+        _blueprintId = BlueprintLibrary.Add("Tour blueprint", bp, ["tour"]).Id;
+        Log($"recorded a blueprint of {bp.Blocks.Length} buildings");
+    }
+
+    /// <summary>Moves the mouse below the smelter, where a picked blueprint's ghost then shows.</summary>
+    void HoverBelow()
+    {
+        var at = GetViewport().GetCanvasTransform() * (new Vector2(_smelter.X, _smelter.Y + 9) * Palette.CellPx);
+        GetViewport().WarpMouse(at);
+        var tool = GetTree().Root.FindChild("BlueprintTool", true, false) as BlueprintTool ?? throw new InvalidOperationException("no BlueprintTool");
+        Log(tool.Mode == BlueprintMode.Place ? $"blueprint picked: {tool.Status.Text}" : "FAIL: Place didn't pick the blueprint");
     }
 
     void HoverSmelter()

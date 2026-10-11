@@ -241,4 +241,15 @@ public class PortTests
         }
         Assert.Equal(Run1(), Run1());
     }
+
+    [Fact]
+    public void ALinkReportsItsItemsPerMinute()
+    {
+        // IO-002, IO-005: one drill's worth (60 a minute) crosses from A to B.
+        var (sim, a, b) = Pair();
+        Run(sim, 2 * 60 * Simulation.TicksPerSecond);
+        Assert.InRange(a.Stats.SentPerMinute(b.Id), 59, 61);
+        Assert.Equal([b.Id], a.Stats.Partners);
+        Assert.Equal(0, b.Stats.SentPerMinute(a.Id));
+    }
 }

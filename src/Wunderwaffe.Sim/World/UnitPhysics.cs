@@ -33,6 +33,7 @@ internal static class UnitPhysics
 
     public static void Step(Simulation sim)
     {
+        UnitSim.Step(sim);
         foreach (var u in sim.Units)
         {
             if (sim.IsAbstract(u))
@@ -70,6 +71,7 @@ internal static class UnitPhysics
             if (!crossing && !through && dist < ArriveRadius && speed < ArriveSpeed)
             {
                 u.Route = null;
+                UnitSim.Arrived(sim, u);
             }
             else if (dist > 0)
             {
@@ -97,24 +99,17 @@ internal static class UnitPhysics
 
     /// <summary>
     /// Where the unit crosses from <paramref name="tile"/> into <paramref name="next"/>: the cell of the next tile, along
-    /// their shared border, that makes the shortest trip from the unit to its destination. Chosen once per border.
+    /// their shared border, in the terrain region its route enters (so its locomotion can cross there, IO-003), that
+    /// makes the shortest trip from the unit to its destination. Chosen once per border.
     /// </summary>
     static (int X, int Y) Portal(Simulation sim, Unit u, TileState tile, TileState next)
     {
         if (u.Portal is { } p && p.Tile == tile.Id && p.Next == next.Id)
             return (p.X, p.Y);
 
-        var cells = sim.Map.BorderCells(next.Id, tile.Id);
-        (int X, int Y) best = (next.CenterX, next.CenterY);
-        long bestD = long.MaxValue;
-        foreach (var (cx, cy) in cells)
-        {
-            long mx = (long)cx * S + S / 2, my = (long)cy * S + S / 2;
-            long a = ISqrt((mx - u.X) * (mx - u.X) + (my - u.Y) * (my - u.Y));
-            long b = ISqrt((u.DestX - mx) * (u.DestX - mx) + (u.DestY - my) * (u.DestY - my));
-            if (a + b < bestD)
-                (best, bestD) = ((cx, cy), a + b);
-        }
+        var g = UnitNav.Regions(sim, u.Locomotion, UnitPath.Clearance(u));
+        int have = u.RouteRegions?[u.RouteIndex] ?? -1, want = u.RouteRegions?[u.RouteIndex + 1] ?? -1;
+        var best = UnitNav.Portal(sim, g, tile, next, have, want, u.X, u.Y, u.DestX, u.DestY);
         u.Portal = (tile.Id, next.Id, best.X, best.Y);
         return best;
     }
@@ -137,7 +132,7 @@ internal static class UnitPhysics
         {
             u.PathKey = key;
             u.PathIndex = 0;
-            var blocked = UnitPath.Blocked(sim, win, tile, next, UnitPath.Clearance(u));
+            var blocked = UnitPath.Blocked(sim, win, tile, next, UnitPath.Clearance(u), u.Locomotion);
             var start = (Math.Clamp(u.X / S, win.X, win.X + win.W - 1) - win.X, Math.Clamp(u.Y / S, win.Y, win.Y + win.H - 1) - win.Y);
             u.Path = UnitPath.Find(win.W, win.H, blocked, start, (goalX - win.X, goalY - win.Y))
                 ?.Select(c => (c.X + win.X, c.Y + win.Y)).ToArray();
@@ -257,14 +252,18 @@ internal static class UnitPhysics
         else
         {
             // Drifted somewhere the order didn't plan: plan again from here.
-            u.Route = UnitSim.FindRoute(sim, sim.Tiles[id], sim.Tiles[u.DestTileId]);
-            u.RouteIndex = 0;
+            UnitSim.Replan(sim, u);
         }
     }
 
-    /// <summary>Pushes a unit out of any solid building its cells overlap, on any tile, and cancels the velocity into it.</summary>
+    /// <summary>
+    /// Pushes a unit out of any solid building its cells overlap, on any tile, and out of terrain its locomotion can't
+    /// cross (UD-004), and cancels the velocity into it. A unit whose centre already stands on such terrain (a boat
+    /// built on land) isn't held by terrain, so it can get off.
+    /// </summary>
     static void CollideBuildings(Simulation sim, Unit u)
     {
+        bool stranded = !Locomotion.CanCross(sim, u.Locomotion, (int)FloorDiv(u.X, S), (int)FloorDiv(u.Y, S));
         foreach (var cell in u.Cells)
         {
             var (cx0, cy0) = u.CellWorld(cell);
@@ -273,9 +272,9 @@ internal static class UnitPhysics
             {
                 for (long nx = gx - 1; nx <= gx + 1; nx++)
                 {
-                    if (sim.TileAtCell((int)nx, (int)ny) is not { } t
-                        || t.Grid.BuildingAt((int)nx - t.OriginX, (int)ny - t.OriginY) is not { } b
-                        || b.Kind == BuildingKind.Conveyor)
+                    bool solid = sim.TileAtCell((int)nx, (int)ny) is { } t
+                        && t.Grid.BuildingAt((int)nx - t.OriginX, (int)ny - t.OriginY) is { Kind: not BuildingKind.Conveyor };
+                    if (!solid && (stranded || Locomotion.CanCross(sim, u.Locomotion, (int)nx, (int)ny)))
                         continue;
 
                     var (cx, cy) = u.CellWorld(cell);

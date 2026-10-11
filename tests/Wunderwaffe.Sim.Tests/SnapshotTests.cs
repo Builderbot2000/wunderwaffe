@@ -31,7 +31,6 @@ public class SnapshotTests(ITestOutputHelper output)
             _east = Sim.Neighbors(_home).First(n => n.Grid.BuildableCount * 2 > n.Grid.Area);
             foreach (var item in new[] { "copper_ore", "iron_ore", "copper_plate", "iron_plate", "steel" })
                 Sim.Enqueue(new DebugGrantCommand(Me, _home.Id, item, 10_000));
-            Sim.Enqueue(new ClaimTileCommand(Me, _east.Id));
             Sim.Step();
 
             // Drills on the tile's own deposits (generated from the seed, so a replay has them too): copper straight into a

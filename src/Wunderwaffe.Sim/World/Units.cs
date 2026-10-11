@@ -20,6 +20,25 @@ public readonly record struct UnitCell(int GX, int GY, int OffX, int OffY, int M
 public readonly record struct Thruster(int Thrust, int Dir);
 
 /// <summary>
+/// What a unit does on its own when it isn't following a player order (UC-004). Combat reads it to decide whether to
+/// fire, and asks <see cref="UnitSim.MayChase"/> before chasing.
+/// </summary>
+public enum Stance
+{
+    /// <summary>Fires at and chases anything it finds.</summary>
+    Aggressive,
+
+    /// <summary>Fires and chases, but only within <see cref="UnitSim.LeashCells"/> of its anchor, then goes back to it.</summary>
+    Defensive,
+
+    /// <summary>Never fires on its own.</summary>
+    HoldFire,
+
+    /// <summary>Follows <see cref="Unit.EscortId"/> and only fights near it.</summary>
+    Escort,
+}
+
+/// <summary>
 /// A mobile rigid body built from the blocks that stood on a tile's frame (see <see cref="UnitAssembly"/>). Position
 /// is the centre of mass in world sub-cells (<see cref="CellScale"/> to a cell; see <see cref="WorldMap"/>), velocity is
 /// sub-cells per tick and angle is a fraction of a turn (<see cref="Trig.Turn"/>). The tile it is on is the tile of the
@@ -81,23 +100,53 @@ public sealed class Unit
         X = x - LocalCentre(coreGX) + (int)comX;
         Y = y - LocalCentre(coreGY) + (int)comY;
 
-        var thrusters = new List<Thruster>();
-        foreach (var b in blocks)
+        BlockCombat = blocks.Select(b => defs[b.DefId] is { Kind: BuildingKind.Weapon or BuildingKind.Shield or BuildingKind.Repair } d
+            ? new CombatState { Charge = d.Shield?.Capacity ?? 0, AmmoItem = d.Weapon?.Ammo } : null).ToArray();
+        CoreBlock = -1;
+        for (int i = 0; i < blocks.Count; i++)
         {
-            if (defs[b.DefId] is { Kind: BuildingKind.Thruster } t)
-                thrusters.Add(new Thruster(t.Thrust, (b.Rotation & 3) * Trig.Quarter));
+            if (blocks[i].GX == coreGX && blocks[i].GY == coreGY)
+                CoreBlock = i;
+        }
+        RecomputeStats(defs);
+        (AnchorX, AnchorY) = (X, Y);
+    }
+
+    /// <summary>
+    /// Derived stats from the blocks still alive (UD-007): engines, top speed, cargo room and resource radius. Called
+    /// when built and whenever a block is destroyed or rebuilt. Dead blocks stay attached as wrecks and keep their mass.
+    /// </summary>
+    internal void RecomputeStats(IReadOnlyDictionary<string, BuildingDef> defs)
+    {
+        var thrusters = new List<Thruster>();
+        int storage = 0, supply = 0;
+        foreach (var b in Blocks)
+        {
+            if (b.Hp <= 0)
+                continue;
+            var def = defs[b.DefId];
+            if (def.Kind == BuildingKind.Thruster)
+                thrusters.Add(new Thruster(def.Thrust, (b.Rotation & 3) * Trig.Quarter));
+            storage += def.Storage;
+            supply = Math.Max(supply, def.SupplyRadius);
         }
         Thrusters = thrusters;
         TotalThrust = thrusters.Sum(t => t.Thrust);
+        CargoCapacity = storage;
+        SupplyRadius = supply;
+        World.Locomotion.Check(defs, Blocks.Where(b => b.Hp > 0).Select(b => b.DefId), out var cls);
+        Locomotion = cls;
 
         // The strongest engine (first on ties) is the one the unit turns toward its goal.
+        MainDir = 0;
+        MaxSpeed = 0;
         if (thrusters.Count > 0)
         {
             var main = thrusters.MaxBy(t => t.Thrust);
             MainDir = main.Dir;
             long push = thrusters.Sum(t => (long)t.Thrust * Math.Max(0, Trig.Cos(t.Dir - main.Dir)) / Trig.One);
             // Terminal speed under drag, with a margin so the engines keep some authority.
-            MaxSpeed = (int)(push * ThrustScale * DragDiv * 9 / (10 * mass));
+            MaxSpeed = (int)(push * ThrustScale * DragDiv * 9 / (10 * (long)Mass));
         }
     }
 
@@ -121,18 +170,36 @@ public sealed class Unit
 
     public IReadOnlyList<UnitBlock> Blocks { get; }
     public IReadOnlyList<UnitCell> Cells { get; }
-    public IReadOnlyList<Thruster> Thrusters { get; }
+    public IReadOnlyList<Thruster> Thrusters { get; private set; } = [];
     public int Mass { get; }
     public long Inertia { get; }
 
     /// <summary>Distance from the centre of mass to the edge of the farthest cell.</summary>
     public int Radius { get; }
 
-    public int TotalThrust { get; }
-    public int MainDir { get; }
+    public int TotalThrust { get; private set; }
+    public int MainDir { get; private set; }
+
+    /// <summary>Which terrain it can cross (UD-004), from its blocks.</summary>
+    public LocomotionClass Locomotion { get; private set; }
 
     /// <summary>Speed it settles at flying straight, in sub-cells per tick. 0 means it cannot move.</summary>
-    public int MaxSpeed { get; }
+    public int MaxSpeed { get; private set; }
+
+    /// <summary>Combat state of each block, by index into <see cref="Blocks"/>; null for blocks that don't fight.</summary>
+    public IReadOnlyList<CombatState?> BlockCombat { get; }
+
+    /// <summary>Index of the unit core in <see cref="Blocks"/>. Destroying it destroys the unit (UD-007).</summary>
+    public int CoreBlock { get; }
+
+    /// <summary>Onboard storage (CB-004, FB-018): ammo and other stock, up to <see cref="CargoCapacity"/> items.</summary>
+    public Core.Inventory Cargo { get; } = new();
+
+    /// <summary>Items <see cref="Cargo"/> holds at most: the sum of its live storage blocks.</summary>
+    public int CargoCapacity { get; private set; }
+
+    /// <summary>Cells within which this unit shares its cargo with friendlies (FB-018); 0 for none.</summary>
+    public int SupplyRadius { get; private set; }
 
     /// <summary>The unit core's cell in the unit grid, and its offset from the centre of mass.</summary>
     public int CoreGX { get; }
@@ -160,8 +227,45 @@ public sealed class Unit
 
     public bool Moving => Route != null;
 
+    /// <summary>
+    /// For each entry of <see cref="Route"/>, the terrain region (<see cref="UnitNav"/>) to enter in that tile, after
+    /// the one the unit started in at index 0. Same length as Route + 1.
+    /// </summary>
+    internal int[]? RouteRegions { get; set; }
+
+    /// <summary>The standing order (UC-001), or null when idle. Movement follows it; combat reads its kind and target.</summary>
+    public UnitOrder? Order { get; internal set; }
+
+    /// <summary>This unit's own goal for <see cref="Order"/> (its formation slot), in world sub-cells.</summary>
+    public int SlotX { get; internal set; }
+    public int SlotY { get; internal set; }
+
+    /// <summary>On a patrol, true while heading back to where the order was given.</summary>
+    public bool PatrolReturning { get; internal set; }
+
+    /// <summary>True while combat has it chasing a target (<see cref="UnitSim.Chase"/>) instead of following its order.</summary>
+    public bool Chasing { get; internal set; }
+
+    public Stance Stance { get; internal set; }
+
+    /// <summary>Where a defensive unit returns to, in world sub-cells: where it last stopped or was given its stance.</summary>
+    public int AnchorX { get; internal set; }
+    public int AnchorY { get; internal set; }
+
+    /// <summary>The unit an escort follows, or -1.</summary>
+    public int EscortId { get; internal set; } = -1;
+
+    /// <summary>The squad it belongs to (UC-002), or 0 for none.</summary>
+    public int SquadId { get; internal set; }
+
     /// <summary>Angular acceleration limit in angle units per tick squared, from the engines' turning torque.</summary>
     internal int TurnAccel => (int)Math.Max(1, TotalThrust * (long)ThrustScale * TurnArm * AnglePerRadian / Inertia);
+
+    /// <summary>Tick the next upkeep payment is due (UD-013, <see cref="UnitUpkeep"/>).</summary>
+    public long UpkeepDue { get; internal set; }
+
+    /// <summary>The last upkeep payment failed: the engines stall until one succeeds.</summary>
+    public bool Unsupplied { get; internal set; }
 
     /// <summary>A cell centre in world sub-cells, given the unit's current position and heading.</summary>
     public (long X, long Y) CellWorld(UnitCell c)

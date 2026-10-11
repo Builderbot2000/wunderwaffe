@@ -15,19 +15,58 @@ public partial class Hud
 {
     TileState SelectedWorldTile() => Sim.TryGetTile(WorldMap.SelectedTileId) ?? _host.ViewedTile;
 
-    void ClaimSelected() => Sim.Enqueue(new ClaimTileCommand(Me, SelectedWorldTile().Id));
+    /// <summary>Sends the selected units to the selected tile's victory circle, to land there and claim it (WM-006).</summary>
+    void SendToCircle()
+    {
+        var tile = SelectedWorldTile();
+        if (_host.Selected.Count > 0)
+            Sim.Enqueue(new MoveUnitsCommand(Me, [.. _host.Selected.Order()], tile.Id, tile.CircleX, tile.CircleY));
+    }
 
     static string InventoryKey(TileState tile) => string.Join(",", tile.Inventory.Entries.Select(kv => kv.Key + kv.Value));
 
     void RefreshTileSide()
     {
         var tile = _host.ViewedTile;
-        string key = "t" + tile.Id + InventoryKey(tile);
+        var nets = ShownNetworks(tile);
+        string key = "t" + tile.Id + InventoryKey(tile)
+            + string.Join(";", nets.Select(n => $"{n.Supply}/{n.Demand}/{n.Stored / Simulation.TicksPerSecond}"));
         if (key == _sideKey)
             return;
         _sideKey = key;
         Ui.Clear(_sideInfo);
+        AddPower(nets);
         AddInventory(tile);
+    }
+
+    /// <summary>Networks worth a line: those that make, use or store power, busiest first.</summary>
+    static List<PowerNetwork> ShownNetworks(TileState tile) => PowerNet.Networks(tile)
+        .Where(n => n.Supply > 0 || n.Demand > 0 || n.Capacity > 0)
+        .OrderByDescending(n => n.Demand).ThenBy(n => n.Id).ToList();
+
+    const int MaxNetworkLines = 4;
+
+    /// <summary>Each power network's balance (FB-005, UI-002): made, used, batteries, and how much of the demand is met.</summary>
+    void AddPower(List<PowerNetwork> nets)
+    {
+        if (nets.Count == 0)
+            return;
+        _sideInfo.AddChild(Ui.Heading("Power"));
+        foreach (var n in nets.Take(MaxNetworkLines))
+        {
+            var row = Ui.Row(6);
+            var text = $"{n.Members.Count} blocks · makes {n.Supply} · uses {n.Demand}";
+            if (n.Capacity > 0)
+                text += $" · stored {n.Stored / Simulation.TicksPerSecond}/{n.Capacity / Simulation.TicksPerSecond}";
+            var label = Ui.Label(text, Ui.SmallFont, Ui.Text);
+            label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            row.AddChild(label);
+            var color = n.Satisfaction >= 1000 ? Ui.Good : n.Satisfaction > 0 ? Ui.Warn : Ui.Bad;
+            row.AddChild(Ui.Label($"{n.Satisfaction / 10}%", Ui.SmallFont, color));
+            _sideInfo.AddChild(row);
+        }
+        if (nets.Count > MaxNetworkLines)
+            _sideInfo.AddChild(Ui.Label($"and {nets.Count - MaxNetworkLines} more networks", Ui.SmallFont, Ui.Muted));
     }
 
     void AddInventory(TileState tile)
@@ -55,13 +94,14 @@ public partial class Hud
     void RefreshWorldSide()
     {
         var tile = SelectedWorldTile();
-        var claim = Expansion.Check(Sim, Me, tile.Id, out var payer);
         bool mine = tile.Owner == Me;
-        _claim.Visible = tile.Owner == TileState.Unowned;
-        _claim.Disabled = claim != ClaimResult.Ok;
-        _enter.Visible = mine;
+        bool contested = Territory.IsContested(Sim, tile);
+        _claim.Visible = !mine;
+        _claim.Disabled = _host.Selected.Count == 0;
+        _enter.Visible = Territory.HasPresence(Sim, Me, tile);
 
-        string key = $"w{tile.Id}/{claim}/{tile.Owner}/{tile.Grid.BuildingCount}/" + (mine ? InventoryKey(tile) : "");
+        string progress = string.Join(",", tile.ClaimTicks.Select(kv => $"{kv.Key}:{kv.Value / Simulation.TicksPerSecond}"));
+        string key = $"w{tile.Id}/{tile.Owner}/{contested}/{progress}/{_enter.Visible}/{tile.Grid.BuildingCount}/" + (mine ? InventoryKey(tile) + LinkKey(tile) : "");
         if (key == _sideKey)
             return;
         _sideKey = key;
@@ -71,33 +111,39 @@ public partial class Hud
         var name = Ui.Label(tile.Name, 20);
         name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         head.AddChild(name);
+        if (contested)
+            head.AddChild(Ui.Label("Contested", Ui.FontSize, Ui.Warn));
         head.AddChild(mine ? Ui.Label("Yours", Ui.FontSize, Ui.Good)
             : tile.Owner == TileState.Unowned ? Ui.Label("Unclaimed", Ui.FontSize, Ui.Muted)
             : Ui.Label($"Player {tile.Owner}", Ui.FontSize, Ui.Bad));
         _sideInfo.AddChild(head);
         AddProfile(tile);
         AddDeposits(tile);
+        AddCircle(tile, mine);
 
         if (mine)
         {
             AddInventory(tile);
             AddPorts(tile);
         }
-        else if (tile.Owner == TileState.Unowned)
+    }
+
+    /// <summary>Who is claiming the tile's victory circle and how far along they are (WM-006), and how to claim it.</summary>
+    void AddCircle(TileState tile, bool mine)
+    {
+        _sideInfo.AddChild(Ui.Heading("Victory circle"));
+        int capture = Expansion.CaptureTicks(Sim);
+        foreach (var (player, ticks) in tile.ClaimTicks)
         {
-            _sideInfo.AddChild(Ui.Heading("Claim"));
-            var cost = Ui.Row(6);
-            cost.AddChild(Ui.Label("Cost", Ui.SmallFont, Ui.Muted));
-            cost.AddChild(Ui.Items(Balance.ClaimCost));
-            _sideInfo.AddChild(cost);
-            _sideInfo.AddChild(Ui.Label(claim switch
-            {
-                ClaimResult.Ok => $"Paid from {payer!.Name}.",
-                ClaimResult.CannotAfford => "A neighbouring tile of yours needs this much in its core.",
-                ClaimResult.NotAdjacent => "Only tiles next to one of yours can be claimed.",
-                _ => "",
-            }, Ui.SmallFont, claim == ClaimResult.Ok ? Ui.Good : Ui.Warn, SideWidth - 24));
+            string who = player == Me ? "You" : $"Player {player}";
+            _sideInfo.AddChild(Ui.Label($"{who}: {ticks * 100 / capture}% claimed", Ui.SmallFont, player == Me ? Ui.Good : Ui.Bad));
         }
+        string help = mine
+            ? "Yours. A rival who keeps a building in the circle for the capture time takes the tile."
+            : Territory.HasPresence(Sim, Me, tile)
+                ? $"Keep a building of yours in the circle for {capture / Simulation.TicksPerSecond} s to claim the tile."
+                : "Select a unit and press C to send it to the circle, then G to land it there.";
+        _sideInfo.AddChild(Ui.Label(help, Ui.SmallFont, Ui.Muted, SideWidth - 24));
     }
 
     /// <summary>The tile's fixed attributes as label/value rows: what its name leaves out.</summary>
@@ -157,6 +203,8 @@ public partial class Hud
             _sideInfo.AddChild(Ui.Label($"No {item.Name.ToLowerInvariant()} here.", Ui.SmallFont, Ui.Muted));
     }
 
+    static string LinkKey(TileState tile) => string.Join(",", tile.Neighbors.Select(n => tile.Stats.SentPerMinute(n)));
+
     /// <summary>One line per I/O zone that has ports: the neighbour it links to and its ports each way.</summary>
     void AddPorts(TileState tile)
     {
@@ -166,7 +214,8 @@ public partial class Hud
             int exports = tile.Grid.ExportPorts.Count(p => PortRules.PartnerOf(tile.Grid, p) == n);
             int imports = tile.Grid.ImportPorts.Count(p => PortRules.PartnerOf(tile.Grid, p) == n);
             if (exports + imports > 0)
-                lines.Add($"To {Sim.Tiles[n].Name}: {exports} out, {imports} in");
+                lines.Add($"To {Sim.Tiles[n].Name}: {exports} out, {imports} in · sends {tile.Stats.SentPerMinute(n)}/min, "
+                    + $"receives {Sim.Tiles[n].Stats.SentPerMinute(tile.Id)}/min · {PortRules.TransitTicksPerTile / Simulation.TicksPerSecond} s transit");
         }
         if (lines.Count == 0)
             return;

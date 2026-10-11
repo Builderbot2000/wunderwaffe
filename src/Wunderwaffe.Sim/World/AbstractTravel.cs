@@ -17,7 +17,7 @@ public sealed class AbstractNode((long X, long Y)[] waypoints, int[]? route)
 /// follows its order's route as a line of waypoints (border crossing points, then the destination) at its cruise speed,
 /// keeping <see cref="Unit.X"/>, <see cref="Unit.Y"/> and <see cref="Unit.TileId"/> exact, and materialises at that
 /// position, with that velocity, as soon as its tile runs the full sim again (viewed or Contested).
-/// The waypoints and speed are a seam until movement's terrain-legal route and ETA land (see <see cref="Plan"/>).
+/// Waypoints and speed come from movement (<see cref="UnitSim.AbstractWaypoints"/>, <see cref="UnitSim.CruiseSpeed"/>).
 /// </summary>
 public static class AbstractTravel
 {
@@ -27,37 +27,10 @@ public static class AbstractTravel
     public const int TolerancePercent = 15;
 
     /// <summary>Cruise speed of an abstract unit, sub-cells per tick: what the flight controller flies at.</summary>
-    public static int Speed(Unit u) => u.MaxSpeed;
+    public static int Speed(Unit u) => UnitSim.CruiseSpeed(u);
 
-    /// <summary>
-    /// Waypoints from the unit's position to its order's destination: for each border on its route, the cell of the
-    /// next tile that makes the shortest trip (as <c>UnitPhysics.Portal</c> picks), then the destination.
-    /// </summary>
-    public static (long X, long Y)[] Plan(Simulation sim, Unit u)
-    {
-        if (u.Route is not { } route)
-            return [];
-        var points = new List<(long X, long Y)>();
-        long cx = u.X, cy = u.Y;
-        int tile = u.TileId;
-        for (int i = u.RouteIndex; i < route.Length; i++)
-        {
-            int next = route[i];
-            (long X, long Y) best = ((long)sim.Tiles[next].CenterX * S + S / 2, (long)sim.Tiles[next].CenterY * S + S / 2);
-            long bestD = long.MaxValue;
-            foreach (var (bx, by) in sim.Map.BorderCells(next, tile))
-            {
-                long mx = (long)bx * S + S / 2, my = (long)by * S + S / 2;
-                long d = Dist(cx, cy, mx, my) + Dist(mx, my, u.DestX, u.DestY);
-                if (d < bestD)
-                    (best, bestD) = ((mx, my), d);
-            }
-            points.Add(best);
-            (cx, cy, tile) = (best.X, best.Y, next);
-        }
-        points.Add((u.DestX, u.DestY));
-        return [.. points];
-    }
+    /// <summary>Terrain-legal waypoints from the unit's position to its order's destination (movement's route).</summary>
+    public static (long X, long Y)[] Plan(Simulation sim, Unit u) => UnitSim.AbstractWaypoints(sim, u);
 
     /// <summary>Ticks an abstract unit takes to finish its order from where it is; -1 if it can't move or has no order.</summary>
     public static long Eta(Simulation sim, Unit u)
@@ -122,8 +95,7 @@ public static class AbstractTravel
             u.RouteIndex++;
             return;
         }
-        u.Route = UnitSim.FindRoute(sim, sim.Tiles[id], sim.Tiles[u.DestTileId]);
-        u.RouteIndex = 0;
+        UnitSim.Replan(sim, u);
         Replan(sim, u, node);
     }
 

@@ -150,12 +150,112 @@ public sealed class ContentDb
                 errors.Add($"building '{b.Id}': ports must be 1x1");
             if (b.Hp <= 0)
                 errors.Add($"building '{b.Id}': hp must be > 0");
+            ValidateCombat(b, errors);
+            if (b.Kind == BuildingKind.Platform && (!b.OnWater || b.Width != 1 || b.Height != 1))
+                errors.Add($"building '{b.Id}': a platform must be 1x1 and onWater");
+            if (b.Kind == BuildingKind.UnitFactory && (b.Radius <= 0 || b.BlockCap <= 0))
+                errors.Add($"building '{b.Id}': a unit factory needs radius and blockCap > 0");
+            foreach (var (id, n) in b.Upkeep ?? [])
+            {
+                if (!Items.ContainsKey(id) || n <= 0)
+                    errors.Add($"building '{b.Id}': upkeep '{id}' must be a known item and > 0");
+            }
+            if ((b.Kind == BuildingKind.Locomotor) != (b.Locomotion != null))
+                errors.Add($"building '{b.Id}': a locomotor needs a locomotion class, and only locomotors have one");
+            ValidateFactory(b, errors);
         }
 
+        // A recipe with no outputs only makes sense as fuel for a generator (FB-005).
+        foreach (var r in Recipes.Values)
+        {
+            if (r.Outputs.Count == 0 && (r.Inputs.Count == 0 || !Buildings.TryGetValue(r.Building, out var host) || host.PowerSupply <= 0))
+                errors.Add($"recipe '{r.Id}': no outputs, so it must burn inputs in a generator (a machine with powerSupply)");
+        }
+        if (Buildings.Values.Count(b => b.Kind == BuildingKind.Platform) > 1)
+            errors.Add("buildings: at most one platform");
         foreach (var g in Goals)
             ValidateCondition(g.Condition, $"goal '{g.Id}'", errors);
 
         ValidateTerrain(errors);
+    }
+
+    /// <summary>Weapons, shields, repair and supply fields (CB-001, CB-002, CB-004, CB-005, FB-010, FB-018).</summary>
+    void ValidateCombat(BuildingDef b, List<string> errors)
+    {
+        string at = $"building '{b.Id}'";
+        if ((b.Kind == BuildingKind.Weapon) != (b.Weapon != null))
+            errors.Add($"{at}: a weapon needs a 'weapon' block, and only weapons may have one");
+        if (b.Weapon is { } w)
+        {
+            if (w.Range <= 0 || w.Damage <= 0 || w.Cooldown <= 0 || w.Speed < 0)
+                errors.Add($"{at}: weapon range, damage and cooldown must be > 0, speed >= 0");
+            if (w.Ammo != null && (!Items.ContainsKey(w.Ammo) || w.Magazine <= 0))
+                errors.Add($"{at}: weapon ammo must be a known item with a magazine > 0");
+        }
+        var types = Buildings.Values.Where(x => x.Weapon != null).Select(x => x.Weapon!.Type).ToHashSet();
+        foreach (var (type, pct) in b.Resist ?? [])
+        {
+            if (!types.Contains(type))
+                errors.Add($"{at}: resist names damage type '{type}', which no weapon deals");
+            if (pct > 100)
+                errors.Add($"{at}: resist '{type}' is over 100%");
+        }
+        if ((b.Kind == BuildingKind.Shield) != (b.Shield != null))
+            errors.Add($"{at}: a shield needs a 'shield' block, and only shields may have one");
+        if (b.Shield is { } s && (s.Radius <= 0 || s.Capacity <= 0 || s.Regen < 0))
+            errors.Add($"{at}: shield radius and capacity must be > 0, regen >= 0");
+        if ((b.Kind == BuildingKind.Repair) != (b.Repair != null))
+            errors.Add($"{at}: a repair block needs a 'repair' block, and only repair blocks may have one");
+        if (b.Repair is { } r)
+        {
+            if (r.Radius <= 0 || r.Rate <= 0 || r.Per <= 0)
+                errors.Add($"{at}: repair radius, rate and per must be > 0");
+            foreach (var id in r.Cost.Keys.Where(id => !Items.ContainsKey(id)))
+                errors.Add($"{at}: unknown repair cost item '{id}'");
+        }
+        if (b.SupplyRadius < 0 || b.Storage < 0)
+            errors.Add($"{at}: supply and storage must be >= 0");
+    }
+
+    /// <summary>Power, storage, logistics and booster fields (FB-004, FB-005, FB-007, FB-016).</summary>
+    static void ValidateFactory(BuildingDef b, List<string> errors)
+    {
+        void Error(string message) => errors.Add($"building '{b.Id}': {message}");
+        if (b.Power < 0 || b.PowerSupply < 0 || b.PowerCapacity < 0 || b.Discharge < 0 || b.Storage < 0 || b.Range < 0)
+            Error("power, powerSupply, powerCapacity, discharge, storage and range must be >= 0");
+        if (b.PowerSupply > 0 && b.Kind is not (BuildingKind.Core or BuildingKind.Machine or BuildingKind.UnitCore))
+            Error("only cores, unit cores and machines (generators) supply power");
+        if (b.Kind == BuildingKind.Battery && (b.PowerCapacity <= 0 || b.Discharge <= 0))
+            Error("a battery needs powerCapacity and discharge > 0");
+        if (b.Kind == BuildingKind.Storage && b.Storage <= 0)
+            Error("storage needs a storage capacity > 0");
+        if (b.Kind == BuildingKind.Bridge && b.Range <= 0)
+            Error("a bridge needs a range > 0");
+        if (b.Kind is BuildingKind.Wire or BuildingKind.Junction or BuildingKind.Router or BuildingKind.Sorter or BuildingKind.Bridge
+            && (b.Width != 1 || b.Height != 1))
+            Error($"a {b.Kind} must be 1x1");
+
+        if ((b.Kind == BuildingKind.Booster) != (b.Booster != null))
+            Error("boosters, and only boosters, have a 'booster' section");
+        if (b.Booster is not { } booster)
+            return;
+        if (booster.Hosts is not { Length: > 0 })
+            Error("a booster needs at least one host category");
+        if (booster.Effects is not { Count: > 0 })
+            Error("a booster needs at least one effect");
+        foreach (var (stat, n) in booster.Effects ?? [])
+        {
+            if (!BoosterDef.Stats.Contains(stat))
+                Error($"unknown booster stat '{stat}' (known: {string.Join(", ", BoosterDef.Stats)})");
+            if (n == 0)
+                Error($"booster stat '{stat}' is 0");
+        }
+        if (booster.MaxPerHost < 0 || booster.MaxHosts < 0)
+            Error("maxPerHost and maxHosts must be >= 0");
+        if (booster.HalfWithout is { } need && !BoosterDef.Stats.Contains(need))
+            Error($"halfWithout names unknown stat '{need}'");
+        if (booster.Chain && b.Width == b.Height)
+            Error("a chain booster must be longer than it is wide, so the chain has a direction");
     }
 
     void ValidateTerrain(List<string> errors)

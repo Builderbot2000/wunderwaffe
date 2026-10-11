@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://render/TileView.cs" id="1_view"]
 [ext_resource type="Script" path="res://input/BuildTool.cs" id="2_build"]
@@ -9,6 +9,8 @@
 [ext_resource type="Script" path="res://input/UnitTool.cs" id="7_unittool"]
 [ext_resource type="Script" path="res://render/MachineStatusView.cs" id="8_status"]
 [ext_resource type="Script" path="res://ui/PauseMenu.cs" id="9_pause"]
+[ext_resource type="Script" path="res://render/CombatView.cs" id="11_combat"]
+[ext_resource type="Script" path="res://input/BlueprintTool.cs" id="10_blueprint"]
 
 [node name="Main" type="Node2D"]
 
@@ -27,11 +29,18 @@ script = ExtResource("5_world")
 [node name="UnitView" type="Node2D" parent="."]
 script = ExtResource("6_units")
 
+[node name="CombatView" type="Node2D" parent="."]
+script = ExtResource("11_combat")
+
 [node name="BuildTool" type="Node2D" parent="."]
 script = ExtResource("2_build")
 
 [node name="UnitTool" type="Node2D" parent="." node_paths=PackedStringArray("BuildTool")]
 script = ExtResource("7_unittool")
+BuildTool = NodePath("../BuildTool")
+
+[node name="BlueprintTool" type="Node2D" parent="." node_paths=PackedStringArray("BuildTool")]
+script = ExtResource("10_blueprint")
 BuildTool = NodePath("../BuildTool")
 
 [node name="Camera" type="Camera2D" parent="." node_paths=PackedStringArray("WorldMap")]
@@ -41,7 +50,7 @@ WorldMap = NodePath("../WorldMapView")
 
 [node name="Hud" type="CanvasLayer" parent="."]
 
-[node name="Hud" type="Control" parent="Hud" node_paths=PackedStringArray("BuildTool", "WorldMap", "UnitTool", "PauseMenu")]
+[node name="Hud" type="Control" parent="Hud" node_paths=PackedStringArray("BuildTool", "WorldMap", "UnitTool", "PauseMenu", "BlueprintTool")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -54,3 +63,4 @@ BuildTool = NodePath("../../BuildTool")
 WorldMap = NodePath("../../WorldMapView")
 UnitTool = NodePath("../../UnitTool")
 PauseMenu = NodePath("../../PauseMenu")
+BlueprintTool = NodePath("../../BlueprintTool")

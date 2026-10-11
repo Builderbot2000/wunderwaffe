@@ -14,9 +14,12 @@ namespace Wunderwaffe.Game.Screens;
 /// </summary>
 public partial class Hud
 {
-    HBoxContainer BuildToolButtons()
+    Container BuildToolButtons()
     {
-        var bar = Ui.Row(6);
+        // Wraps into rows between the side panels once there are more tools than fit one row.
+        var bar = new HFlowContainer { CustomMinimumSize = new Vector2(BuildBarWidth, 0), MouseFilter = MouseFilterEnum.Ignore };
+        bar.AddThemeConstantOverride("h_separation", 6);
+        bar.AddThemeConstantOverride("v_separation", 6);
         for (int i = 0; i < BuildTool.Tools.Count; i++)
         {
             var tool = BuildTool.Tools[i];
@@ -56,6 +59,8 @@ public partial class Hud
             b.TooltipText = ToolTooltip(tool);
         }
 
+        if (ShowBlueprintStatus())
+            return;
         if (BuildTool.Selected is not { } picked)
         {
             _placePanel.Visible = false;
@@ -106,8 +111,12 @@ public partial class Hud
             case PlaceResult.BadTerrain:
                 var cell = BuildTool.HoveredCell();
                 return $"can't build on {Content.TerrainList[tile.Grid.TerrainAt(cell.X, cell.Y)].Name.ToLowerInvariant()}";
-            case PlaceResult.NotOwner:
-                return "not your tile";
+            case PlaceResult.Wreck:
+                return "a wreck is in the way: right-click it with a building picked to salvage it";
+            case PlaceResult.NoPresence:
+                return "land a unit here first: you need a building or unit on a tile to build on it";
+            case PlaceResult.EnemyCircle:
+                return "an enemy building holds this victory circle";
             default:
                 return result.ToString();
         }
