@@ -21,7 +21,7 @@ public sealed partial class Simulation
     /// <see cref="Balance.RegionalChancePercent"/> of tiles, never on a start, and always on at least one land neighbour
     /// of each start (RS-003).
     /// </summary>
-    public void GenerateWorld(int width, int height, ulong seed, int players = 1, int tileSize = DefaultTileSize)
+    public void GenerateWorld(int width, int height, ulong seed, int players = 1, int tileSize = DefaultTileSize, int richnessPercent = 100)
     {
         if (_tiles.Count > 0)
             throw new InvalidOperationException("the world already has tiles");
@@ -45,10 +45,10 @@ public sealed partial class Simulation
             CreateTile(b.X0, b.Y0, b.X1 - b.X0 + 1, b.Y1 - b.Y0 + 1);
         RebuildTopology();
 
-        _startTileIds.AddRange(ChooseStarts(w, h, players, seed));
+        _startTileIds.AddRange(ChooseStarts(w, h, players, seed, richnessPercent));
         var missing = RegionalExclusions(_startTileIds.Select(id => _tiles[id]).ToList(), seed);
         foreach (var t in _tiles)
-            TileGenerator.GenerateDeposits(t.Grid, Content, DepositRng(seed, t.Id), missing[t.Id]);
+            TileGenerator.GenerateDeposits(t.Grid, Content, DepositRng(seed, t.Id), missing[t.Id], richnessPercent);
 
         // Victory circles go on the deposits (WM-014); tiles are independent, so in parallel.
         var circles = new (int X, int Y)[_tiles.Count];
@@ -100,7 +100,7 @@ public sealed partial class Simulation
     /// their regional deposits (within <see cref="Balance.RegionalHops"/>), then the most even starting deposits, then
     /// the widest spacing; earlier attempts win ties. One player just gets the middle start.
     /// </summary>
-    List<int> ChooseStarts(int w, int h, int players, ulong seed)
+    List<int> ChooseStarts(int w, int h, int players, ulong seed, int richnessPercent)
     {
         var fits = _tiles.Where(t => CoreSpot(t) != null).ToList();
         if (fits.Count < players)
@@ -130,7 +130,7 @@ public sealed partial class Simulation
             if (!deposits.TryGetValue(t.Id, out var d))
             {
                 var grid = t.Grid.Blank();
-                TileGenerator.GenerateDeposits(grid, Content, DepositRng(seed, t.Id), regional);
+                TileGenerator.GenerateDeposits(grid, Content, DepositRng(seed, t.Id), regional, richnessPercent);
                 d = deposits[t.Id] = grid.DepositCounts();
             }
             return d;

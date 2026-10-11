@@ -107,7 +107,7 @@ public partial class Hud
         if (Sim.TryGetTile(PortRules.PartnerOf(tile.Grid, port)) is not { } n)
             return "Not in an I/O zone: nowhere to send items.";
         if (n.Owner != tile.Owner)
-            return $"{n.Name} isn't yours. Claim it to send items there.";
+            return $"{n.Name} isn't yours. Claim its victory circle to send items there.";
         if (!n.Grid.ImportPorts.Any(p => PortRules.PartnerOf(n.Grid, p) == tile.Id))
             return $"No import port in {n.Name}'s zone facing this tile. Items wait here until there is.";
         return null;

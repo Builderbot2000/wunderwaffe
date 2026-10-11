@@ -6,32 +6,33 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 
 | File | Owns |
 |---|---|
-| `Simulation.cs` | Core state: tiles, map, units, players, command log. `NewGame` (settles every player of the setup), `Step` (tick order; see `team.md`), `Enqueue`, lookups (`TryGetTile`, `TileAtCell`, `ResolveCell`, `Neighbors`, `UnitById`, `PlayerOrNull`), `StartTileId`/`StartTileIds`, `StateHash()`. Command handlers `TryClaim`/`TryPlace`/`TryRemove`. `TicksPerSecond`=60, `CoreBuildingId`. |
-| `Simulation.World.cs` | Partial: world building. `GenerateWorld` (runs Gen phases, `ChooseStarts` = placeholder farthest-point spread per player, regional deposits RS-003), `AddTile`/`AddStartingTile` (hand-built square tiles for tests), `SettleStartingTile`, `CreateTile`, `RebuildTopology` (adjacency + zones), `CoreSpot`/`PlaceCore`. `DefaultTileSize`=96. |
-| `Balance.cs` | Code-side tuning: `StartingItems`, `ClaimCost`, `ClaimedTileItems`, `FrameCost`, `RefundPercent`, `RegionalChancePercent`, land-share thresholds. |
+| `Simulation.cs` | Core state: tiles, map, units, players, command log. `NewGame` (settles every player of the setup), `Step` (tick order; see `team.md`), `Enqueue`, lookups (`TryGetTile`, `TileAtCell`, `ResolveCell`, `Neighbors`, `UnitById`, `PlayerOrNull`), `StartTileId`/`StartTileIds`, `StateHash()`. Command handlers `TryPlace` (pays the plan's payer; platforms) / `TryRemove` (own buildings, not the last core; platforms), `CoreCount`. `TicksPerSecond`=60, `CoreBuildingId`. |
+| `Simulation.World.cs` | Partial: world building. `GenerateWorld` (runs Gen phases, `ChooseStarts` = fair starts OQ-22: seeded farthest-point attempts scored on regional reach, deposit evenness, spacing; regional deposits RS-003; circles), `AddTile`/`AddStartingTile` (hand-built square tiles for tests), `SettleStartingTile`, `CreateTile`, `RebuildTopology` (adjacency + zones), `CoreSpot` (nearest the circle centre)/`PlaceCore`, `PlaceScout` (starting landed scout), `FreeSpot`. `DefaultTileSize`=96. |
+| `Balance.cs` | Code-side tuning: `StartingItems`, `CircleRadius`, `CircleClearance`, `CaptureSeconds`, `StartAttempts`, `FrameCost`, `RefundPercent`, `RegionalChancePercent`, land-share thresholds. |
 | `GameSetup.cs` | Record (Width, Height, Seed, Players=1) in nominal tiles; `Default`, `ParseSeed` (text → FNV hash). |
-| `Content/Defs.cs` | JSON records: `ItemDef`, `RecipeDef` (empty inputs = extraction), `BuildingDef` (`Hp` per block, +`Footprint(rotation)`), `BuildingKind` enum, `UnlockCondition` (goal conditions: `produce`/`claim`/`ship`/`launch`), `GoalDef`, `TerrainDef` (bands, deposit weights). |
+| `Content/Defs.cs` | JSON records: `ItemDef`, `RecipeDef` (empty inputs = extraction), `BuildingDef` (`Hp` per block, +`Footprint(rotation)`), `BuildingKind` enum (`Platform` = water floor layer), `OnWater`, `UnlockCondition` (goal conditions: `produce`/`claim`/`ship`/`launch`), `GoalDef`, `TerrainDef` (bands, deposit weights). |
 | `Content/ContentDb.cs` | Loads + validates all JSON (`FromJson`, throws `ContentException` with every error). Lookups: `Items`, `Recipes`, `Buildings`, `BuildingList` (menu order), `Goals`, `TerrainList`, `RecipesByBuilding`, `DefaultTerrain`, `RiverTerrain`, `Classify(elev, moist)`. |
-| `Core/Command.cs` | Every player action as a JSON-polymorphic record with `Apply(sim)`: place/remove building, claim, place/remove frame, activate/deploy/move units, debug grant. No tech tree, so no unlock command. `LoggedCommand`. |
+| `Core/Command.cs` | Every player action as a JSON-polymorphic record with `Apply(sim)`: place/remove building, place/remove frame, activate/deploy/move units, debug grant, debug destroy. Claims have no command (circle timers). No tech tree, so no unlock command. `LoggedCommand`. |
 | `Core/SaveFile.cs` | `SaveFile` (setup + log + hash, `CurrentVersion`), `Replay` (sliced re-simulation, `Matches`), `SaveException`. |
 | `Core/StateHash.cs` | FNV-1a over tiles, buildings, entity state, players, units. Must cover all sim state. |
 | `Core/Inventory.cs` | Sorted item counts (long); `Add`, `Has`, `TryTake` (all or nothing). Throws on underflow. |
 | `Core/Rng.cs` | SplitMix64, seeded; `Next`, `Range`. |
 | `Core/IntMath.cs` | `FloorDiv` (int/long), `ISqrt`. |
-| `World/TileState.cs` | A territory: id, name, origin, centre, neighbours, biome, `Owner` (`Unowned`=-1), `Inventory`, `Grid`, `ToGlobal`. |
-| `World/TileGrid.cs` | `PlacedBuilding` (def id, kind, `Owner` = placing player, `Hp`, footprint, rotation, recipe, runtime state). `TileGrid`: cell → building, deposits, mask/buildable/terrain, frames, zones, kind lists (`Belts`, `Machines`, `ExportPorts`, `ImportPorts`), `Revision` (bumped on every change). `InRect` = in box, `InBounds` = in tile. |
+| `World/TileState.cs` | A territory: id, name, origin, centre, neighbours, biome, `Owner` (`Unowned`=-1), `Inventory`, `Grid`, `ToGlobal`, victory circle `CircleX`/`CircleY` + `InCircle`, `ClaimTicks` (per player). |
+| `World/TileGrid.cs` | `PlacedBuilding` (def id, kind, `Owner` = placing player, `Hp`, footprint, rotation, recipe, runtime state). `TileGrid`: cell → building, deposits, mask/buildable/terrain, frames, platforms (count as buildable), zones, `Blank`, kind lists (`Belts`, `Machines`, `ExportPorts`, `ImportPorts`), `Revision` (bumped on every change). `InRect` = in box, `InBounds` = in tile. |
 | `World/Entities.cs` | Runtime state: `BeltState` (4 items/cell, positions 0..128), `MachineState` (+`MachineStatus`), `ExportState` + `Shipment`. |
 | `World/TileEntities.cs` | Per-tick tile sim: machines work and dump to neighbours, belts advance/hand off, export ports send/deliver. `TryInsert` = who accepts what. `Drain` returns a removed building's items. |
-| `World/Placement.cs` | `Placement.Check` → `PlaceResult` + `PlacementPlan`: ownership, bounds, overlap, terrain, port zones, recipe resolution (extractors pick by deposit), cost. |
+| `World/Placement.cs` | `Placement.Check` → `PlaceResult` + `PlacementPlan` (+`Payer`): presence and enemy circles (WM-015), bounds, overlap, terrain, port zones, recipe resolution (extractors pick by deposit), cost. |
 | `World/PortRules.cs` | `ZoneDepth`, `TransitTicksPerTile`, `ZoneOf(footprint)`, `PartnerOf(port)`. |
-| `World/Expansion.cs` | `Expansion.Check` → `ClaimResult` + paying neighbour tile. |
+| `World/Expansion.cs` | Circle claims (WM-006): `CaptureTicks`, `CircleOccupants` (cached by `Revision`), `Progress`, `Step` (tick phase 2), `Claim` (wipes rivals in the circle). |
+| `World/Territory.cs` | `HasPresence` (WM-015), `EnemyCircleBlocks`, `Payer`/`RefundTo` (own tile else owned neighbour), `IsContested`/`ContestedTiles` (WM-004), `DestroyBuilding` (stand-in for combat's). |
 | `World/Progression.cs` | Goal chain progress: `Progress`, `IsMet`, `CurrentGoal`, `Step` (end of tick). No tech tree (TT-001). |
 | `World/PlayerState.cs` | Per-player counters (`Produced`, `Shipped`, `Launched`), goal completion ticks. |
 | `World/WorldMap.cs` | Global grid: terrain, elevation, tile id per cell; adjacency (`MinBorderCells`=3), `BorderCells(from,to)`, `Grow` for hand-built worlds. |
-| `World/TileGenerator.cs` | Deposit patches on a tile, weighted by terrain (`GenerateDeposits`, `exclude` for regional items). |
+| `World/TileGenerator.cs` | Deposit patches on a tile, weighted by terrain (`GenerateDeposits`, `exclude` for regional items, `richnessPercent`). |
 | `World/Direction.cs` | N/E/S/W, `Dx`/`Dy`, `FromRotation` (0=east, clockwise), `Opposite`. |
 | `World/Units.cs` | `Unit` rigid body (mass, inertia, radius, thrusters, max speed computed in ctor), order/path state; `UnitBlock` (carries the building's `Hp`), `UnitCell`, `Thruster`. |
-| `World/UnitAssembly.cs` | Frames (`CheckFrame`, place/remove), lift-off (`CheckActivate` flood-fills frame from a unit core → `Activate` spawns unit), landing (`CheckDeploy` → `Deploy`). Result enums. `MaxCells`=64. |
+| `World/UnitAssembly.cs` | Frames (`CheckFrame`, place/remove), lift-off (`CheckActivate` flood-fills frame from a unit core → `Activate` spawns unit), landing (`CheckDeploy` → `Deploy`; any tile, not in an enemy-held circle). Result enums. `MaxCells`=64. |
 | `World/UnitSim.cs` | Move orders: `Order` (formation, `MoveResult`), `FindRoute` (BFS over tiles). |
 | `World/UnitPhysics.cs` | Per-tick flight controller, border portals, path following, tile tracking, collisions with buildings and units. |
 | `World/UnitPath.cs` | A* over current + next tile with clearance, line-of-sight straightening. |
@@ -41,6 +42,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Gen/Zones.cs` | Phase 3: per-tile I/O zones by multi-source BFS from borders. |
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
+| `World/Gen/Circles.cs` | Phase 4: victory circle per tile (WM-014): most deposit cells in the disc among centres clear of the border (Chebyshev depth). |
 
 ## game/ (Godot project; namespaces `Wunderwaffe.Game[.Input/.Render/.Screens/.Debug]`)
 
@@ -60,13 +62,13 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `render/TileShapes.cs` | Cached per-tile geometry: border outline, zone runs/outlines/label points. |
 | `render/MachineStatusView.cs` | Pulsing dots on stopped machines (FB-006). |
 | `render/UnitView.cs` | Units on the tile view (blocks rotated by heading, selection, destination line). `PixelPos`, `InView`. |
-| `render/WorldMapView.cs` | World layer: snapshot texture, owner tint, borders, labels, claimable outlines, port links, unit dots; select/enter/claim input. `CellPx`=2, `CellAt`, `Center`, `Fit`. |
+| `render/WorldMapView.cs` | World layer: snapshot texture, owner tint, borders, labels, victory circles with claim arcs, Contested outlines, port links, unit dots; select/enter input, C sends units to the circle. `CellPx`=2, `CellAt`, `Center`, `Fit`. |
 | `render/WorldSnapshot.cs` | Downsampled picture of every tile's contents for the world map; `Refresh` repaints changed tiles. |
 | `ui/Ui.cs` | Theme, colours, font sizes, control builders (`Label`, `Button`, `Panel`, `Row`, `Column`, `Icon`, `Items`, `Pin`, `Overlay`, `Clear`, `Clock`). |
 | `ui/GameText.cs` | Player-facing wording: `ItemName`, `Cost`, `Recipe`, `ConditionUnit`, `TerrainName`, `Plural`. |
 | `ui/Hud.cs` | HUD layout, help/complete overlays, per-frame update, `RefreshSlow` (5 Hz). |
 | `ui/Hud.Objectives.cs` | Goal panel, toasts (`Toast`), goal notifications. |
-| `ui/Hud.SidePanel.cs` | Left panel: tile inventory; world-map tile profile/deposits/ports/claim. Cached by `_sideKey`. |
+| `ui/Hud.SidePanel.cs` | Left panel: tile inventory; world-map tile profile/deposits/victory circle progress/ports; Send units button. Cached by `_sideKey`. |
 | `ui/Hud.BuildBar.cs` | Build buttons, afford tinting, tooltips, placement message per `PlaceResult`. |
 | `ui/Hud.Hover.cs` | Hover panel: building/deposit under cursor, machine status, port problems. |
 | `ui/TitleScreen.cs` | Title menu, new game form, load progress bar, handles `SimHost.PendingLoad`. |
@@ -97,7 +99,8 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `SaveTests.cs` | Save/replay round trip, every command kind serialises, divergence detection. |
 | `SimulationTests.cs` | Determinism, starting tile. |
 | `StressTests.cs` | NF-001 tick budget with thousands of buildings. |
-| `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats: content changes that break the loop fail here. |
+| `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats (scout lift-off, landing in the coal circle): content changes that break the loop fail here. |
+| `TerritoryTests.cs` | Presence, paying from a neighbour, circle claims and wipes, enemy circles, landing, Contested, cores, platforms, circle placement, fair starts. |
 
 ## Other
 
