@@ -24,10 +24,15 @@ public partial class Hud
         {
             var tool = BuildTool.Tools[i];
             int index = i;
+            string key = i < InputActions.Slots ? ((i + 1) % 10).ToString() : "";
+            var icon = tool.IconId == null ? null : Sprites.Get(tool.IconId);
             var b = new Button
             {
-                Text = i < InputActions.Slots ? ((i + 1) % 10).ToString() : "",
-                Icon = tool.IconId == null ? null : Sprites.Get(tool.IconId),
+                // No sprite yet: the name stands in, so the button isn't blank.
+                Text = icon != null ? key : $"{key} {tool.Label}".Trim(),
+                Icon = icon,
+                AutowrapMode = TextServer.AutowrapMode.Word,
+                ClipText = true,
                 ExpandIcon = true,
                 IconAlignment = HorizontalAlignment.Center,
                 VerticalIconAlignment = VerticalAlignment.Top,
