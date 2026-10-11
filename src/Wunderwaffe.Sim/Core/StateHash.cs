@@ -22,6 +22,7 @@ internal sealed class StateHash
             s.MixPlayer(p);
         foreach (var u in sim.Units)
             s.MixUnit(u);
+        s.MixScaling(sim);
         return s._h;
     }
 
@@ -163,6 +164,36 @@ internal sealed class StateHash
         else
         {
             Mix(-1);
+        }
+    }
+
+    /// <summary>Rate mode (each tile's mode and part-made items per flow) and abstract units' travel plans.</summary>
+    void MixScaling(Simulation sim)
+    {
+        foreach (var t in sim.Tiles)
+        {
+            var state = sim.RateState(t.Id);
+            Mix(state.Full ? 1 : 0);
+            for (int i = 0; i < state.Acc.Length; i++)
+            {
+                if (state.Acc[i] == 0)
+                    continue;
+                var key = state.AccKeys[i];
+                Mix((long)key.Kind);
+                Mix(key.PortId);
+                Mix(key.Item);
+                Mix(state.Acc[i]);
+            }
+        }
+        foreach (var (id, node) in sim.Abstract)
+        {
+            Mix(id);
+            Mix(node.Next);
+            foreach (var (x, y) in node.Waypoints)
+            {
+                Mix(x);
+                Mix(y);
+            }
         }
     }
 }

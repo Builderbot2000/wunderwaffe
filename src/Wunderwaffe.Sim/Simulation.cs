@@ -64,7 +64,7 @@ public sealed partial class Simulation(ContentDb content)
     {
         if (setup.Players is < 1 or > GameSetup.MaxPlayers)
             throw new ArgumentOutOfRangeException(nameof(setup), $"{setup.Players} players; 1 to {GameSetup.MaxPlayers} allowed");
-        var sim = new Simulation(content) { Setup = setup };
+        var sim = new Simulation(content) { Setup = setup, RateModeEnabled = true };
         sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, setup.Players);
         for (int p = 0; p < setup.Players; p++)
             sim.SettleStartingTile(sim.Tiles[sim.StartTileIds[p]], p);
@@ -128,6 +128,7 @@ public sealed partial class Simulation(ContentDb content)
     /// <summary>One tick: queued commands, then each tile's entities, then units, then goals.</summary>
     public void Step()
     {
+        MaybeSnapshot();
         foreach (var command in _pending)
         {
             _log.Add(new LoggedCommand(Tick, command));
@@ -136,8 +137,12 @@ public sealed partial class Simulation(ContentDb content)
         _pending.Clear();
 
         foreach (var tile in _tiles)
-            TileEntities.Step(this, tile);
+        {
+            if (FullSim(tile))
+                TileEntities.Step(this, tile);
+        }
         UnitPhysics.Step(this);
+        RateMode.Step(this);
         Progression.Step(this);
 
         Tick++;

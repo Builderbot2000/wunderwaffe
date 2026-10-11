@@ -42,6 +42,7 @@ public class SaveTests(ITestOutputHelper output)
         At(5, new ActivateUnitCommand(Me, home.Id, ux + 1, uy));
         At(6, new MoveUnitsCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY));
         At(20, new DeployUnitCommand(Me, 1));
+        At(21, new SetViewedTileCommand(Me, home.Id));
         At(30);
         return sim;
     }

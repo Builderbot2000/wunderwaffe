@@ -6,15 +6,17 @@ namespace Wunderwaffe.Sim.Core;
 public sealed class SaveException(string message) : Exception(message);
 
 /// <summary>
-/// A saved match (NF-002): its setup and every command applied, which replay to the same state (NF-004).
+/// A saved match (NF-002): its setup and every command applied, which replay to the same state (NF-004), plus the
+/// match's latest periodic snapshot (NF-008) so a load only replays the commands after it.
 /// <see cref="Hash"/> is the state hash at save time; a replay that ends elsewhere was saved with different rules
 /// or content.
 /// </summary>
 /// <param name="Label">Free text for the load menu, such as progress at save time.</param>
-public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Hash, string Label, List<LoggedCommand> Commands)
+/// <param name="Snapshot">State at a tick no later than <paramref name="Tick"/>, or null for a full replay.</param>
+public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Hash, string Label, List<LoggedCommand> Commands, Snapshot? Snapshot = null)
 {
-    /// <summary>2: irregular tiles cut from one generated world map; version 1 saves describe a square grid.</summary>
-    public const int CurrentVersion = 2;
+    /// <summary>3: rate mode, view commands and snapshots. No compatibility with older saves (OQ-34).</summary>
+    public const int CurrentVersion = 3;
 
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
@@ -22,7 +24,7 @@ public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Has
     {
         if (sim.Setup is not { } setup)
             throw new SaveException("only matches started with Simulation.NewGame can be saved");
-        return new SaveFile(CurrentVersion, setup, sim.Tick, sim.StateHash(), label, [.. sim.CommandLog]);
+        return new SaveFile(CurrentVersion, setup, sim.Tick, sim.StateHash(), label, [.. sim.CommandLog], sim.LatestSnapshot);
     }
 
     public string ToJson() => JsonSerializer.Serialize(this, Options);
@@ -47,23 +49,42 @@ public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Has
 }
 
 /// <summary>
-/// Rebuilds a saved match by replaying its commands from its setup. <see cref="Advance"/> runs a slice at a time
-/// so a loading screen can show progress.
+/// Rebuilds a saved match: from its snapshot, replaying only the commands after it (NF-008), or from its setup,
+/// replaying everything. <see cref="Advance"/> runs a slice at a time so a loading screen can show progress. If a
+/// snapshot load ends away from the saved hash (state the snapshot doesn't capture), it starts again as a full replay.
 /// </summary>
 public sealed class Replay
 {
+    readonly ContentDb _content;
     readonly SaveFile _save;
     int _next;
 
-    public Replay(ContentDb content, SaveFile save)
+    /// <param name="useSnapshot">False forces a full replay from the setup, ignoring the save's snapshot.</param>
+    public Replay(ContentDb content, SaveFile save, bool useSnapshot = true)
     {
+        _content = content;
         _save = save;
-        Sim = Simulation.NewGame(content, save.Setup);
+        if (useSnapshot && save.Snapshot is { } snap && snap.Tick <= save.Tick)
+        {
+            FromSnapshot = true;
+            _next = save.Commands.FindIndex(c => c.Tick >= snap.Tick);
+            if (_next < 0)
+                _next = save.Commands.Count;
+            Sim = snap.Restore(content, save.Setup, save.Commands.Take(_next));
+            FallBackIfDiverged();
+        }
+        else
+        {
+            Sim = Simulation.NewGame(content, save.Setup);
+        }
     }
 
-    public Simulation Sim { get; }
+    public Simulation Sim { get; private set; }
     public long TotalTicks => _save.Tick;
     public bool Done => Sim.Tick >= _save.Tick;
+
+    /// <summary>Started from the save's snapshot and still on it (not fallen back to a full replay).</summary>
+    public bool FromSnapshot { get; private set; }
 
     /// <summary>True once done if the replay reached exactly the saved state.</summary>
     public bool Matches => Done && Sim.StateHash() == _save.Hash;
@@ -78,13 +99,25 @@ public sealed class Replay
                 Sim.Enqueue(log[_next++].Command);
             Sim.Step();
         }
+        FallBackIfDiverged();
     }
 
-    /// <summary>Replays the whole save. Throws if it doesn't reach the saved state.</summary>
-    public static Simulation Load(ContentDb content, SaveFile save)
+    void FallBackIfDiverged()
     {
-        var replay = new Replay(content, save);
-        replay.Advance(int.MaxValue);
+        if (Done && FromSnapshot && !Matches)
+        {
+            FromSnapshot = false;
+            _next = 0;
+            Sim = Simulation.NewGame(_content, _save.Setup);
+        }
+    }
+
+    /// <summary>Loads the whole save. Throws if it doesn't reach the saved state.</summary>
+    public static Simulation Load(ContentDb content, SaveFile save, bool useSnapshot = true)
+    {
+        var replay = new Replay(content, save, useSnapshot);
+        while (!replay.Done)
+            replay.Advance(int.MaxValue);
         if (!replay.Matches)
             throw new SaveException("replay did not reach the saved state");
         return replay.Sim;

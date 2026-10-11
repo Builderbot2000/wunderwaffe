@@ -35,6 +35,8 @@ internal static class UnitPhysics
     {
         foreach (var u in sim.Units)
         {
+            if (sim.IsAbstract(u))
+                continue;
             int px = u.X, py = u.Y;
             Control(sim, u);
             UpdateTile(sim, u, px, py);
@@ -327,6 +329,8 @@ internal static class UnitPhysics
             for (int j = i + 1; j < units.Count; j++)
             {
                 Unit a = units[i], b = units[j];
+                if (sim.IsAbstract(a) || sim.IsAbstract(b))
+                    continue;
                 long far = (long)a.Radius + b.Radius;
                 long ddx = a.X - (long)b.X, ddy = a.Y - (long)b.Y;
                 if (ddx * ddx + ddy * ddy >= far * far)

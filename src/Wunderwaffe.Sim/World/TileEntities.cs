@@ -216,7 +216,8 @@ internal static class TileEntities
         return true;
     }
 
-    static void Deliver(Simulation sim, TileState tile, PlacedBuilding port)
+    /// <summary>Lands an export port's arrived shipments in the partner tile. Rate mode calls it for tiles it steps.</summary>
+    internal static void Deliver(Simulation sim, TileState tile, PlacedBuilding port)
     {
         var link = port.Export!;
         var neighbor = sim.TryGetTile(PortRules.PartnerOf(tile.Grid, port));

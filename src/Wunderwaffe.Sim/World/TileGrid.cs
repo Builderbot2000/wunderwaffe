@@ -273,4 +273,47 @@ public sealed class TileGrid
                 _cells[cy * Width + cx] = value;
         }
     }
+    // ---- Snapshots (NF-008): put a grid's changing state back exactly, building ids and revision included. ----
+
+    /// <summary>Removes every building and frame and forgets building ids, so a snapshot can add its own back.</summary>
+    internal void ClearForRestore()
+    {
+        Array.Clear(_cells);
+        Array.Clear(_frames);
+        _buildings.Clear();
+        _buildings.Add(null);
+        _belts.Clear();
+        _machines.Clear();
+        _exportPorts.Clear();
+        _importPorts.Clear();
+        BuildingCount = 0;
+        FrameCount = 0;
+    }
+
+    /// <summary>Adds a building under a given id, higher than any added since <see cref="ClearForRestore"/>.</summary>
+    internal PlacedBuilding Restore(int id, BuildingDef def, int owner, int x, int y, int w, int h, int rotation, RecipeDef? recipe, int hp)
+    {
+        while (_buildings.Count < id)
+            _buildings.Add(null);
+        var b = new PlacedBuilding(id, def, owner, x, y, w, h, rotation, recipe, hp);
+        _buildings.Add(b);
+        KindList(b.Kind)?.Add(b);
+        Fill(b, b.Id);
+        BuildingCount++;
+        return b;
+    }
+
+    /// <summary>The building with this id, or null if there is none (or it was removed).</summary>
+    public PlacedBuilding? BuildingById(int id) => id > 0 && id < _buildings.Count ? _buildings[id] : null;
+
+    /// <summary>Ids handed out so far: the next building added gets this one.</summary>
+    internal int NextBuildingId => _buildings.Count;
+
+    /// <summary>Pads the id list so the next building added gets <paramref name="next"/>, as it would have in the saved game.</summary>
+    internal void RestoreIds(int next, int revision)
+    {
+        while (_buildings.Count < next)
+            _buildings.Add(null);
+        Revision = revision;
+    }
 }
