@@ -28,6 +28,9 @@ public sealed class PlayerState(int id)
     /// <summary>The tick each completed goal finished on.</summary>
     public IReadOnlyList<long> GoalTicks => _goalTicks;
 
+    /// <summary>The tick this player lost their last core (MP-001), or -1 while they are in the game.</summary>
+    public long EliminatedTick { get; internal set; } = -1;
+
     internal void AddProduced(IReadOnlyDictionary<string, int> items)
     {
         foreach (var (item, n) in items)
@@ -35,4 +38,7 @@ public sealed class PlayerState(int id)
     }
 
     internal void CompleteGoal(long tick) => _goalTicks.Add(tick);
+
+    /// <summary>Tile this player is looking at (SetViewedTileCommand), or -1 for the world map. Tiles nobody views run in rate mode.</summary>
+    public int ViewedTile { get; internal set; } = -1;
 }

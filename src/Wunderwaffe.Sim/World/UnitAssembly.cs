@@ -167,6 +167,7 @@ public static class UnitAssembly
         int px = gx * Unit.CellScale + Unit.CellScale / 2, py = gy * Unit.CellScale + Unit.CellScale / 2;
         sim.SpawnUnit(player, tile.Id, px, py, blocks, body, 0, 0);
         sim.Player(player).Launched++;
+        sim.Raise(GameEventKind.UnitCompleted, player, tile.Id, sim.Units[^1].Id);
 
         // The buildings are the unit now: lift them off, keeping any items they held on the tile.
         foreach (var b in buildings)

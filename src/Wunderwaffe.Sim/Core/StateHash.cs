@@ -22,6 +22,9 @@ internal sealed class StateHash
             s.MixPlayer(p);
         foreach (var u in sim.Units)
             s.MixUnit(u);
+        s.Mix(sim.Winner);
+        s.Mix(sim.EndTick);
+        s.Mix((int)sim.EndReason);
         return s._h;
     }
 
@@ -128,6 +131,8 @@ internal sealed class StateHash
         Mix(p.Launched);
         foreach (long t in p.GoalTicks)
             Mix(t);
+        Mix(p.EliminatedTick);
+        Mix(p.ViewedTile);
     }
 
     void MixUnit(Unit u)

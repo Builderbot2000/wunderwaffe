@@ -62,8 +62,8 @@ public sealed partial class Simulation(ContentDb content)
     /// </summary>
     public static Simulation NewGame(ContentDb content, GameSetup setup)
     {
-        if (setup.Players is < 1 or > GameSetup.MaxPlayers)
-            throw new ArgumentOutOfRangeException(nameof(setup), $"{setup.Players} players; 1 to {GameSetup.MaxPlayers} allowed");
+        if (setup.Problem() is { } problem)
+            throw new ArgumentOutOfRangeException(nameof(setup), problem);
         var sim = new Simulation(content) { Setup = setup };
         sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, setup.Players);
         for (int p = 0; p < setup.Players; p++)
@@ -139,6 +139,8 @@ public sealed partial class Simulation(ContentDb content)
             TileEntities.Step(this, tile);
         UnitPhysics.Step(this);
         Progression.Step(this);
+        Victory.Step(this);
+        Alerts.Step(this);
 
         Tick++;
     }
@@ -161,6 +163,7 @@ public sealed partial class Simulation(ContentDb content)
         Player(player);
         PlaceCore(tile);
         tile.Inventory.Add(Balance.ClaimedTileItems);
+        Raise(GameEventKind.TileClaimed, player, tileId);
         return ClaimResult.Ok;
     }
 

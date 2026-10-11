@@ -1,4 +1,5 @@
 using Wunderwaffe.Sim.Content;
+using Wunderwaffe.Sim.Core;
 
 namespace Wunderwaffe.Sim.World;
 
@@ -39,7 +40,10 @@ public static class Progression
         foreach (var p in sim.Players)
         {
             while (p.GoalsDone < goals.Count && IsMet(sim, p.Id, goals[p.GoalsDone].Condition))
+            {
                 p.CompleteGoal(sim.Tick);
+                sim.Raise(GameEventKind.GoalCompleted, p.Id, itemId: goals[p.GoalsDone - 1].Id);
+            }
         }
     }
 }
