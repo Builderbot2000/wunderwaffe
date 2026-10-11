@@ -128,6 +128,7 @@ internal sealed class StateHash
         Mix(p.Launched);
         foreach (long t in p.GoalTicks)
             Mix(t);
+        Mix(p.ViewedTile);
     }
 
     void MixUnit(Unit u)

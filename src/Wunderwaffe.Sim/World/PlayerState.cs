@@ -35,4 +35,7 @@ public sealed class PlayerState(int id)
     }
 
     internal void CompleteGoal(long tick) => _goalTicks.Add(tick);
+
+    /// <summary>Tile this player is looking at (SetViewedTileCommand), or -1 for the world map. Tiles nobody views run in rate mode.</summary>
+    public int ViewedTile { get; internal set; } = -1;
 }

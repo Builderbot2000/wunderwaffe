@@ -17,6 +17,7 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(DeployUnitCommand), "deploy_unit")]
 [JsonDerivedType(typeof(MoveUnitsCommand), "move_units")]
 [JsonDerivedType(typeof(DebugGrantCommand), "debug_grant")]
+[JsonDerivedType(typeof(SetViewedTileCommand), "view_tile")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -111,4 +112,10 @@ public sealed record DebugGrantCommand(int Player, int TileId, string ItemId, in
         if (sim.TryGetTile(TileId) is { } tile && sim.Content.Items.ContainsKey(ItemId) && Amount > 0)
             tile.Inventory.Add(ItemId, Amount);
     }
+}
+
+/// <summary>The tile <paramref name="TileId"/> the player is looking at, or -1 for the world map. Lockstep input: rate mode (FB-013) depends on it.</summary>
+public sealed record SetViewedTileCommand(int Player, int TileId) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => sim.Player(Player).ViewedTile = sim.TryGetTile(TileId) is null ? -1 : TileId;
 }
