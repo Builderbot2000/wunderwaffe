@@ -111,15 +111,7 @@ public sealed record DeployUnitCommand(int Player, int UnitId) : Command(Player)
 /// </summary>
 public sealed record MoveUnitsCommand(int Player, int[] UnitIds, int TileId, int X, int Y) : Command(Player)
 {
-    internal override void Apply(Simulation sim)
-    {
-        foreach (int id in UnitIds)
-        {
-            if (sim.UnitById(id) is { } u && u.Owner == Player)
-                CombatOrders.Clear(u);
-        }
-        UnitSim.Order(sim, Player, UnitIds, TileId, X, Y);
-    }
+    internal override void Apply(Simulation sim) => UnitSim.Order(sim, Player, UnitIds, TileId, X, Y);
 }
 
 /// <summary>Debug only: adds items to a tile. Must be disabled in multiplayer.</summary>
@@ -132,7 +124,10 @@ public sealed record DebugGrantCommand(int Player, int TileId, string ItemId, in
     }
 }
 
-/// <summary>Sends units after an enemy unit until it is destroyed (CB-001). They close to weapon range and fire.</summary>
+/// <summary>
+/// Sends units after an enemy unit until it is destroyed (CB-001). They close to weapon range and fire. Their squads
+/// also take it as their focus target (UC-002).
+/// </summary>
 public sealed record AttackCommand(int Player, int[] UnitIds, int TargetUnitId) : Command(Player)
 {
     internal override void Apply(Simulation sim)
@@ -141,7 +136,12 @@ public sealed record AttackCommand(int Player, int[] UnitIds, int TargetUnitId) 
             return;
         var (gx, gy) = ((int)(target.X / Unit.CellScale), (int)(target.Y / Unit.CellScale));
         var tile = sim.Tiles[target.TileId];
-        CombatOrders.Issue(sim, Player, UnitIds, CombatOrderKind.Attack, tile.Id, gx - tile.OriginX, gy - tile.OriginY, TargetUnitId);
+        UnitSim.Issue(sim, Player, UnitIds, OrderKind.Attack, tile.Id, gx - tile.OriginX, gy - tile.OriginY, TargetUnitId);
+        foreach (int id in UnitIds)
+        {
+            if (sim.UnitById(id) is { } u && u.Owner == Player && sim.Squads.Of(u) is { } squad)
+                squad.TargetId = TargetUnitId;
+        }
     }
 }
 
@@ -151,7 +151,7 @@ public sealed record AttackBuildingCommand(int Player, int[] UnitIds, int TileId
     internal override void Apply(Simulation sim)
     {
         if (sim.TryGetTile(TileId) is { } tile && tile.Grid.BuildingAt(X, Y) is { } b && b.Owner != Player)
-            CombatOrders.Issue(sim, Player, UnitIds, CombatOrderKind.Attack, TileId, X, Y);
+            UnitSim.Issue(sim, Player, UnitIds, OrderKind.Attack, TileId, X, Y);
     }
 }
 
@@ -159,7 +159,7 @@ public sealed record AttackBuildingCommand(int Player, int[] UnitIds, int TileId
 public sealed record AttackMoveCommand(int Player, int[] UnitIds, int TileId, int X, int Y) : Command(Player)
 {
     internal override void Apply(Simulation sim) =>
-        CombatOrders.Issue(sim, Player, UnitIds, CombatOrderKind.AttackMove, TileId, X, Y);
+        UnitSim.Issue(sim, Player, UnitIds, OrderKind.AttackMove, TileId, X, Y);
 }
 
 /// <summary>Debug only: damages the building on a cell, as an untyped hit (it may be destroyed). Must be disabled in multiplayer.</summary>

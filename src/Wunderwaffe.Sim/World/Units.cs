@@ -201,9 +201,6 @@ public sealed class Unit
     /// <summary>Cells within which this unit shares its cargo with friendlies (FB-018); 0 for none.</summary>
     public int SupplyRadius { get; private set; }
 
-    /// <summary>Combat's stand-in for the shared order (see <c>CombatOrders</c>); replaced by movement's order at merge.</summary>
-    internal CombatOrder? AttackOrder { get; set; }
-
     /// <summary>The unit core's cell in the unit grid, and its offset from the centre of mass.</summary>
     public int CoreGX { get; }
     public int CoreGY { get; }

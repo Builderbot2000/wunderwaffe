@@ -199,14 +199,6 @@ internal sealed class StateHash
         foreach (var c in u.BlockCombat)
             MixCombat(c);
         Mix(u.Cargo.Entries);
-        if (u.AttackOrder is { } order)
-        {
-            Mix((int)order.Kind);
-            Mix(order.TileId);
-            Mix(order.X);
-            Mix(order.Y);
-            Mix(order.TargetId);
-        }
         if (u.Route is { } route)
         {
             Mix(u.RouteIndex);

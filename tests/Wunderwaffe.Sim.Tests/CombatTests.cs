@@ -239,7 +239,7 @@ public class CombatTests
         sim.Enqueue(new AttackCommand(Me, [unit.Id], enemy.Id));
         Assert.True(RunUntil(sim, () => sim.UnitById(enemy.Id) == null, 4000), "the enemy unit should die");
         Run(sim, 20);
-        Assert.Null(CombatOrders.OrderOf(unit));
+        Assert.Null(unit.Order);
     }
 
     [Fact]
@@ -251,10 +251,11 @@ public class CombatTests
         sim.Step();
         sim.Enqueue(new AttackBuildingCommand(Me, [unit.Id], theirs.Id, 12, 16));
         sim.Step();
-        Assert.NotNull(CombatOrders.OrderOf(unit));
+        Assert.Equal(OrderKind.Attack, unit.Order?.Kind);
+        // One shared order per unit: the move replaces the attack.
         sim.Enqueue(new MoveUnitsCommand(Me, [unit.Id], mine.Id, 5, 5));
         sim.Step();
-        Assert.Null(CombatOrders.OrderOf(unit));
+        Assert.Equal(OrderKind.Move, unit.Order?.Kind);
     }
 
     [Fact]
@@ -268,7 +269,7 @@ public class CombatTests
 
         sim.Enqueue(new AttackMoveCommand(Me, [unit.Id], theirs.Id, 10, 4));
         Assert.True(RunUntil(sim, () => theirs.Grid.BuildingAt(2, 2) == null, 3000), "it fights what it passes");
-        Assert.True(RunUntil(sim, () => CombatOrders.OrderOf(unit) == null, 3000), "then finishes the move");
+        Assert.True(RunUntil(sim, () => unit.Order == null, 3000), "then finishes the move");
         Assert.Equal(theirs.Id, unit.TileId);
     }
 

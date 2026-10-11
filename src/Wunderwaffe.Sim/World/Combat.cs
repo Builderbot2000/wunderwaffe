@@ -275,22 +275,22 @@ public static class Combat
     /// </summary>
     static void UpdateOrder(Simulation sim, Unit u)
     {
-        if (CombatOrders.OrderOf(u) is not { } order || (sim.Tick + u.Id) % OrderTicks != 0)
+        if (u.Order is not { Kind: OrderKind.Attack or OrderKind.AttackMove } order || (sim.Tick + u.Id) % OrderTicks != 0)
             return;
         int range = WeaponRange(sim, u);
-        if (order.Kind == CombatOrderKind.Attack)
+        if (order.Kind == OrderKind.Attack)
         {
             if (Resolve(sim, OrderTarget(sim, u, order)) is not { } pos)
             {
-                CombatOrders.Resume(sim, u);
+                EndOrder(u);
                 return;
             }
             long reach = (long)range * S * EngagePercent / 100;
             long dx = pos.X - u.X, dy = pos.Y - u.Y;
             if (range > 0 && dx * dx + dy * dy <= reach * reach)
-                CombatOrders.Halt(u);
-            else if (CombatOrders.MayChase(sim, u, pos.X, pos.Y))
-                CombatOrders.Chase(sim, u, pos.X, pos.Y);
+                UnitSim.Halt(u);
+            else if (UnitSim.MayChase(sim, u, pos.X, pos.Y))
+                UnitSim.Chase(sim, u, pos.X, pos.Y);
             return;
         }
 
@@ -301,34 +301,56 @@ public static class Combat
         var (gx, gy) = dest.ToGlobal(order.X, order.Y);
         long ex = (long)gx * S + S / 2 - u.X, ey = (long)gy * S + S / 2 - u.Y;
         if (engaged)
-            CombatOrders.Halt(u);
+            UnitSim.Halt(u);
         else if (ex * ex + ey * ey <= 4L * S * S && !u.Moving)
-            CombatOrders.Clear(u);
+            EndOrder(u);
         else if (!u.Moving)
-            CombatOrders.Resume(sim, u);
+            UnitSim.Resume(sim, u);
+    }
+
+    /// <summary>An attack is over (target gone) or an attack-move got there: the unit stays and anchors where it is.</summary>
+    static void EndOrder(Unit u)
+    {
+        u.Order = null;
+        u.Chasing = false;
+        u.Route = null;
+        (u.AnchorX, u.AnchorY) = (u.X, u.Y);
     }
 
     /// <summary>The target an attack order names: a unit's nearest live block, or the building on a cell.</summary>
-    static Target OrderTarget(Simulation sim, Unit u, CombatOrder order)
+    static Target OrderTarget(Simulation sim, Unit u, UnitOrder order)
     {
         if (order.TargetId > 0)
-        {
-            if (sim.UnitById(order.TargetId) is not { } t || t.Owner == u.Owner)
-                return Target.None;
-            int best = NearestBlock(t, u.X, u.Y, out _);
-            return best < 0 ? Target.None : new Target(t.Id, best, -1, 0);
-        }
+            return UnitTarget(sim, u, order.TargetId);
         var tile = sim.Tiles[order.TileId];
         return tile.Grid.BuildingAt(order.X, order.Y) is { } b && b.Owner != u.Owner
             ? new Target(0, -1, tile.Id, b.Id) : Target.None;
+    }
+
+    /// <summary>The nearest live block of enemy unit <paramref name="id"/>, or none.</summary>
+    static Target UnitTarget(Simulation sim, Unit u, int id)
+    {
+        if (sim.UnitById(id) is not { } t || t.Owner == u.Owner)
+            return Target.None;
+        int best = NearestBlock(t, u.X, u.Y, out _);
+        return best < 0 ? Target.None : new Target(t.Id, best, -1, 0);
+    }
+
+    /// <summary>What the unit fires at first when in range: its attack order's target, else its squad's focus (UC-002).</summary>
+    static Target Preferred(Simulation sim, Unit u)
+    {
+        if (u.Order is { Kind: OrderKind.Attack } o)
+            return OrderTarget(sim, u, o);
+        return sim.Squads.Of(u) is { TargetId: > 0 } squad ? UnitTarget(sim, u, squad.TargetId) : Target.None;
     }
 
     // ---- Firing ----
 
     static void FireUnit(Simulation sim, TargetIndex targets, Unit u)
     {
-        var preferred = CombatOrders.OrderOf(u) is { Kind: CombatOrderKind.Attack } o ? OrderTarget(sim, u, o) : Target.None;
-        bool canFire = CombatOrders.CanFire(u);
+        var preferred = Preferred(sim, u);
+        // An explicit attack order fires even on hold-fire stance; otherwise the stance decides (UC-004).
+        bool canFire = UnitSim.CanFire(u) || u.Order?.Kind == OrderKind.Attack;
         for (int i = 0; i < u.Blocks.Count; i++)
         {
             var blk = u.Blocks[i];
