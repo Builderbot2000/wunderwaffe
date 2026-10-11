@@ -55,7 +55,7 @@ public partial class Hud : Control
     Control? _welcome;
     bool _showStats;
     double _slowTimer;
-    int _shownTileId = -1;
+    int _shownTileId = -1, _shownSelection;
     string _sideKey = "";
 
     public override void _Ready()
@@ -293,12 +293,13 @@ public partial class Hud : Control
         UpdateBuildBar();
         CheckProgress();
 
-        // A new tile picked on the world map shows at once rather than at the next slow refresh.
+        // A new tile picked on the world map, or a changed unit selection, shows at once rather than at the next slow refresh.
         int selected = _host.View == ViewMode.World ? WorldMap.SelectedTileId : -1;
         _slowTimer -= delta;
-        if (_slowTimer <= 0 || selected != _shownTileId)
+        if (_slowTimer <= 0 || selected != _shownTileId || _host.Selected.Count != _shownSelection)
         {
             _shownTileId = selected;
+            _shownSelection = _host.Selected.Count;
             _slowTimer = SlowRefresh;
             RefreshSlow();
         }

@@ -70,7 +70,7 @@ public partial class UiTour : Node
             Log(scout is { Moving: true } ? "scout on its way to the coal tile's circle" : "FAIL: the scout didn't take the order");
             Shot("07b_scout_sent");
         });
-        Step(1, "back to tile", () => Key(Godot.Key.Tab));
+        Step(1, "back to tile", () => { _host.Selected.Clear(); Key(Godot.Key.Tab); });
         Step(5, "pause", () => { Key(Godot.Key.Escape); });
         Step(5, "paused", () => { _pausedTick = _host.Sim.Tick; Shot("08_pause"); });
         Step(20, "still paused", () =>
