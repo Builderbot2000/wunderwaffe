@@ -103,7 +103,11 @@ public static class InputActions
         [CamLeft] = "Pan left", [CamRight] = "Pan right", [CamUp] = "Pan up", [CamDown] = "Pan down",
         [Rotate] = "Rotate building", [Cancel] = "Cancel / menu", [Stress] = "Debug: stress test", [DebugCheat] = "Debug: add items",
         [DebugStats] = "Debug: performance", [Help] = "Help", [WorldToggle] = "World map / tile", [WorldEnter] = "Open tile",
-        [WorldClaim] = "Claim tile", [UnitToggle] = "Lift off / land",
+        [WorldClaim] = "Send units to circle", [UnitToggle] = "Lift off / land", [AttackMove] = "Attack-move",
+        [BlueprintLibrary] = "Blueprint library", [BlueprintFlip] = "Mirror blueprint", [BlueprintRecord] = "Record unit design",
+        [UnitHold] = "Hold position", [UnitPatrol] = "Patrol", [UnitRetreat] = "Retreat", [UnitSquad] = "Make squad",
+        [UnitFormation] = "Next formation", [UnitStance] = "Next stance", [UnitEscort] = "Escort", [UnitRally] = "Set rally point",
+        [CycleFilter] = "Sorter filter", [StatsToggle] = "Production stats", [LogisticsToggle] = "Logistics overlay",
     };
 
     /// <summary>Every action registered here, in registration order.</summary>
