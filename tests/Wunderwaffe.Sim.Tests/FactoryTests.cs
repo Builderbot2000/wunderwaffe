@@ -207,6 +207,16 @@ public class FactoryTests
         Assert.Equal(Run1(), Run1());
     }
 
+    [Fact]
+    public void FactoryAndUpkeepContentIsValidated()
+    {
+        var e = Assert.Throws<Wunderwaffe.Sim.Content.ContentException>(() => TestContent.Load(json => json
+            .Replace("\"radius\": 6", "\"radius\": 0")
+            .Replace("\"kind\": \"thruster\",", "\"kind\": \"thruster\", \"upkeep\": { \"unobtainium\": 1 },")));
+        Assert.Contains(e.Errors, m => m.Contains("unit_factory") && m.Contains("radius"));
+        Assert.Contains(e.Errors, m => m.Contains("thruster") && m.Contains("upkeep"));
+    }
+
     static bool RunUntil(Simulation sim, Func<bool> done, int maxTicks)
     {
         for (int i = 0; i < maxTicks; i++)
