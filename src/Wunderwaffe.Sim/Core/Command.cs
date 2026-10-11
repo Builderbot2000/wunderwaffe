@@ -17,6 +17,8 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(DeployUnitCommand), "deploy_unit")]
 [JsonDerivedType(typeof(MoveUnitsCommand), "move_units")]
 [JsonDerivedType(typeof(DebugGrantCommand), "debug_grant")]
+[JsonDerivedType(typeof(PlaceBlueprintCommand), "place_blueprint")]
+[JsonDerivedType(typeof(SetFactoryBlueprintCommand), "set_factory_blueprint")]
 [JsonDerivedType(typeof(HoldUnitsCommand), "hold_units")]
 [JsonDerivedType(typeof(PatrolUnitsCommand), "patrol_units")]
 [JsonDerivedType(typeof(RetreatUnitsCommand), "retreat_units")]
@@ -121,6 +123,37 @@ public sealed record DebugGrantCommand(int Player, int TileId, string ItemId, in
     {
         if (sim.TryGetTile(TileId) is { } tile && sim.Content.Items.ContainsKey(ItemId) && Amount > 0)
             tile.Inventory.Add(ItemId, Amount);
+    }
+}
+
+/// <summary>
+/// Places a whole blueprint in one action with its top-left at (X, Y), mirrored if <paramref name="Flip"/> and then
+/// turned <paramref name="Rotation"/> quarter turns, paying the total cost (FB-009). Nothing is placed unless every
+/// block fits and the total is affordable; see <see cref="Blueprints.Check"/>.
+/// </summary>
+public sealed record PlaceBlueprintCommand(int Player, int TileId, Blueprint Blueprint, int X, int Y, int Rotation = 0, bool Flip = false)
+    : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile)
+            Blueprints.Place(sim, tile, Player, Blueprint, X, Y, Rotation, Flip);
+    }
+}
+
+/// <summary>
+/// Projects a blueprint from a unit factory (UD-006): the factory covering cell (X, Y) builds it with its top-left at
+/// (OX, OY), turned and flipped as for <see cref="PlaceBlueprintCommand"/>, over and over. A null blueprint stops it.
+/// See <see cref="UnitFactory.CheckProject"/>.
+/// </summary>
+public sealed record SetFactoryBlueprintCommand(
+    int Player, int TileId, int X, int Y, Blueprint? Blueprint, int OX = 0, int OY = 0, int Rotation = 0, bool Flip = false)
+    : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile)
+            UnitFactory.Project(sim, tile, Player, X, Y, Blueprint, OX, OY, Rotation, Flip);
     }
 }
 

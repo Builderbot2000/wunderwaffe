@@ -82,6 +82,29 @@ public class MovementTests
         Assert.Equal(LocomotionClass.Ground, Scout(sim, tile, 5, 10).Locomotion);
     }
 
+    [Fact]
+    public void LiftOffRefusesAHullWithWheels()
+    {
+        var sim = NewSim();
+        var tile = Tile(sim);
+        for (int i = 0; i < 4; i++)
+            sim.Enqueue(new PlaceFrameCommand(Me, tile.Id, 4 + i, 5));
+        Place(sim, tile, "thruster", 4, 5);
+        Place(sim, tile, "unit_core", 5, 5);
+        Place(sim, tile, "hull", 6, 5);
+        Place(sim, tile, "wheels", 7, 5);
+        sim.Step();
+        Assert.Equal(AssembleResult.ConflictingLocomotion, UnitAssembly.CheckActivate(sim, tile, Me, 5, 5, out _));
+
+        // Swapping the wheels for a rotor makes it an air unit.
+        sim.Enqueue(new RemoveBuildingCommand(Me, tile.Id, 7, 5));
+        Place(sim, tile, "rotor", 7, 5);
+        sim.Step();
+        sim.Enqueue(new ActivateUnitCommand(Me, tile.Id, 5, 5));
+        sim.Step();
+        Assert.Equal(LocomotionClass.Air, Assert.Single(sim.Units).Locomotion);
+    }
+
     // --- terrain-aware routes on a generated world (UC-005, UC-007, IO-003) ---
 
     static (Simulation Sim, (int X, int Y) Land, (int X, int Y) Deep) WorldWithSea()

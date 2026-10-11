@@ -219,6 +219,12 @@ public sealed class Unit
     /// <summary>Angular acceleration limit in angle units per tick squared, from the engines' turning torque.</summary>
     internal int TurnAccel => (int)Math.Max(1, TotalThrust * (long)ThrustScale * TurnArm * AnglePerRadian / Inertia);
 
+    /// <summary>Tick the next upkeep payment is due (UD-013, <see cref="UnitUpkeep"/>).</summary>
+    public long UpkeepDue { get; internal set; }
+
+    /// <summary>The last upkeep payment failed: the engines stall until one succeeds.</summary>
+    public bool Unsupplied { get; internal set; }
+
     /// <summary>A cell centre in world sub-cells, given the unit's current position and heading.</summary>
     public (long X, long Y) CellWorld(UnitCell c)
     {

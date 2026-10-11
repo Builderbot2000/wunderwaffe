@@ -31,7 +31,7 @@ public static class Placement
 {
     public static PlaceResult Check(
         Simulation sim, TileState tile, int player, string buildingId, int x, int y, int rotation,
-        string? recipeId, out PlacementPlan plan)
+        string? recipeId, out PlacementPlan plan, bool ignoreCost = false)
     {
         plan = default;
         var content = sim.Content;
@@ -57,7 +57,7 @@ public static class Placement
         if (resolved.Error != PlaceResult.Ok)
             return resolved.Error;
 
-        if (!tile.Inventory.Has(def.Cost))
+        if (!ignoreCost && !tile.Inventory.Has(def.Cost))
             return PlaceResult.CannotAfford;
 
         plan = new PlacementPlan(def, x, y, w, h, rotation, resolved.RecipeId);

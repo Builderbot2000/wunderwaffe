@@ -30,6 +30,15 @@ public static class Balance
     /// <summary>A neighbour counts as land, for the start and for regional deposits, with this share of buildable ground.</summary>
     public const int LandPercent = 30;
 
+    /// <summary>Ticks a unit factory spends placing a block, per item of the block's cost (UD-002, UD-006).</summary>
+    public const int BuildTicksPerItem = 6;
+
+    /// <summary>Units with more frame cells than this are Wunderwaffe class, for the UI and alerts (WW-001).</summary>
+    public const int WunderwaffeCells = 48;
+
+    /// <summary>Ticks between upkeep payments; upkeep is declared per minute (UD-013).</summary>
+    public const int UpkeepPeriod = 60 * Simulation.TicksPerSecond;
+
     static IReadOnlyDictionary<string, int> Items(params (string Id, int N)[] items) =>
         new SortedDictionary<string, int>(items.ToDictionary(i => i.Id, i => i.N), StringComparer.Ordinal);
 }

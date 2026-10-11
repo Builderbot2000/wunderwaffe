@@ -140,6 +140,8 @@ public sealed partial class Simulation(ContentDb content)
 
         foreach (var tile in _tiles)
             TileEntities.Step(this, tile);
+        UnitFactory.Step(this);
+        UnitUpkeep.Step(this);
         UnitPhysics.Step(this);
         Progression.Step(this);
 

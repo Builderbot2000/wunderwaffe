@@ -37,6 +37,11 @@ file. Don't add empty stubs ahead of time.
 | 7 | Goals / victory | G | exists: `Progression.Step(this);` (victory checks go right after it) |
 | 8 | `Tick++` | shared | exists: last line |
 
+D's calls: `UnitFactory.Step(this)` right after the tile loop (end of phase 3: factories build and lift off), and
+`UnitUpkeep.Step(this)` right before `UnitPhysics.Step` (after combat). Every lift-off, by hand or from a factory, goes
+through `UnitAssembly.Launch` and ends in its `Built(sim, unit, tile, source)` hook: that is where rally/auto-squad
+(E, UC-006) and the unit-completed alert (G) belong.
+
 C owns the scheduling in `Simulation.Step` (for example rate-mode tiles skipping phase 3); other silos only insert
 their one call.
 

@@ -229,7 +229,7 @@ public partial class UnitTool : Node2D
         }
         else if (_host.Selected.Count > 0)
         {
-            line += "\nG: land · H hold · P patrol · X retreat · Q squad · F formation · V stance · E escort";
+            line += "\nG: land · H hold · P patrol · X retreat · Q squad · T formation · V stance · E escort";
             int stuck = _host.Selected.Count(id => sim.UnitById(id) is { MaxSpeed: <= 0 });
             if (stuck > 0)
                 line += $"\n{stuck} selected can't move: no thruster";

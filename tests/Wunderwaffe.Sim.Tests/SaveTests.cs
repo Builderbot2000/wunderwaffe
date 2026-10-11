@@ -49,6 +49,9 @@ public class SaveTests(ITestOutputHelper output)
         At(8, new PatrolUnitsCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY),
             new HoldUnitsCommand(Me, [1]), new RetreatUnitsCommand(Me, [1]));
         At(20, new DeployUnitCommand(Me, 1));
+        var belts = new Blueprint([new BlueprintBlock("conveyor", 0, 0, 0), new BlueprintBlock("conveyor", 1, 0, 0)], []);
+        At(22, new PlaceBlueprintCommand(Me, home.Id, belts, x0, y0 + 5, 2, Flip: true),
+            new SetFactoryBlueprintCommand(Me, home.Id, x0, y0 + 5, belts, x0, y0 + 1));
         At(30);
         return sim;
     }

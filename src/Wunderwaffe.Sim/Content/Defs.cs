@@ -41,6 +41,9 @@ public enum BuildingKind
     /// <summary>Pushes a unit the way it faces while the unit is active. Inert on a tile.</summary>
     Thruster,
 
+    /// <summary>Builds a library blueprint block by block within its radius, fed by belts, and lifts units off (UD-006).</summary>
+    UnitFactory,
+
     /// <summary>Wheels, a hull or a rotor: gives a unit its <see cref="BuildingDef.Locomotion"/> class (UD-004). Inert on a tile.</summary>
     Locomotor,
 }
@@ -50,6 +53,9 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// <param name="Hp">Hit points of one placed block (one building, wherever it stands: tile or unit). Must be &gt; 0.</param>
 /// <param name="Speed">Conveyors only: how far an item moves along a cell each tick, out of <c>BeltState.CellLength</c>.</param>
 /// <param name="Thrust">Thrusters only: force on the unit while it is active.</param>
+/// <param name="Radius">Unit factories only: how far, in cells, from the factory's footprint it may build (UD-006).</param>
+/// <param name="BlockCap">Unit factories only: the most frame cells a unit it builds may have (UD-006, WW-002).</param>
+/// <param name="Upkeep">Items a minute this block costs while it rides on a unit (UD-013); null for none.</param>
 /// <param name="Locomotion">Locomotors only: the class this block gives a unit (see <c>World.Locomotion</c>).</param>
 public sealed record BuildingDef(
     string Id,
@@ -62,6 +68,9 @@ public sealed record BuildingDef(
     [property: JsonConverter(typeof(SnakeCaseEnumConverter))] BuildingKind Kind = BuildingKind.Machine,
     int Speed = 0,
     int Thrust = 0,
+    int Radius = 0,
+    int BlockCap = 0,
+    Dictionary<string, int>? Upkeep = null,
     [property: JsonConverter(typeof(SnakeCaseEnumConverter))] World.LocomotionClass? Locomotion = null)
 {
     /// <summary>Width and height after <paramref name="rotation"/> quarter turns: odd turns swap them.</summary>
