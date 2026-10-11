@@ -354,9 +354,11 @@ public static class Combat
             state.Cooldown--;
         long range = (long)w.Range * S;
 
-        // Keep the current target while it is valid and in range; look again now and then for something closer.
+        // Keep the current target while it is valid and in range; look again now and then for something closer. With
+        // nothing to aim at it only looks every RetargetTicks too: idle weapons are most of them, and searching is the cost.
         var aim = Resolve(sim, state.Target);
-        bool search = aim == null || !InRange(aim.Value, x, y, range) || (sim.Tick + stagger) % RetargetTicks == 0;
+        bool lost = !state.Target.IsNone && (aim == null || !InRange(aim.Value, x, y, range));
+        bool search = lost || (sim.Tick + stagger) % RetargetTicks == 0;
         if (!preferred.IsNone && Resolve(sim, preferred) is { } p && InRange(p, x, y, range))
         {
             state.Target = preferred;
