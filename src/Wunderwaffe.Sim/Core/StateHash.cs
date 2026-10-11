@@ -87,6 +87,13 @@ internal sealed class StateHash
             Mix(b.Hp);
             MixEntity(b);
         }
+        Mix(t.Stats.TotalMade);
+        Mix(t.Stats.TotalUsed);
+        foreach (var (partner, n) in t.Stats.TotalSent)
+        {
+            Mix(partner);
+            Mix(n);
+        }
     }
 
     void MixEntity(PlacedBuilding b)
@@ -117,6 +124,35 @@ internal sealed class StateHash
                 Mix(s.ArriveTick);
                 Mix(s.ItemId);
             }
+        }
+        if (b.Machine is { } mc)
+            Mix(mc.OutputCredit);
+        if (b.Storage is { } store)
+        {
+            Mix(store.DumpWait);
+            Mix(store.DumpCursor);
+            Mix(store.Output);
+        }
+        if (b.Battery is { } bat)
+            Mix(bat.Charge);
+        if (b.Relay is { } relay)
+        {
+            Mix(relay.Cursor);
+            foreach (var lane in relay.Lanes)
+            {
+                Mix(lane.Count);
+                foreach (var r in lane)
+                {
+                    Mix(r.ItemId);
+                    Mix(r.ReadyTick);
+                    Mix(r.From);
+                }
+            }
+        }
+        if (b.Sorter is { } sorter)
+        {
+            Mix(sorter.Filter);
+            Mix(sorter.Flip ? 1 : 0);
         }
     }
 

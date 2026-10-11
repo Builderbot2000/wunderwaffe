@@ -35,5 +35,8 @@ public sealed class TileState(int id, int originX, int originY, TileGrid grid)
 
     public TileGrid Grid { get; } = grid;
 
+    /// <summary>Per-item production and consumption, and link throughput, over the last 10 minutes (FB-011).</summary>
+    public ProductionStats Stats { get; } = new();
+
     public (int X, int Y) ToGlobal(int x, int y) => (OriginX + x, OriginY + y);
 }

@@ -150,12 +150,61 @@ public sealed class ContentDb
                 errors.Add($"building '{b.Id}': ports must be 1x1");
             if (b.Hp <= 0)
                 errors.Add($"building '{b.Id}': hp must be > 0");
+            ValidateFactory(b, errors);
+        }
+
+        // A recipe with no outputs only makes sense as fuel for a generator (FB-005).
+        foreach (var r in Recipes.Values)
+        {
+            if (r.Outputs.Count == 0 && (r.Inputs.Count == 0 || !Buildings.TryGetValue(r.Building, out var host) || host.PowerSupply <= 0))
+                errors.Add($"recipe '{r.Id}': no outputs, so it must burn inputs in a generator (a machine with powerSupply)");
         }
 
         foreach (var g in Goals)
             ValidateCondition(g.Condition, $"goal '{g.Id}'", errors);
 
         ValidateTerrain(errors);
+    }
+
+    /// <summary>Power, storage, logistics and booster fields (FB-004, FB-005, FB-007, FB-016).</summary>
+    static void ValidateFactory(BuildingDef b, List<string> errors)
+    {
+        void Error(string message) => errors.Add($"building '{b.Id}': {message}");
+        if (b.Power < 0 || b.PowerSupply < 0 || b.PowerCapacity < 0 || b.Discharge < 0 || b.Storage < 0 || b.Range < 0)
+            Error("power, powerSupply, powerCapacity, discharge, storage and range must be >= 0");
+        if (b.PowerSupply > 0 && b.Kind is not (BuildingKind.Core or BuildingKind.Machine))
+            Error("only cores and machines (generators) supply power");
+        if (b.Kind == BuildingKind.Battery && (b.PowerCapacity <= 0 || b.Discharge <= 0))
+            Error("a battery needs powerCapacity and discharge > 0");
+        if (b.Kind == BuildingKind.Storage && b.Storage <= 0)
+            Error("storage needs a storage capacity > 0");
+        if (b.Kind == BuildingKind.Bridge && b.Range <= 0)
+            Error("a bridge needs a range > 0");
+        if (b.Kind is BuildingKind.Wire or BuildingKind.Junction or BuildingKind.Router or BuildingKind.Sorter or BuildingKind.Bridge
+            && (b.Width != 1 || b.Height != 1))
+            Error($"a {b.Kind} must be 1x1");
+
+        if ((b.Kind == BuildingKind.Booster) != (b.Booster != null))
+            Error("boosters, and only boosters, have a 'booster' section");
+        if (b.Booster is not { } booster)
+            return;
+        if (booster.Hosts is not { Length: > 0 })
+            Error("a booster needs at least one host category");
+        if (booster.Effects is not { Count: > 0 })
+            Error("a booster needs at least one effect");
+        foreach (var (stat, n) in booster.Effects ?? [])
+        {
+            if (!BoosterDef.Stats.Contains(stat))
+                Error($"unknown booster stat '{stat}' (known: {string.Join(", ", BoosterDef.Stats)})");
+            if (n == 0)
+                Error($"booster stat '{stat}' is 0");
+        }
+        if (booster.MaxPerHost < 0 || booster.MaxHosts < 0)
+            Error("maxPerHost and maxHosts must be >= 0");
+        if (booster.HalfWithout is { } need && !BoosterDef.Stats.Contains(need))
+            Error($"halfWithout names unknown stat '{need}'");
+        if (booster.Chain && b.Width == b.Height)
+            Error("a chain booster must be longer than it is wide, so the chain has a direction");
     }
 
     void ValidateTerrain(List<string> errors)

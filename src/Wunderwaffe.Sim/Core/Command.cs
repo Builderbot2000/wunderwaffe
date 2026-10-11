@@ -17,6 +17,7 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(DeployUnitCommand), "deploy_unit")]
 [JsonDerivedType(typeof(MoveUnitsCommand), "move_units")]
 [JsonDerivedType(typeof(DebugGrantCommand), "debug_grant")]
+[JsonDerivedType(typeof(SetFilterCommand), "set_filter")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -110,5 +111,15 @@ public sealed record DebugGrantCommand(int Player, int TileId, string ItemId, in
     {
         if (sim.TryGetTile(TileId) is { } tile && sim.Content.Items.ContainsKey(ItemId) && Amount > 0)
             tile.Inventory.Add(ItemId, Amount);
+    }
+}
+
+/// <summary>Sets which item the sorter at (X, Y) lets through straight ahead; null lets nothing through (FB-004).</summary>
+public sealed record SetFilterCommand(int Player, int TileId, int X, int Y, string? ItemId) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile)
+            Logistics.SetFilter(sim, tile, Player, X, Y, ItemId);
     }
 }

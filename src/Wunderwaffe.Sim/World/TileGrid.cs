@@ -8,6 +8,7 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     public int Id { get; } = id;
     public string DefId { get; } = def.Id;
     public BuildingKind Kind { get; } = def.Kind;
+    public BuildingDef Def { get; } = def;
 
     /// <summary>Player who placed or landed it; a tile's core belongs to the tile's owner. Need not be the tile's owner.</summary>
     public int Owner { get; internal set; } = owner;
@@ -33,6 +34,19 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     public MachineState? Machine { get; } =
         def.Kind is BuildingKind.Machine or BuildingKind.ImportPort ? new MachineState(recipe) : null;
     public ExportState? Export { get; } = def.Kind == BuildingKind.ExportPort ? new ExportState() : null;
+    public StorageState? Storage { get; } = def.Kind == BuildingKind.Storage ? new StorageState(def.Storage) : null;
+    public BatteryState? Battery { get; } =
+        def.Kind == BuildingKind.Battery ? new BatteryState((long)def.PowerCapacity * Simulation.TicksPerSecond) : null;
+    public RelayState? Relay { get; } = def.Kind switch
+    {
+        BuildingKind.Junction => new RelayState(4),
+        BuildingKind.Router or BuildingKind.Bridge => new RelayState(1),
+        _ => null,
+    };
+    public SorterState? Sorter { get; } = def.Kind == BuildingKind.Sorter ? new SorterState() : null;
+
+    /// <summary>Takes part in a power network (FB-005); see <see cref="BuildingDef.IsPower"/>.</summary>
+    public bool IsPower { get; } = def.IsPower;
 }
 
 /// <summary>
@@ -58,6 +72,8 @@ public sealed class TileGrid
     readonly List<PlacedBuilding> _machines = [];
     readonly List<PlacedBuilding> _exportPorts = [];
     readonly List<PlacedBuilding> _importPorts = [];
+    readonly List<PlacedBuilding> _storages = [];
+    readonly List<PlacedBuilding> _relays = [];
     readonly bool[] _frames;
 
     /// <summary>A rectangular tile of buildable ground with no port zones.</summary>
@@ -116,6 +132,13 @@ public sealed class TileGrid
 
     public IReadOnlyList<PlacedBuilding> ExportPorts => _exportPorts;
     public IReadOnlyList<PlacedBuilding> ImportPorts => _importPorts;
+    public IReadOnlyList<PlacedBuilding> Storages => _storages;
+
+    /// <summary>Junctions, routers and bridges (FB-004).</summary>
+    public IReadOnlyList<PlacedBuilding> Relays => _relays;
+
+    /// <summary>Power networks and boosted stats, rebuilt from the layout when <see cref="Revision"/> changes (FB-005, FB-016).</summary>
+    public TilePower Power { get; } = new();
 
     /// <summary>Cells carrying a unit frame (the floor a unit is built on).</summary>
     public int FrameCount { get; private set; }
@@ -193,6 +216,29 @@ public sealed class TileGrid
     public PlacedBuilding? BuildingAt(int x, int y) =>
         InRect(x, y) ? _buildings[_cells[y * Width + x]] : null;
 
+    /// <summary>Buildings sharing an edge with <paramref name="b"/>'s footprint, each once, in id order.</summary>
+    public List<PlacedBuilding> Touching(PlacedBuilding b)
+    {
+        var found = new List<PlacedBuilding>();
+        void At(int x, int y)
+        {
+            if (BuildingAt(x, y) is { } n && n != b && !found.Contains(n))
+                found.Add(n);
+        }
+        for (int x = b.X; x < b.X + b.Width; x++)
+        {
+            At(x, b.Y - 1);
+            At(x, b.Y + b.Height);
+        }
+        for (int y = b.Y; y < b.Y + b.Height; y++)
+        {
+            At(b.X - 1, y);
+            At(b.X + b.Width, y);
+        }
+        found.Sort((p, q) => p.Id.CompareTo(q.Id));
+        return found;
+    }
+
     /// <summary>Every cell of the footprint is part of this tile.</summary>
     public bool InBounds(int x, int y, int w, int h)
     {
@@ -262,6 +308,8 @@ public sealed class TileGrid
         BuildingKind.Machine => _machines,
         BuildingKind.ExportPort => _exportPorts,
         BuildingKind.ImportPort => _importPorts,
+        BuildingKind.Storage => _storages,
+        BuildingKind.Junction or BuildingKind.Router or BuildingKind.Bridge => _relays,
         _ => null,
     };
 

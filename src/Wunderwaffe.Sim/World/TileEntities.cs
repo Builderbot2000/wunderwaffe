@@ -3,28 +3,39 @@ using Wunderwaffe.Sim.Content;
 namespace Wunderwaffe.Sim.World;
 
 /// <summary>
-/// The tile's entity simulation: machines work and dump output, belts carry items cell by cell, and ports move
-/// items between tiles (FB-004, FB-006, IO-002). Everything is integer and visits buildings in id order, so the
-/// same commands give the same state on every machine (NF-004).
+/// The tile's entity simulation: power networks balance, machines work and dump output, storage and relays pass
+/// items on, belts carry items cell by cell, and ports move items between tiles (FB-004..FB-007, FB-016, IO-002).
+/// Everything is integer and visits buildings in id order, so the same commands give the same state on every
+/// machine (NF-004).
 /// </summary>
 internal static class TileEntities
 {
     const int DumpRetryTicks = 8;
 
+    /// <summary>Most sorters an item may pass through in one tick, so a ring of sorters can't loop forever.</summary>
+    const int MaxSorterChain = 16;
+
     public static void Step(Simulation sim, TileState tile)
     {
+        tile.Stats.Advance(sim.Tick);
         var grid = tile.Grid;
         if (grid.BuildingCount == 0)
             return;
 
+        PowerNet.Step(grid);
+
         foreach (var b in grid.Machines)
         {
-            if (Work(b.Machine!) is { } made && tile.Owner != TileState.Unowned)
+            if (Work(tile, b.Machine!) is { } made && tile.Owner != TileState.Unowned)
                 sim.Player(tile.Owner).AddProduced(made);
-            Dump(sim, tile, b);
+            Dump(sim, tile, b, b.Machine!);
         }
         foreach (var b in grid.ImportPorts)
-            Dump(sim, tile, b);
+            Dump(sim, tile, b, b.Machine!);
+        foreach (var b in grid.Storages)
+            Dump(sim, tile, b, b.Storage!);
+        foreach (var b in grid.Relays)
+            Relay(sim, tile, b);
 
         // Items advance within their cells first, then front items cross into the next building. Crossing
         // checks the state after everyone has moved, so a belt hands over as soon as the next cell has room.
@@ -37,14 +48,20 @@ internal static class TileEntities
             Deliver(sim, tile, b);
     }
 
-    /// <summary>Advances the machine's recipe. Returns the outputs of a batch that finished this tick, if one did.</summary>
-    static IReadOnlyDictionary<string, int>? Work(MachineState m)
+    /// <summary>
+    /// Advances the machine's recipe at its boosted speed, scaled by its power (FB-005, FB-016). Returns the outputs
+    /// of a batch that finished this tick, if one did, with any booster extra included.
+    /// </summary>
+    static IReadOnlyDictionary<string, int>? Work(TileState tile, MachineState m)
     {
         var recipe = m.Recipe;
         if (recipe == null)
             return null;
 
-        if (!m.Working && !TryStart(m, recipe))
+        int rate = m.Working || TryStart(tile, m, recipe)
+            ? (int)((long)MachineState.ProgressPerTick * (100 + m.Boost.Speed) * m.PowerPermille / 100_000)
+            : 0;
+        if (rate <= 0)
         {
             if (m.IdleTicks < int.MaxValue)
                 m.IdleTicks++;
@@ -52,16 +69,25 @@ internal static class TileEntities
         }
         m.IdleTicks = 0;
 
-        if (++m.Progress < recipe.Ticks)
+        m.Progress += rate;
+        if (m.Progress < recipe.Ticks * MachineState.ProgressPerTick)
             return null;
-        foreach (var (id, n) in recipe.Outputs)
-            m.Output[id] = m.Output.GetValueOrDefault(id) + n;
-        m.OutputCount += m.OutputPerBatch;
         m.Working = false;
-        return recipe.Outputs;
+
+        int batches = 1;
+        m.OutputCredit += m.Boost.Output;
+        for (; m.OutputCredit >= 100; m.OutputCredit -= 100)
+            batches++;
+        var made = batches == 1 ? recipe.Outputs : recipe.Outputs.ToDictionary(kv => kv.Key, kv => kv.Value * batches);
+        foreach (var (id, n) in made)
+        {
+            m.AddOutput(id, n);
+            tile.Stats.RecordMade(id, n);
+        }
+        return made;
     }
 
-    static bool TryStart(MachineState m, RecipeDef recipe)
+    static bool TryStart(TileState tile, MachineState m, RecipeDef recipe)
     {
         if (m.OutputCount + m.OutputPerBatch > MachineState.OutputCapacity)
             return false;
@@ -73,7 +99,10 @@ internal static class TileEntities
                 return false;
         }
         foreach (var (id, need) in recipe.Inputs)
+        {
             Take(m.Input, id, need);
+            tile.Stats.RecordUsed(id, need);
+        }
         m.Working = true;
         m.Progress = 0;
         return true;
@@ -88,10 +117,9 @@ internal static class TileEntities
             buffer[id] = left;
     }
 
-    /// <summary>Pushes one output item into an adjacent building that takes it, neighbours in turn.</summary>
-    static void Dump(Simulation sim, TileState tile, PlacedBuilding b)
+    /// <summary>Pushes one held item into an adjacent building that takes it, neighbours in turn.</summary>
+    static void Dump(Simulation sim, TileState tile, PlacedBuilding b, OutputBuffer m)
     {
-        var m = b.Machine!;
         if (m.OutputCount == 0)
             return;
         if (m.DumpWait > 0)
@@ -106,7 +134,10 @@ internal static class TileEntities
         {
             int i = (m.DumpCursor + k) % around;
             var (x, y) = Perimeter(b, i);
-            if (tile.Grid.BuildingAt(x, y) is not { } target || target == b || !TryInsert(sim, tile, target, item, b))
+            if (tile.Grid.BuildingAt(x, y) is not { } target || target == b
+                // Two stores side by side would pass items back and forth for ever.
+                || (b.Kind == BuildingKind.Storage && target.Kind == BuildingKind.Storage)
+                || !TryInsert(sim, tile, target, item, b))
                 continue;
 
             Take(m.Output, item, 1);
@@ -154,8 +185,18 @@ internal static class TileEntities
         }
     }
 
+    /// <summary>The way an item moves going from <paramref name="source"/> into the adjacent <paramref name="target"/>.</summary>
+    static Direction TravelDir(PlacedBuilding source, PlacedBuilding target) =>
+        source.X + source.Width <= target.X ? Direction.East
+        : source.X >= target.X + target.Width ? Direction.West
+        : source.Y + source.Height <= target.Y ? Direction.South
+        : Direction.North;
+
+    static PlacedBuilding? Beside(TileState tile, PlacedBuilding b, Direction d) =>
+        tile.Grid.BuildingAt(b.X + d.Dx(), b.Y + d.Dy());
+
     /// <summary>Offers an item to a building. True if it took it.</summary>
-    static bool TryInsert(Simulation sim, TileState tile, PlacedBuilding target, string item, PlacedBuilding source)
+    static bool TryInsert(Simulation sim, TileState tile, PlacedBuilding target, string item, PlacedBuilding source, int depth = 0)
     {
         switch (target.Kind)
         {
@@ -166,8 +207,7 @@ internal static class TileEntities
             case BuildingKind.Conveyor:
             {
                 // A belt takes items from behind and from the sides, never from the cell it faces.
-                var ahead = Directions.FromRotation(target.Rotation);
-                if (tile.Grid.BuildingAt(target.X + ahead.Dx(), target.Y + ahead.Dy()) == source)
+                if (Beside(tile, target, Directions.FromRotation(target.Rotation)) == source)
                     return false;
                 var belt = target.Belt!;
                 if (!belt.CanAccept)
@@ -191,9 +231,149 @@ internal static class TileEntities
             case BuildingKind.ExportPort:
                 return Send(sim, tile, target, item);
 
+            case BuildingKind.Storage:
+            {
+                var s = target.Storage!;
+                if (s.OutputCount >= s.Capacity)
+                    return false;
+                s.AddOutput(item, 1);
+                return true;
+            }
+
+            case BuildingKind.Junction:
+            {
+                var dir = TravelDir(source, target);
+                var lane = target.Relay!.Lanes[(int)dir];
+                if (lane.Count >= RelayState.JunctionCapacity)
+                    return false;
+                lane.Add(new RelayItem(item, sim.Tick + RelayState.PassTicks, (int)dir));
+                return true;
+            }
+
+            case BuildingKind.Router:
+            {
+                var lane = target.Relay!.Lanes[0];
+                if (lane.Count >= RelayState.RouterCapacity)
+                    return false;
+                lane.Add(new RelayItem(item, sim.Tick + RelayState.PassTicks, source.Id));
+                return true;
+            }
+
+            case BuildingKind.Bridge:
+            {
+                // Never from the building it feeds, or the two would pass items back and forth.
+                var lane = target.Relay!.Lanes[0];
+                if (lane.Count >= RelayState.BridgeCapacity
+                    || Beside(tile, target, Directions.FromRotation(target.Rotation)) == source)
+                    return false;
+                lane.Add(new RelayItem(item, sim.Tick + 1, 0));
+                return true;
+            }
+
+            case BuildingKind.Sorter:
+                return Sort(sim, tile, target, item, source, depth);
+
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// A sorter passes items on at once: its filter item straight ahead, anything else to the left or right,
+    /// alternating, whichever takes it (FB-004). Straight ahead is the way the item was travelling.
+    /// </summary>
+    static bool Sort(Simulation sim, TileState tile, PlacedBuilding sorter, string item, PlacedBuilding source, int depth)
+    {
+        if (depth >= MaxSorterChain)
+            return false;
+        var s = sorter.Sorter!;
+        var dir = TravelDir(source, sorter);
+        if (item == s.Filter)
+            return Beside(tile, sorter, dir) is { } ahead && TryInsert(sim, tile, ahead, item, sorter, depth + 1);
+
+        var left = (Direction)(((int)dir + 3) & 3);
+        var right = (Direction)(((int)dir + 1) & 3);
+        foreach (var side in s.Flip ? [right, left] : new[] { left, right })
+        {
+            if (Beside(tile, sorter, side) is { } next && TryInsert(sim, tile, next, item, sorter, depth + 1))
+            {
+                s.Flip = !s.Flip;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Moves the ready front item of a junction, router or bridge on.</summary>
+    static void Relay(Simulation sim, TileState tile, PlacedBuilding b)
+    {
+        var relay = b.Relay!;
+        switch (b.Kind)
+        {
+            case BuildingKind.Junction:
+                for (int d = 0; d < 4; d++)
+                {
+                    var lane = relay.Lanes[d];
+                    if (lane.Count > 0 && lane[0].ReadyTick <= sim.Tick
+                        && Beside(tile, b, (Direction)d) is { } target && TryInsert(sim, tile, target, lane[0].ItemId, b))
+                        lane.RemoveAt(0);
+                }
+                break;
+
+            case BuildingKind.Router:
+            {
+                var lane = relay.Lanes[0];
+                if (lane.Count == 0 || lane[0].ReadyTick > sim.Tick)
+                    return;
+                for (int k = 0; k < 4; k++)
+                {
+                    int i = (relay.Cursor + k) & 3;
+                    if (Beside(tile, b, Directions.All[i]) is not { } target || target.Id == lane[0].From
+                        || !TryInsert(sim, tile, target, lane[0].ItemId, b))
+                        continue;
+                    lane.RemoveAt(0);
+                    relay.Cursor = (i + 1) & 3;
+                    return;
+                }
+                break;
+            }
+
+            case BuildingKind.Bridge:
+            {
+                var lane = relay.Lanes[0];
+                if (lane.Count == 0 || lane[0].ReadyTick > sim.Tick)
+                    return;
+                if (BridgeLink(tile.Grid, b) is { } link)
+                {
+                    var far = link.Target.Relay!.Lanes[0];
+                    if (far.Count >= RelayState.BridgeCapacity)
+                        return;
+                    far.Add(lane[0] with { ReadyTick = sim.Tick + link.Distance * RelayState.BridgeTicksPerCell });
+                    lane.RemoveAt(0);
+                }
+                else if (Beside(tile, b, Directions.FromRotation(b.Rotation)) is { } target
+                    && TryInsert(sim, tile, target, lane[0].ItemId, b))
+                {
+                    lane.RemoveAt(0);
+                }
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The bridge <paramref name="b"/> sends to: the nearest bridge facing the same way within its range ahead, or
+    /// null if it is the last of its line and puts items into the building it faces.
+    /// </summary>
+    public static (PlacedBuilding Target, int Distance)? BridgeLink(TileGrid grid, PlacedBuilding b)
+    {
+        var d = Directions.FromRotation(b.Rotation);
+        for (int i = 1; i <= b.Def.Range; i++)
+        {
+            if (grid.BuildingAt(b.X + d.Dx() * i, b.Y + d.Dy() * i) is { Kind: BuildingKind.Bridge } other)
+                return other.Rotation == b.Rotation ? (other, i) : null;
+        }
+        return null;
     }
 
     /// <summary>
@@ -213,6 +393,7 @@ internal static class TileEntities
             return false;
 
         link.InFlight.Enqueue(new Shipment(sim.Tick + PortRules.TransitTicksPerTile, item));
+        tile.Stats.RecordSent(neighbor.Id, 1);
         return true;
     }
 
@@ -230,10 +411,7 @@ internal static class TileEntities
                 return; // Landing is blocked: the item waits at the edge and the link backs up.
 
             var imports = neighbor.Grid.ImportPorts;
-            var m = imports[i].Machine!;
-            string item = link.InFlight.Dequeue().ItemId;
-            m.Output[item] = m.Output.GetValueOrDefault(item) + 1;
-            m.OutputCount++;
+            imports[i].Machine!.AddOutput(link.InFlight.Dequeue().ItemId, 1);
             link.Cursor = (i + 1) % imports.Count;
             if (neighbor.Owner != TileState.Unowned)
                 sim.Player(neighbor.Owner).Shipped++;
@@ -258,7 +436,7 @@ internal static class TileEntities
         return -1;
     }
 
-    /// <summary>Everything a building holds, so removing it doesn't destroy items.</summary>
+    /// <summary>Everything a building holds, so removing it doesn't destroy items. Battery charge is lost.</summary>
     public static void Drain(TileState tile, PlacedBuilding b)
     {
         var inv = tile.Inventory;
@@ -284,6 +462,19 @@ internal static class TileEntities
         {
             foreach (var s in link.InFlight)
                 inv.Add(s.ItemId, 1);
+        }
+        if (b.Storage is { } store)
+        {
+            foreach (var (id, n) in store.Output)
+                inv.Add(id, n);
+        }
+        if (b.Relay is { } relay)
+        {
+            foreach (var lane in relay.Lanes)
+            {
+                foreach (var r in lane)
+                    inv.Add(r.ItemId, 1);
+            }
         }
     }
 }
