@@ -1,5 +1,8 @@
 using System;
+using System.Linq;
 using Godot;
+using Wunderwaffe.Game.Input;
+using Wunderwaffe.Game.Render;
 
 namespace Wunderwaffe.Game.Screens;
 
@@ -21,6 +24,9 @@ public static class GameSettings
     const string Section = "display";
     const string MapSection = "map";
     const string HudSection = "hud";
+    const string KeySection = "keys";
+
+    public const int MinUiScale = 75, MaxUiScale = 150;
 
     public const int MaxSnapshotEvery = 20;
 
@@ -29,6 +35,15 @@ public static class GameSettings
 
     /// <summary>The world map redraws its blurred pictures of the tiles every this many switches between views.</summary>
     public static int SnapshotEvery { get; private set; } = 3;
+
+    /// <summary>
+    /// Size of menus and HUD, in percent (UI-005): the window's content scale, so the map's default zoom grows with it
+    /// (the mouse wheel still zooms it freely).
+    /// </summary>
+    public static int UiScale { get; private set; } = 100;
+
+    /// <summary>Player and signal colours (UI-005): normal or one of the colour-blind sets.</summary>
+    public static ColourMode Colours { get; private set; }
 
     /// <summary>Alert groups shown in the HUD's alert list.</summary>
     public static AlertFilter Alerts { get; private set; } = AlertFilter.All;
@@ -45,6 +60,16 @@ public static class GameSettings
             VSync = (bool)cfg.GetValue(Section, "vsync", true);
             SnapshotEvery = Math.Clamp((int)cfg.GetValue(MapSection, "snapshot_every", 3), 1, MaxSnapshotEvery);
             Alerts = (AlertFilter)(int)cfg.GetValue(HudSection, "alerts", (int)AlertFilter.All) & AlertFilter.All;
+            UiScale = Math.Clamp((int)cfg.GetValue(Section, "ui_scale", 100), MinUiScale, MaxUiScale);
+            Colours = (ColourMode)Math.Clamp((int)cfg.GetValue(Section, "colours", 0), 0, (int)ColourMode.BlueYellow);
+            if (cfg.HasSection(KeySection))
+            {
+                foreach (string action in cfg.GetSectionKeys(KeySection).Where(a => InputMap.HasAction(a)))
+                {
+                    var keys = ((string)cfg.GetValue(KeySection, action, "")).Split(',', StringSplitOptions.RemoveEmptyEntries);
+                    InputActions.Set(action, keys.Select(k => (Key)long.Parse(k)));
+                }
+            }
         }
         Apply();
     }
@@ -70,6 +95,23 @@ public static class GameSettings
         Changed?.Invoke();
     }
 
+    public static void SetUiScale(int percent)
+    {
+        UiScale = Math.Clamp(percent, MinUiScale, MaxUiScale);
+        Apply();
+        Save();
+    }
+
+    public static void SetColours(ColourMode mode)
+    {
+        Colours = mode;
+        Apply();
+        Save();
+    }
+
+    /// <summary>Saves the key bindings after a rebind (they live in the input map, not here).</summary>
+    public static void SaveKeys() => Save();
+
     public static void SetAlert(AlertFilter filter, bool on)
     {
         Alerts = on ? Alerts | filter : Alerts & ~filter;
@@ -78,6 +120,9 @@ public static class GameSettings
 
     static void Apply()
     {
+        Palette.Mode = Colours;
+        if (Engine.GetMainLoop() is SceneTree tree)
+            tree.Root.ContentScaleFactor = UiScale / 100f;
         // Headless runs have no window to change.
         if (DisplayServer.GetName() == "headless")
             return;
@@ -93,6 +138,10 @@ public static class GameSettings
         cfg.SetValue(Section, "vsync", VSync);
         cfg.SetValue(MapSection, "snapshot_every", SnapshotEvery);
         cfg.SetValue(HudSection, "alerts", (int)Alerts);
+        cfg.SetValue(Section, "ui_scale", UiScale);
+        cfg.SetValue(Section, "colours", (int)Colours);
+        foreach (string action in InputActions.All.Where(InputActions.Changed))
+            cfg.SetValue(KeySection, action, string.Join(",", InputActions.Keys(action).Select(k => ((long)k).ToString())));
         cfg.Save(Path);
     }
 
@@ -119,8 +168,40 @@ public static class GameSettings
         every.AddChild(spin);
         every.AddChild(Ui.Label("view switches", Ui.SmallFont, Ui.Text));
         col.AddChild(every);
-        col.AddChild(Ui.Label("Key bindings and audio come later (UI-005).", Ui.SmallFont, Ui.Muted));
+        var scale = Ui.Row(8);
+        scale.AddChild(Ui.Label("Interface size", Ui.SmallFont, Ui.Text));
+        var scaleSpin = new SpinBox
+        {
+            MinValue = MinUiScale, MaxValue = MaxUiScale, Step = 5, Value = UiScale, Suffix = " %", FocusMode = Control.FocusModeEnum.None,
+        };
+        scaleSpin.ValueChanged += v => SetUiScale((int)v);
+        scale.AddChild(scaleSpin);
+        col.AddChild(scale);
+
+        var colours = Ui.Row(8);
+        colours.AddChild(Ui.Label("Colours", Ui.SmallFont, Ui.Text));
+        var pick = new OptionButton { FocusMode = Control.FocusModeEnum.None };
+        pick.AddItem("Normal");
+        pick.AddItem("Red-green safe");
+        pick.AddItem("Blue-yellow safe");
+        pick.Selected = (int)Colours;
+        pick.ItemSelected += i => SetColours((ColourMode)(int)i);
+        colours.AddChild(pick);
+        col.AddChild(colours);
+
+        // The bindings screen replaces this one in the same spot.
+        var holder = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        var panel = Ui.Panel(col, 360);
+        col.AddChild(Ui.Button("Key bindings…", () =>
+        {
+            panel.Visible = false;
+            KeyBindingsPanel? keys = null;
+            keys = KeyBindingsPanel.Build(() => { keys!.QueueFree(); panel.Visible = true; });
+            holder.AddChild(keys);
+        }));
+        col.AddChild(Ui.Label("Audio comes later.", Ui.SmallFont, Ui.Muted));
         col.AddChild(Ui.Button("Back", onBack));
-        return Ui.Panel(col, 360);
+        holder.AddChild(panel);
+        return holder;
     }
 }

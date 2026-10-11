@@ -61,11 +61,11 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `scenes/title.tscn` | Root Control with `TitleScreen`. |
 | `scenes/main.tscn` | Match scene; node order matters for input (PauseMenu first sees Esc last). Wires `[Export]`s: UnitTool→BuildTool, Camera→WorldMapView, Hud→BuildTool/WorldMapView/UnitTool/PauseMenu. |
 | `autoload/SimHost.cs` | `SimHost.Instance`. Owns `Content`, `Sim`, tick loop (`_Process`, max 8 ticks/frame), `ViewMode` (Tile/World) + `ViewedTile`, `Selected` units, `WatchView`/`ShowOnlyIn` helpers, new/save/load (`BeginLoad` replays over frames), quit, CLI flags (`--tour`, `--stress`, `--drive`), F3/F4/Tab. `LocalPlayer` (seat), `Send(command)` (the only way the game issues commands: sim alone, `Lockstep` online), `Lockstep`/`IsMultiplayer`, AI seats (`AiDirector`, host only), `view_tile` sent on view changes, `FocusCell` (camera jump), `Net` child, `StartMultiplayer`, `--net-smoke`. |
-| `input/InputActions.cs` | Action names + default key bindings (registered in code). |
+| `input/InputActions.cs` | Action names + default key bindings (registered in code). UI-005: `All`, `Name`, `Keys`, `KeyText`, `Rebind`/`Set`/`ResetAll`, `Changed`; bindings are physical key + modifier bits. |
 | `input/BuildTool.cs` | Build palette (`Tools`, one per building or per recipe for multi-recipe crafters, + frame), selection, `BuildRotation`, placement/removal on mouse, ghost and port-zone drawing, `Preview`, `HoveredZone`, `PickedIsPort`, `HoveredCell`. |
 | `input/UnitTool.cs` | Unit selection (click/box, Shift adds), move orders (tile and world map), G = lift off / land, `Status` text. Active when no building is picked. |
 | `input/CameraController.cs` | Pan/zoom; keeps separate camera per view; fits the world map. Consumes `SimHost.FocusCell`. |
-| `render/Palette.cs` | `CellPx`=16, placeholder colours (spread by id), terrain colours, `Zone`, `Owner`. |
+| `render/Palette.cs` | `CellPx`=16, placeholder colours (spread by id), terrain colours, `Zone`, `Owner`. `ColourMode` (`Normal`, `RedGreen`, `BlueYellow`; `Mode`) drives `Owner`, `Good`/`Bad`, ghosts (UI-005). |
 | `render/Sprites.cs` | `res://assets/sprites/{id}.png` lookup with cache; null if missing (callers fall back to colours). |
 | `render/TileView.cs` | Tile layer: terrain image, MultiMesh layers (ground, deposits, frames, buildings, belt items), outline/zones. Redraws on `Revision`. `Rect` (quad transform), `CellAt` (canvas pos → cell). |
 | `render/TileShapes.cs` | Cached per-tile geometry: border outline, zone runs/outlines/label points. |
@@ -82,7 +82,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `ui/Hud.Hover.cs` | Hover panel: building/deposit under cursor, machine status, port problems. |
 | `ui/TitleScreen.cs` | Title menu, new game (`MatchSettings`), multiplayer page (name/address/port, host/join) and lobby (players, host-editable settings, Start), load progress bar, handles `SimHost.PendingLoad`. |
 | `ui/PauseMenu.cs` | Esc menu (pauses tree alone; never online, OQ-32, and no loading there), save/load/settings/quit; `LoadMenu` (save list, shared with title). |
-| `ui/GameSettings.cs` | `user://settings.cfg`: fullscreen, vsync, world-map snapshot interval; settings panel. `AlertFilter` flags (`Alerts`, `SetAlert`). |
+| `ui/GameSettings.cs` | `user://settings.cfg`: fullscreen, vsync, world-map snapshot interval; settings panel. `AlertFilter` flags (`Alerts`, `SetAlert`). UI-005: `UiScale` (root content scale), `Colours`, key bindings (section `keys`, changed actions only); settings panel opens `KeyBindingsPanel`. |
 | `ui/SaveSlots.cs` | `user://saves/*.json` listing (`SaveInfo`), new path, delete. |
 | `debug/DebugTools.cs` | `Cheat` (F4, items only), `StressFill` (F3 / `--stress`). |
 | `debug/StressBench.cs` | Node that prints ms/tick over 600 ticks after a stress fill; quits if headless. |
@@ -95,6 +95,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `ui/Hud.Alerts.cs` | UI-003: alert list from `GameQuery.AllEvents`, filter toggles per group, combat alerts toast, click jumps (`JumpTo*`), `PlayerName`. |
 | `ui/Hud.Match.cs` | MP-001 end screen (winner, reason, per-player stats); MP-003 status line (waiting, leaver, desync). |
 | `debug/NetSmoke.cs` | `--net-smoke host` / `--net-smoke join`: two headless instances play 1200 ticks over ENet with an AI and report tick, hash, desync. |
+| `ui/KeyBindingsPanel.cs` | UI-005 rebinding screen: every `InputActions.All` action, click then press a key (Esc cancels), reset to defaults. |
 
 ## tests/Wunderwaffe.Sim.Tests (xUnit, real `game/data` content)
 

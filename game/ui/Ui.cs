@@ -13,8 +13,8 @@ public static class Ui
     public static readonly Color Text = new(0.92f, 0.93f, 0.95f);
     public static readonly Color Muted = new(0.62f, 0.65f, 0.7f);
     public static readonly Color Accent = new(0.98f, 0.78f, 0.3f);
-    public static readonly Color Good = new(0.45f, 0.9f, 0.5f);
-    public static readonly Color Bad = new(1f, 0.42f, 0.38f);
+    public static Color Good => Palette.Good;
+    public static Color Bad => Palette.Bad;
     public static readonly Color Warn = new(1f, 0.72f, 0.25f);
     static readonly Color PanelBg = new(0.07f, 0.08f, 0.1f, 0.9f);
     static readonly Color PanelEdge = new(0.28f, 0.31f, 0.36f);
