@@ -296,7 +296,9 @@ public sealed class AiPlayer(int player)
     /// </summary>
     IReadOnlyList<Command>? Attack(Context c)
     {
-        var idle = c.Q.Units(Player).Where(u => !u.Moving && u.MaxSpeed > 0).ToList();
+        // Idle = no order: a unit halted mid-fight on an attack-move is still busy, and an unsupplied one takes no orders.
+        var idle = c.Q.Units(Player)
+            .Where(u => !u.Moving && u.MaxSpeed > 0 && c.Q.UnitOrders(u.Id) is { Order: null, Unsupplied: false }).ToList();
         if (idle.Count < AttackGroup)
             return null;
         var enemies = c.Q.Players().Where(p => p.Id != Player && !p.Eliminated).Select(p => p.Id).ToHashSet();
