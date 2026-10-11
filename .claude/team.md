@@ -9,8 +9,8 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   chain (`goals.json`, `UnlockCondition` types `produce`/`claim`/`ship`/`launch`, counters on `PlayerState`).
 - **Building owner.** `PlacedBuilding.Owner` is the player who placed it (`PlaceBuildingCommand.Player`), the tile's
   owner for a tile core (`Simulation.PlaceCore`), or the unit's owner for blocks put back by landing
-  (`UnitAssembly.Deploy`). It need not equal `TileState.Owner`; placement needs presence, not ownership (see Territory rules below; silo A
-  changes that). Frame cells have no owner: they belong to whoever owns the tile.
+  (`UnitAssembly.Deploy`). It need not equal `TileState.Owner`; placement needs presence, not ownership (see Territory rules
+  below). Frame cells have no owner: they belong to whoever owns the tile.
 - **Hit points.** `BuildingDef.Hp` (`hp` in `buildings.json`, validated > 0) is one block's full HP.
   `PlacedBuilding.Hp` and `UnitBlock.Hp` are the current value (both `internal set`), carried across lift-off
   (`UnitAssembly.Activate`) and landing (`UnitAssembly.Deploy`), hashed in `StateHash`. Nothing deals damage yet (F).
