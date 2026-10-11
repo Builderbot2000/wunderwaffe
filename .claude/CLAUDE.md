@@ -2,7 +2,12 @@
 
 2D factory-builder RTS, proof-of-concept stage. Godot 4.7.2 .NET (C#, net8.0) for presentation over a pure-C#
 deterministic simulation. Requirement ids in comments (WM-xxx, FB-xxx, NF-xxx, OQ-xx...) refer to
-`Wunderwaffe_3037_Requirements.xlsx`. Player-facing behaviour and design notes are in `README.md`.
+`specs/requirements/*.md`. Player-facing behaviour and design notes are in `README.md`.
+
+**Specs**: the Markdown in `specs/` is the source; `specs/xlsx/*.xlsx` is generated for the owner to view. Edit the
+Markdown (format in the `tools/specs.py` docstring), run `python tools/specs.py build`, commit both. If build stops
+because a workbook was edited by hand, run `python tools/specs.py diff`, copy the changes into the Markdown, then
+`build --force`. Never edit the workbooks directly.
 
 **Use the file index below before opening code.** It says where everything lives and what each file owns, so
 read only the files a change touches. When you add, move, split or delete a file, or change what a file owns,

@@ -1,6 +1,6 @@
 # Wunderwaffe 3037
 
-2D factory-builder RTS. Requirements: `Wunderwaffe_3037_Requirements.xlsx`.
+2D factory-builder RTS. Requirements: [`specs/requirements`](specs/requirements/README.md) (workbooks for viewing: `specs/xlsx/`).
 
 ## Setup
 
