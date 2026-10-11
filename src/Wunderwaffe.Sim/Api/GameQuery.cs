@@ -23,6 +23,15 @@ public sealed partial class GameQuery(Simulation sim, int player)
 
     public long Tick => sim.Tick;
 
+    // ---- Content: what can be built and made (the build bar) ----
+
+    /// <summary>Every building, in build-menu order: size, cost, kind.</summary>
+    public IReadOnlyList<BuildingDef> BuildingTypes() => sim.Content.BuildingList;
+
+    /// <summary>The recipes of one building, or every recipe.</summary>
+    public IReadOnlyList<RecipeDef> Recipes(string? buildingId = null) =>
+        buildingId == null ? [.. sim.Content.Recipes.Values] : sim.Content.RecipesByBuilding.GetValueOrDefault(buildingId) ?? [];
+
     // ---- Match and players ----
 
     public MatchView Match() => new(

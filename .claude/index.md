@@ -41,9 +41,10 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Gen/Zones.cs` | Phase 3: per-tile I/O zones by multi-source BFS from borders. |
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
-| `Api/GameQuery.cs` | NF-009 read-only observation API for one player (`new GameQuery(sim, player)`): match, players, tiles, cells, buildings, units, goal, events, checks (`CheckPlace`, `CheckClaim`, `CheckActivate`), `Revision`, planner wrappers. Returns `Views` records. The GUI, AI and external drivers all read through it. |
+| `Api/GameQuery.cs` | NF-009 read-only observation API for one player (`new GameQuery(sim, player)`): match, players, tiles, cells, buildings, units, goal, events, checks (`CheckPlace`, `CheckClaim`, `CheckActivate`), `Revision`, planner wrappers. Returns `Views` records. The GUI, AI and external drivers all read through it. Also `BuildingTypes`/`Recipes` (catalogue). |
 | `Api/Views.cs` | Plain records `GameQuery` returns (`MatchView`, `PlayerView`, `TileSummary`, `TileInfo`, `CellView`, `BuildingView`, `UnitInfo`, `GoalView`, `Spot`, `BeltStep`). Copies, JSON-serialisable. |
 | `Api/Planner.cs` | Read-only layout searches: `FindSpot`, `RouteBelt` (may merge into a belt already ending at the target), `PlanLine` (drill or first stage, stages, belt; optional zone), `FindFrame`, `OutletOf`. Never places; avoids cross-feeding neighbours. |
+| `Api/JsonDriver.cs` | NF-009 text interface: JSON lines `new`/`query` (any `GameQuery` member by reflection, case-insensitive args)/`queries`/`command` (save-file command JSON, own seat only)/`step`; `Run(stdin, stdout)`; errors come back as `{"ok":false}`. |
 | `Ai/AiPlayer.cs` | MP-002 AI seat: stateless `Think` reads `GameQuery`, returns ordinary commands. Priority list Clean/Economy/Steel/Units/Expand/Outposts/Attack. `Expand` is the claim seam (A's scout flow replaces it), `Attack` the combat seam (F). |
 | `Ai/AiDirector.cs` | Runs the AI seats (`GameSetup.IsAi`): `Collect` / `BeforeStep` before each step on the host; replays never run it. |
 | `Core/GameEvents.cs` | UI-003 event list: `GameEventKind` (append only), `GameEvent` (seq, tick, player, tile, unit, item). |
@@ -118,7 +119,8 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats: content changes that break the loop fail here. |
 | `AiTests.cs` | AI plays the whole goal chain alone (NF-009 driver through commands + queries), two AIs replay from the log, no stall over a long match. |
 | `LockstepTests.cs` | Lockstep over a laggy in-memory JSON network: same commands on the same ticks (with a host AI), desync reported to all, seat spoofing and cheats refused. |
+| `JsonDriverTests.cs` | An external client plays the whole demo loop through JSON strings only; bad requests get errors. |
 
 ## Other
 
-`README.md` (player-facing behaviour, design notes), `.claude/team.md` (agent-team conventions: tick order, silo file ownership, rules for shared hotspots), `tools/pixellab_gen.py` (sprite generation via PixelLab API, `PIXELLAB_API_KEY` from env or `.env`), `art/` (sprite pipeline: `jobs.json`, palette, mockups; see `art/README.md`), `.vscode/` (Play/Open Editor launch configs, build/test tasks).
+`README.md` (player-facing behaviour, design notes), `src/Wunderwaffe.Cli` (NF-009 headless driver: `JsonDriver` on stdin/stdout, `--data <dir>`), `.claude/team.md` (agent-team conventions: tick order, silo file ownership, rules for shared hotspots), `tools/pixellab_gen.py` (sprite generation via PixelLab API, `PIXELLAB_API_KEY` from env or `.env`), `art/` (sprite pipeline: `jobs.json`, palette, mockups; see `art/README.md`), `.vscode/` (Play/Open Editor launch configs, build/test tasks).
