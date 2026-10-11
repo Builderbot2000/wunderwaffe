@@ -1,3 +1,5 @@
+using Wunderwaffe.Sim.Content;
+
 namespace Wunderwaffe.Sim.World;
 
 public enum FilterResult
@@ -31,5 +33,20 @@ public static class Logistics
         if (result == FilterResult.Ok)
             tile.Grid.BuildingAt(x, y)!.Sorter!.Filter = itemId;
         return result;
+    }
+
+    /// <summary>
+    /// The bridge <paramref name="b"/> sends to: the nearest bridge facing the same way within its range ahead, or
+    /// null if it is the last of its line and puts items into the building it faces.
+    /// </summary>
+    public static (PlacedBuilding Target, int Distance)? BridgeLink(TileGrid grid, PlacedBuilding b)
+    {
+        var d = Directions.FromRotation(b.Rotation);
+        for (int i = 1; i <= b.Def.Range; i++)
+        {
+            if (grid.BuildingAt(b.X + d.Dx() * i, b.Y + d.Dy() * i) is { Kind: BuildingKind.Bridge } other)
+                return other.Rotation == b.Rotation ? (other, i) : null;
+        }
+        return null;
     }
 }

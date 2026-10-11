@@ -106,8 +106,24 @@ public partial class BuildTool : Node2D
         }
         if (e.IsActionPressed(InputActions.Rotate))
             _rotation = (_rotation + 1) & 3;
+        if (e.IsActionPressed(InputActions.CycleFilter))
+            CycleSorterFilter();
         if (e is InputEventMouseButton { Pressed: true })
             _lastActionCell = new(-1, -1);
+    }
+
+    /// <summary>Sets the hovered sorter to let the next item through: none, then each item in id order (FB-004).</summary>
+    void CycleSorterFilter()
+    {
+        var tile = _host.ViewedTile;
+        var cell = HoveredCell();
+        if (tile.Grid.BuildingAt(cell.X, cell.Y)?.Sorter is not { } sorter)
+            return;
+        var items = _host.Content.Items.Keys.Order(System.StringComparer.Ordinal).Select(k => (string?)k).Prepend(null).ToList();
+        string? next = items[(items.IndexOf(sorter.Filter) + 1) % items.Count];
+        if (Logistics.CheckFilter(_host.Sim, tile, _host.LocalPlayer, cell.X, cell.Y, next) == FilterResult.Ok)
+            _host.Sim.Enqueue(new SetFilterCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y, next));
+        GetViewport().SetInputAsHandled();
     }
 
     public override void _Process(double delta)

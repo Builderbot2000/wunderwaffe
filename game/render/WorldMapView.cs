@@ -38,6 +38,9 @@ public partial class WorldMapView : Node2D
 
     public int SelectedTileId { get; set; }
 
+    /// <summary>The logistics overlay (IO-005): link arrows with items per minute and transit time. L toggles it.</summary>
+    public bool ShowLogistics { get; set; } = true;
+
     public override void _Ready()
     {
         _host = SimHost.Instance;
@@ -99,6 +102,10 @@ public partial class WorldMapView : Node2D
         else if (e.IsActionPressed(InputActions.WorldClaim))
         {
             _host.Sim.Enqueue(new ClaimTileCommand(_host.LocalPlayer, SelectedTileId));
+        }
+        else if (e.IsActionPressed(InputActions.LogisticsToggle))
+        {
+            ShowLogistics = !ShowLogistics;
         }
     }
 
@@ -199,13 +206,14 @@ public partial class WorldMapView : Node2D
             DrawDeposits(tile, new Rect2(box.Position.X, box.End.Y - 8, box.Size.X, 6));
             DrawRegional(tile, new Vector2(box.End.X + 4, box.Position.Y));
         }
-        DrawLinks();
+        if (ShowLogistics)
+            DrawLinks();
         DrawUnits();
     }
 
     /// <summary>
     /// One arrow per pair of linked zones that has export ports, between the two tiles' centres, with a dot for each
-    /// item still on its way (IO-005).
+    /// item still on its way, its items per minute over the last minute and its transit time (IO-002, IO-005).
     /// </summary>
     void DrawLinks()
     {
@@ -233,11 +241,15 @@ public partial class WorldMapView : Node2D
                 }
 
                 int n = group.Count();
-                _overlay.DrawString(ThemeDB.FallbackFont, (a + b) / 2 + perp * 20, n == 1 ? "1 port" : $"{n} ports",
+                _overlay.DrawString(ThemeDB.FallbackFont, (a + b) / 2 + perp * 20, LinkLabel(tile, to.Id, n),
                     HorizontalAlignment.Left, -1, FontSize - 4, Colors.White);
             }
         }
     }
+
+    /// <summary>Throughput and latency of one link, as the world map and side panel show it (IO-002).</summary>
+    public static string LinkLabel(TileState from, int to, int ports) =>
+        $"{(ports == 1 ? "1 port" : $"{ports} ports")} · {from.Stats.SentPerMinute(to)}/min · {PortRules.TransitTicksPerTile / Sim.Simulation.TicksPerSecond} s";
 
     /// <summary>Each unit as a dot where it is in the world, ringed if selected.</summary>
     void DrawUnits()

@@ -54,6 +54,14 @@ public partial class UiTour : Node
         Step(10, "hover shot", () => Shot("05b_hover"));
         Step(1, "port zones", ShowPortZones);
         Step(10, "port zones shot", () => { Shot("05c_port_zones"); Key(Godot.Key.Escape); });
+        Step(5, "production stats", () => Key(Godot.Key.P));
+        Step(10, "production stats shot", () =>
+        {
+            var panel = GetTree().Root.FindChild("Hud", true, false) is Hud ? Find(GetTree().Root, "Close  P") : null;
+            Log(panel != null ? "production stats open" : "FAIL: P didn't open the production stats");
+            Shot("05d_production");
+            Key(Godot.Key.P);
+        });
         Step(5, "world again", () => { Key(Godot.Key.Tab); });
         Step(10, "select coal tile", SelectCoalNeighbour);
         Step(10, "world tile panel", () => { Shot("07_world_coal"); Press("Claim"); });
@@ -62,6 +70,14 @@ public partial class UiTour : Node
             int tiles = _host.Sim.Tiles.Count(t => t.Owner == _host.LocalPlayer);
             Log(tiles == 2 ? "claimed the coal tile" : $"FAIL: own {tiles} tiles after Claim");
             Shot("07b_claimed");
+        });
+        Step(1, "logistics overlay", () => Key(Godot.Key.L));
+        Step(5, "logistics overlay off", () =>
+        {
+            var map = GetTree().Root.FindChild("WorldMapView", true, false) as WorldMapView ?? throw new InvalidOperationException("no WorldMapView");
+            Log(map.ShowLogistics ? "FAIL: L didn't hide the logistics overlay" : "logistics overlay toggles");
+            Shot("07c_logistics_off");
+            Key(Godot.Key.L);
         });
         Step(1, "back to tile", () => Key(Godot.Key.Tab));
         Step(5, "pause", () => { Key(Godot.Key.Escape); });

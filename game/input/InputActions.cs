@@ -23,6 +23,12 @@ public static class InputActions
     public const string WorldEnter = "world_enter";
     public const string WorldClaim = "world_claim";
     public const string UnitToggle = "unit_toggle";
+    /// <summary>F: steps the hovered sorter's filter to the next item (FB-004).</summary>
+    public const string CycleFilter = "build_filter";
+    /// <summary>P: the viewed tile's production statistics (FB-011).</summary>
+    public const string StatsToggle = "ui_stats";
+    /// <summary>L: the world map's logistics overlay, items per minute on each link (IO-005).</summary>
+    public const string LogisticsToggle = "world_logistics";
     public const int Slots = 10;
 
     /// <summary>Slots 1-9 are the number keys; the tenth is 0.</summary>
@@ -44,6 +50,9 @@ public static class InputActions
         Add(WorldEnter, Key.Enter, Key.KpEnter);
         Add(WorldClaim, Key.C);
         Add(UnitToggle, Key.G);
+        Add(CycleFilter, Key.F);
+        Add(StatsToggle, Key.P);
+        Add(LogisticsToggle, Key.L);
         for (int i = 0; i < Slots; i++)
             Add(Slot(i), i == 9 ? Key.Key0 : Key.Key1 + i);
     }

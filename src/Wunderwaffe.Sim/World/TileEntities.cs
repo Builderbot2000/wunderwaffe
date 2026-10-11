@@ -343,7 +343,7 @@ internal static class TileEntities
                 var lane = relay.Lanes[0];
                 if (lane.Count == 0 || lane[0].ReadyTick > sim.Tick)
                     return;
-                if (BridgeLink(tile.Grid, b) is { } link)
+                if (Logistics.BridgeLink(tile.Grid, b) is { } link)
                 {
                     var far = link.Target.Relay!.Lanes[0];
                     if (far.Count >= RelayState.BridgeCapacity)
@@ -359,21 +359,6 @@ internal static class TileEntities
                 break;
             }
         }
-    }
-
-    /// <summary>
-    /// The bridge <paramref name="b"/> sends to: the nearest bridge facing the same way within its range ahead, or
-    /// null if it is the last of its line and puts items into the building it faces.
-    /// </summary>
-    public static (PlacedBuilding Target, int Distance)? BridgeLink(TileGrid grid, PlacedBuilding b)
-    {
-        var d = Directions.FromRotation(b.Rotation);
-        for (int i = 1; i <= b.Def.Range; i++)
-        {
-            if (grid.BuildingAt(b.X + d.Dx() * i, b.Y + d.Dy() * i) is { Kind: BuildingKind.Bridge } other)
-                return other.Rotation == b.Rotation ? (other, i) : null;
-        }
-        return null;
     }
 
     /// <summary>

@@ -41,6 +41,10 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Gen/Zones.cs` | Phase 3: per-tile I/O zones by multi-source BFS from borders. |
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
+| `World/PowerNet.cs` | FB-005: `PowerNetwork` (members, supply, demand, battery store, `Satisfaction` permille), `TilePower` on `TileGrid.Power` (rebuilt on `Revision`; cores, wire and power blocks join what they touch), `PowerNet` queries (`Networks`, `Satisfaction`, `IsPowered`, `OnboardSupply` for units, `SpeedPermille`, `DrawOf`/`SupplyOf`), `Step` (before machines). Hashed. |
+| `World/Boosters.cs` | FB-016 / OQ-25: `BoostStats`, `Boosters.StatsOf`/`Bonus(sim, tile, host, stat)`/`Of`; a booster boosts every matching host it touches, per-type caps from buildings.json, gantry chains count only in a straight line outward. |
+| `World/Logistics.cs` | FB-004: sorter filter (`CheckFilter` → `FilterResult`, `SetFilter` for the filter command), `BridgeLink`. Junction/router/sorter/bridge/storage stepping lives in `TileEntities`. |
+| `World/ProductionStats.cs` | FB-011 / IO-005: `TileState.Stats`, 10 s buckets over 10 minutes of made/used per item and sent per partner tile; `MadePerMinute`/`UsedPerMinute`/`SentPerMinute`, `MadeHistory`/`UsedHistory`, totals. Hashed. |
 
 ## game/ (Godot project; namespaces `Wunderwaffe.Game[.Input/.Render/.Screens/.Debug]`)
 
@@ -78,6 +82,8 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `debug/DebugDriver.cs` | `--drive`: scripted unit session through injected input, screenshot. |
 | `debug/UiTour.cs` | `--tour`: scripted click-through of all screens with screenshots; cleans up its saves. |
 | `data/*.json` | Content: items, recipes, buildings (order = build menu), goals (order = chain), terrain (order = classification; supports `//` comments). |
+| `ui/Hud.Stats.cs` | P: production panel for the viewed tile (FB-011): per item made/used per minute + `HistoryGraph`. |
+| `ui/HistoryGraph.cs` | Small line chart of one item's 10-minute made/used history. |
 
 ## tests/Wunderwaffe.Sim.Tests (xUnit, real `game/data` content)
 
@@ -98,6 +104,9 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `SimulationTests.cs` | Determinism, starting tile. |
 | `StressTests.cs` | NF-001 tick budget with thousands of buildings. |
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats: content changes that break the loop fail here. |
+| `PowerTests.cs` | Core power, wire networks, fuel generator, batteries, shortfall slows machines, unit onboard supply. |
+| `BoosterTests.cs` | OQ-25 boosters: touch rule, multi-host, caps, gantry straight chains, factory radius/cap query, Precision Jig gate. |
+| `LogisticsTests.cs` | Junction, router, sorter filter, bridge, storage. |
 
 ## Other
 

@@ -22,12 +22,45 @@ public partial class Hud
     void RefreshTileSide()
     {
         var tile = _host.ViewedTile;
-        string key = "t" + tile.Id + InventoryKey(tile);
+        var nets = ShownNetworks(tile);
+        string key = "t" + tile.Id + InventoryKey(tile)
+            + string.Join(";", nets.Select(n => $"{n.Supply}/{n.Demand}/{n.Stored / Simulation.TicksPerSecond}"));
         if (key == _sideKey)
             return;
         _sideKey = key;
         Ui.Clear(_sideInfo);
+        AddPower(nets);
         AddInventory(tile);
+    }
+
+    /// <summary>Networks worth a line: those that make, use or store power, busiest first.</summary>
+    static List<PowerNetwork> ShownNetworks(TileState tile) => PowerNet.Networks(tile)
+        .Where(n => n.Supply > 0 || n.Demand > 0 || n.Capacity > 0)
+        .OrderByDescending(n => n.Demand).ThenBy(n => n.Id).ToList();
+
+    const int MaxNetworkLines = 4;
+
+    /// <summary>Each power network's balance (FB-005, UI-002): made, used, batteries, and how much of the demand is met.</summary>
+    void AddPower(List<PowerNetwork> nets)
+    {
+        if (nets.Count == 0)
+            return;
+        _sideInfo.AddChild(Ui.Heading("Power"));
+        foreach (var n in nets.Take(MaxNetworkLines))
+        {
+            var row = Ui.Row(6);
+            var text = $"{n.Members.Count} blocks · makes {n.Supply} · uses {n.Demand}";
+            if (n.Capacity > 0)
+                text += $" · stored {n.Stored / Simulation.TicksPerSecond}/{n.Capacity / Simulation.TicksPerSecond}";
+            var label = Ui.Label(text, Ui.SmallFont, Ui.Text);
+            label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            row.AddChild(label);
+            var color = n.Satisfaction >= 1000 ? Ui.Good : n.Satisfaction > 0 ? Ui.Warn : Ui.Bad;
+            row.AddChild(Ui.Label($"{n.Satisfaction / 10}%", Ui.SmallFont, color));
+            _sideInfo.AddChild(row);
+        }
+        if (nets.Count > MaxNetworkLines)
+            _sideInfo.AddChild(Ui.Label($"and {nets.Count - MaxNetworkLines} more networks", Ui.SmallFont, Ui.Muted));
     }
 
     void AddInventory(TileState tile)
@@ -61,7 +94,7 @@ public partial class Hud
         _claim.Disabled = claim != ClaimResult.Ok;
         _enter.Visible = mine;
 
-        string key = $"w{tile.Id}/{claim}/{tile.Owner}/{tile.Grid.BuildingCount}/" + (mine ? InventoryKey(tile) : "");
+        string key = $"w{tile.Id}/{claim}/{tile.Owner}/{tile.Grid.BuildingCount}/" + (mine ? InventoryKey(tile) + LinkKey(tile) : "");
         if (key == _sideKey)
             return;
         _sideKey = key;
@@ -157,6 +190,8 @@ public partial class Hud
             _sideInfo.AddChild(Ui.Label($"No {item.Name.ToLowerInvariant()} here.", Ui.SmallFont, Ui.Muted));
     }
 
+    static string LinkKey(TileState tile) => string.Join(",", tile.Neighbors.Select(n => tile.Stats.SentPerMinute(n)));
+
     /// <summary>One line per I/O zone that has ports: the neighbour it links to and its ports each way.</summary>
     void AddPorts(TileState tile)
     {
@@ -166,7 +201,8 @@ public partial class Hud
             int exports = tile.Grid.ExportPorts.Count(p => PortRules.PartnerOf(tile.Grid, p) == n);
             int imports = tile.Grid.ImportPorts.Count(p => PortRules.PartnerOf(tile.Grid, p) == n);
             if (exports + imports > 0)
-                lines.Add($"To {Sim.Tiles[n].Name}: {exports} out, {imports} in");
+                lines.Add($"To {Sim.Tiles[n].Name}: {exports} out, {imports} in · sends {tile.Stats.SentPerMinute(n)}/min, "
+                    + $"receives {Sim.Tiles[n].Stats.SentPerMinute(tile.Id)}/min · {PortRules.TransitTicksPerTile / Simulation.TicksPerSecond} s transit");
         }
         if (lines.Count == 0)
             return;

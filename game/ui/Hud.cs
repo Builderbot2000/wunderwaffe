@@ -16,6 +16,7 @@ namespace Wunderwaffe.Game.Screens;
 /// <item><c>Hud.SidePanel.cs</c>: the viewed tile's inventory, or the selected world tile with claim/open (left).</item>
 /// <item><c>Hud.BuildBar.cs</c>: build bar and what the picked building would do (bottom centre).</item>
 /// <item><c>Hud.Hover.cs</c>: what's under the cursor (bottom left).</item>
+/// <item><c>Hud.Stats.cs</c>: the viewed tile's production statistics (P, centred).</item>
 /// </list>
 /// F1 opens the controls, F2 the performance line.
 /// </summary>
@@ -24,6 +25,7 @@ public partial class Hud : Control
     const double SlowRefresh = 0.2;
     const int SideWidth = 400;
     const int RightWidth = 420;
+    const int BuildBarWidth = 1000;
 
     [Export] public BuildTool BuildTool = null!;
     [Export] public WorldMapView WorldMap = null!;
@@ -69,6 +71,7 @@ public partial class Hud : Control
         BuildRight();
         BuildBottom();
         BuildOverlays();
+        BuildStatsPanel();
 
         _seenGoals = MyState?.GoalsDone ?? 0;
         _host.WatchView(this, OnViewChanged);
@@ -91,6 +94,8 @@ public partial class Hud : Control
             _welcome!.QueueFree();
         _buildArea.Visible = tile;
         _claim.GetParent<Control>().Visible = !tile;
+        if (!tile)
+            _statsPanel.Visible = false;
         _sideKey = "";
         RefreshSlow();
     }
@@ -239,6 +244,7 @@ public partial class Hud : Control
     static string HelpText() => string.Join("\n", [
         "World map",
         "    Click selects a tile · double-click or Enter opens one of yours · C claims the selected tile",
+        "    L shows or hides the links between your tiles, with items per minute and transit time",
         "    Tab toggles between the world map and the last tile you viewed",
         "    The map is a blurred picture of each tile, refreshed every few toggles (Settings)",
         "",
@@ -249,6 +255,9 @@ public partial class Hud : Control
         "    Ports go in the I/O zones along the tile's borders: one zone per neighbour, on the side facing it.",
         "    An export port sends to the import ports in the neighbour's zone facing back; items flow both ways.",
         "    Water and peaks can't be built on.",
+        "    Power: machines draw power. A core powers what touches it; power buildings that touch share a network,",
+        "    and wire joins them across gaps. Fuel generators burn fuel for more; batteries store the surplus.",
+        "    Boosters touching a building improve it (hover to see). F sets the hovered sorter's item. P shows production.",
         "",
         "Units",
         "    Lay frame (0) under a unit core and thrusters, hover the core with no building picked and press G",
@@ -263,7 +272,9 @@ public partial class Hud : Control
 
     public override void _UnhandledInput(InputEvent e)
     {
-        if (e.IsActionPressed(InputActions.Help))
+        if (HandleStatsInput(e))
+            GetViewport().SetInputAsHandled();
+        else if (e.IsActionPressed(InputActions.Help))
             Toggle(_help);
         else if (e.IsActionPressed(InputActions.DebugStats))
             _stats.Visible = _showStats = !_showStats;
@@ -302,16 +313,17 @@ public partial class Hud : Control
             _title.Text = _host.ViewedTile.Name;
             RefreshTileSide();
             RefreshHover();
+            RefreshStats();
             _hints.Text = BuildTool.HasTool
                 ? "R rotate · drag to place a line · right-click removes · Esc drops the building"
-                : "Tab world map · 1-9 pick a building · drag to select units";
+                : "Tab world map · 1-9 pick a building · P production · drag to select units";
         }
         else
         {
             _title.Text = "World map";
             RefreshWorldSide();
             _hoverPanel.Visible = _host.Selected.Count > 0 && SetHover(UnitTool.Status);
-            _hints.Text = "Double-click your tile to open it · C claims · Tab back";
+            _hints.Text = "Double-click your tile to open it · C claims · L logistics overlay · Tab back";
         }
     }
 
