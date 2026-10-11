@@ -61,9 +61,9 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/ProductionStats.cs` | FB-011 / IO-005: `TileState.Stats`, 10 s buckets over 10 minutes of made/used per item and sent per partner tile; `MadePerMinute`/`UsedPerMinute`/`SentPerMinute`, `MadeHistory`/`UsedHistory`, totals. Hashed. |
 | `Simulation.Scaling.cs` | Partial (C): `RateModeEnabled` (on for `NewGame`, off for hand-built test sims), per-tile `TileRateState`, abstract nodes (`Abstract`, `IsAbstract`), `SnapshotIntervalTicks`/`LatestSnapshot` (taken at tick start), snapshot restore helpers. |
 | `Core/Snapshot.cs` | NF-008 state snapshot (`Capture`, `Restore`): tiles, buildings + entity state, rate accumulators, players, units, abstract nodes. Every new piece of sim state needs a field here too, or snapshot loads fall back to full replay. |
-| `World/RateMode.cs` | FB-012..014 tick phase 6: steps rate-mode tiles at their rates (stalls when an import buffer or export link can't cover a tick), runs `AbstractTravel`, then picks each tile's mode for the next tick (viewed by any player or `ContestedTiles` → full). `IsFullSim`, `RatesOf`. Belts/machines freeze in rate mode, so switching is lossless. |
-| `World/RateModel.cs` | Solves per-item rates from the building/belt graph (OQ-14), per group of port-linked tiles, iterating until imports/exports agree, so shortfalls propagate (FB-014). Fixed point: `One` = 1 item/tick (`Shift`=24). |
-| `World/TileRates.cs` | `FlowKind` (Core, Made, Draw, Export), `Flow` (sorted, hashed, saved), `TileRates` (`Flows`, `RateOf`, `Total`). |
+| `World/RateMode.cs` | FB-012..014 tick phase 6: steps rate-mode tiles at their rates (stalls when an import buffer or export link can't cover a tick), runs `AbstractTravel`, then picks each tile's mode for the next tick (viewed by any player or `ContestedTiles` → full). `IsFullSim`, `RatesOf`. Belts/machines freeze in rate mode (never touches `Working`/`IdleTicks`), so switching is lossless. Records made/used/sent in `ProductionStats`. |
+| `World/RateModel.cs` | Solves per-item rates from the building/belt graph (OQ-14), per group of port-linked tiles, iterating until imports/exports agree, so shortfalls propagate (FB-014). Machines at boosted speed/output and their power network's steady-state satisfaction (`Rebalance`; generators by fuel burnt, batteries ignored). Fixed point: `One` = 1 item/tick (`Shift`=24). |
+| `World/TileRates.cs` | `FlowKind` (Core, Produced, Draw, Export, Used), `Flow` (sorted, hashed, saved), `TileRates` (`Flows`, `RateOf`, `Total`). |
 | `World/AbstractTravel.cs` | UC-009: units on rate-mode tiles become `AbstractNode`s moving along planned waypoints at cruise speed with no physics; materialise on promotion. `Eta`, `TolerancePercent`. |
 | `World/StressScene.cs` | NF-001 benchmark world (8 viewed full-sim tiles x 2,000 buildings + 200 rate-mode factories), shared by `StressTests` and `--stress`; `Fill`. |
 
@@ -107,7 +107,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `ui/BlueprintLibrary.cs` | `user://blueprints.json`, shared across matches: `BlueprintEntry` (name, tags, blueprint), `Add`, `Rename`, `SetTags`, `Duplicate`, `Delete`, `Revision`. |
 | `ui/Hud.Blueprints.cs` | Library panel (B): entries with stats, rename/tags/duplicate/delete/place/build in factory. Factory panel: status, per-stage progress (WW-004), buffer, missing. |
 | `data/*.json` | Content: items, recipes, buildings (order = build menu), goals (order = chain), terrain (order = classification; supports `//` comments). |
-| `ui/Hud.Stats.cs` | P: production panel for the viewed tile (FB-011): per item made/used per minute + `HistoryGraph`. |
+| `ui/Hud.Stats.cs` | O: production panel for the viewed tile (FB-011): per item made/used per minute + `HistoryGraph`. |
 | `ui/HistoryGraph.cs` | Small line chart of one item's 10-minute made/used history. |
 
 ## tests/Wunderwaffe.Sim.Tests (xUnit, real `game/data` content)
@@ -116,7 +116,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 |---|---|
 | `Harness.cs` | `NewSim` (empty sim, real content), `Tile` (hand-built, stocked), `Open`, `Place`, `Ore`, `Belt`, `Run`. Players `Me`=0, `Them`=1. |
 | `TestContent.cs` | Loads the real JSON from the output dir; `Load(edit)` with buildings.json edited. |
-| `TimingCollection.cs` | Non-parallel collection for wall-time tests. |
+| `TimingCollection.cs` | Non-parallel collection for wall-time tests; `Timing.PreferFastCores` (opts the test host out of Windows power throttling, which parked it on E-cores at 2-2.5x the tick time). |
 | `ContentTests.cs` | Content loads; validation errors. |
 | `PlacementTests.cs` | Bounds, overlap, deposits, recipe choice, rotation, terrain. |
 | `EntityTests.cs` | Machines, belts (speed, throughput, corners, merging, spacing), dumping, removal returns items. |
@@ -127,7 +127,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `UnitTests.cs` | Frames, lift-off, physics, pathing, borders, collisions, landing. |
 | `SaveTests.cs` | Save/replay round trip, every command kind serialises, divergence detection. |
 | `SimulationTests.cs` | Determinism, starting tile. |
-| `StressTests.cs` | NF-001 tick budget with thousands of buildings, and the `StressScene` (8 full + 200 rate-mode tiles) under 4 ms/tick. Best of several windows. |
+| `StressTests.cs` | NF-001 tick budget with thousands of buildings, and the `StressScene` (8 full + 200 rate-mode tiles) under 4 ms/tick. `Timing.PreferFastCores`, warm-up, best of several windows. |
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats (scout lift-off, landing in the coal circle): content changes that break the loop fail here. |
 | `TerritoryTests.cs` | Presence, paying from a neighbour (buildings, frames, blueprints), circle claims and wipes, enemy circles, landing and lifting off again from an unowned tile, Contested, cores, platforms, circle placement, fair starts, starting scout vs UD-003/UD-004, unreachable circles. |
 | `BlueprintTests.cs` | Recording, identical rebuild (UD-001), transforms, all-or-nothing placement, lift-off validation, stats, Wunderwaffe class, upkeep. |
@@ -138,7 +138,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `PowerTests.cs` | Core power, wire networks, fuel generator, batteries, shortfall slows machines, unit onboard supply. |
 | `BoosterTests.cs` | OQ-25 boosters: touch rule, multi-host, caps, gantry straight chains, factory radius/cap query, Precision Jig gate. |
 | `LogisticsTests.cs` | Junction, router, sorter filter, bridge, storage. |
-| `RateModeTests.cs` | Rate mode vs full sim within 5% over 5 min, rates from the graph, promotion/demotion (view, Contested) loses nothing, import shortfalls propagate along a chain. |
+| `RateModeTests.cs` | Rate mode vs full sim within 5% over 5 min, rates from the graph, promotion/demotion (view, Contested) loses nothing, import shortfalls propagate along a chain, power shortfall, boosters, fuel generator and stats. |
 | `AbstractTravelTests.cs` | Abstract nodes, travel time vs physics, materialising when viewed or Contested. |
 | `SnapshotTests.cs` | Snapshot restore matches, latest snapshot + later commands match a full replay, 30-minute determinism (`Category=Long`, a few seconds). |
 
