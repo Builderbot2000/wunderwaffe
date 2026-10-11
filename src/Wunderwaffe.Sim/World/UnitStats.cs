@@ -74,6 +74,5 @@ public sealed record UnitStats(
     /// <summary>Seam for factory's power API: <c>PowerNet.OnboardSupply(def)</c> (generator supply plus battery discharge).</summary>
     static int OnboardSupply(BuildingDef def) => 0;
 
-    /// <summary>Seam for combat's weapons: <c>Combat.Dps(def)</c>.</summary>
-    static int WeaponDps(BuildingDef def) => 0;
+    static int WeaponDps(BuildingDef def) => Combat.Dps(def);
 }

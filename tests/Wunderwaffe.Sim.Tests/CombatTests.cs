@@ -72,6 +72,19 @@ public class CombatTests
     }
 
     [Fact]
+    public void AGunshipBlueprintCountsItsDpsAndBuildsTheGunLast()
+    {
+        var content = TestContent.Load();
+        var bp = new Blueprint(
+            [new BlueprintBlock("gun_turret", 0, 0, 0), new BlueprintBlock("unit_core", 1, 0, 0), new BlueprintBlock("thruster", 2, 0, 0)],
+            [new BlueprintCell(0, 0), new BlueprintCell(1, 0), new BlueprintCell(2, 0)]);
+        Assert.Equal(Combat.Dps(content.Buildings["gun_turret"]), UnitStats.Of(content, bp).Dps);
+        // UD-006: frame, then systems, then armament.
+        var last = UnitFactory.StepsOf(content, bp, 0, 0)[^1];
+        Assert.Equal((BuildStage.Armament, 0), (last.Stage, last.Block));
+    }
+
+    [Fact]
     public void AWeaponWithoutAWeaponBlockIsRejected()
     {
         string buildings = """
@@ -196,6 +209,19 @@ public class CombatTests
         Assert.Null(mine.Grid.WreckAt(6, 6));
         Assert.Equal(copper + 20 * Balance.WreckRefundPercent / 100, Items(mine, "copper_ore"));
         Assert.Equal(PlaceResult.Ok, Placement.Check(sim, mine, Me, "conveyor", 6, 6, 0, null, out _));
+    }
+
+    [Fact]
+    public void TerritoryDestructionLeavesAWreckToo()
+    {
+        // Circle wipes and debug destroy go through Territory.DestroyBuilding, which forwards to combat (CB-006).
+        var (sim, mine, _) = Arena();
+        Put(sim, mine, Me, "wall", 5, 5);
+        sim.Step();
+        sim.Enqueue(new DebugDestroyCommand(Me, mine.Id, 5, 5));
+        sim.Step();
+        Assert.Null(mine.Grid.BuildingAt(5, 5));
+        Assert.Equal("wall", mine.Grid.WreckAt(5, 5)?.DefId);
     }
 
     [Fact]

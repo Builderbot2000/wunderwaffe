@@ -114,8 +114,8 @@ public static class UnitFactory
     /// <summary>Seam for factory's booster query: <c>Boosters.Bonus(sim, tile, host, stat)</c>.</summary>
     static int BoosterBonus(Simulation sim, TileState tile, PlacedBuilding host, string stat) => 0;
 
-    /// <summary>Seam for combat's weapon blocks (<c>def.Kind == BuildingKind.Weapon</c>), built last.</summary>
-    static bool IsArmament(BuildingDef def) => false;
+    /// <summary>Weapon blocks (CB-001) are the armament stage, built last.</summary>
+    static bool IsArmament(BuildingDef def) => def.Kind == BuildingKind.Weapon;
 
     /// <summary>
     /// What a blueprint counts against the block cap: frame cells for a unit (its size, as for lift-off), buildings for a

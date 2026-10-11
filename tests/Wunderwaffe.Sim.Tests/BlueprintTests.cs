@@ -293,8 +293,10 @@ public class BlueprintTests
     static Simulation UpkeepSim() =>
         new(TestContent.Load(json => json.Replace("\"kind\": \"thruster\",", "\"kind\": \"thruster\", \"upkeep\": { \"iron_ore\": 1 },")));
 
+    /// <summary>A scout next to a core, whose resource radius (FB-018) pays its upkeep from the tile.</summary>
     static Unit Scout(Simulation sim, TileState tile)
     {
+        Place(sim, tile, "core", 4, 14);
         Frame(sim, tile, 9, 10, 3);
         Place(sim, tile, "thruster", 9, 10);
         Place(sim, tile, "unit_core", 10, 10);
@@ -304,7 +306,7 @@ public class BlueprintTests
     }
 
     [Fact]
-    public void UpkeepIsPaidEachMinuteFromTheOwnedTileUnderTheUnit()
+    public void UpkeepIsPaidEachMinuteFromTheSupplierInReach()
     {
         var sim = UpkeepSim();
         var tile = Tile(sim);
@@ -317,6 +319,19 @@ public class BlueprintTests
         Run(sim, 2);
         Assert.Equal(iron - 2, Items(tile, "iron_ore"));
         Assert.False(unit.Unsupplied);
+    }
+
+    [Fact]
+    public void UpkeepComesFromOnboardStorageFirst()
+    {
+        var sim = UpkeepSim();
+        var tile = Tile(sim);
+        var unit = Scout(sim, tile);
+        unit.Cargo.Add("iron_ore", 5);
+        long iron = Items(tile, "iron_ore");
+        Run(sim, Balance.UpkeepPeriod);
+        Assert.Equal(3, unit.Cargo.Get("iron_ore"));
+        Assert.Equal(iron, Items(tile, "iron_ore"));
     }
 
     [Fact]

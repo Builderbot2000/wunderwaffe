@@ -20,17 +20,16 @@ internal static class UnitUpkeep
                 continue;
 
             var upkeep = UnitStats.Of(sim.Content, u).Upkeep;
-            bool paid = upkeep.Count == 0 || (Supplier(sim, u)?.TryTake(upkeep) ?? false);
+            bool paid = upkeep.Count == 0 || (Supplier(sim, u, upkeep)?.TryTake(upkeep) ?? false);
             u.Unsupplied = !paid;
             u.UpkeepDue = sim.Tick + (paid ? Balance.UpkeepPeriod : Simulation.TicksPerSecond);
         }
     }
 
     /// <summary>
-    /// Where the unit pays from. Seam until combat's resource radius (FB-018) lands: then onboard storage first
-    /// (<c>Unit.Cargo</c>), else <c>ResourceRadius.SupplierFor(sim, unit)</c>. For now the inventory of a tile its owner
-    /// holds and it is over stands in for the core's radius; elsewhere it can't pay.
+    /// Where the unit pays from: its onboard storage (<see cref="Unit.Cargo"/>) when that holds the whole upkeep, else
+    /// the friendly supplier whose resource radius covers it (FB-018, <see cref="ResourceRadius.SupplierFor"/>).
     /// </summary>
-    static Inventory? Supplier(Simulation sim, Unit u) =>
-        sim.Tiles[u.TileId] is { } tile && tile.Owner == u.Owner ? tile.Inventory : null;
+    static Inventory? Supplier(Simulation sim, Unit u, IReadOnlyDictionary<string, int> upkeep) =>
+        u.Cargo.Has(upkeep) ? u.Cargo : ResourceRadius.SupplierFor(sim, u);
 }
