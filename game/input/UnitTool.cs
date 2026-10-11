@@ -12,7 +12,7 @@ namespace Wunderwaffe.Game.Input;
 /// Unit control (UC-001 to UC-006). Tile view, with no building picked: left-click or drag a box selects your units
 /// (Shift adds), right-click sends the selection to that cell, and a cell past the tile's border sends it into the tile
 /// there. World map: right-click sends the selection to the clicked spot. H holds, P then right-click patrols, X
-/// retreats, Q makes the selection a squad, F cycles its formation, V cycles the stance, E escorts the unit under the
+/// retreats, Q makes the selection a squad, T cycles its formation, V cycles the stance, E escorts the unit under the
 /// cursor, Y over a unit core then right-click sets its rally point. Ctrl+1-9 stores the selection as a control group,
 /// Alt+1-9 recalls it. G over a unit core lifts the framed blocks around it off as a unit; G with units selected lands
 /// them. The selection is shared between both views, in <see cref="SimHost.Selected"/>.
@@ -44,6 +44,9 @@ public partial class UnitTool : Node2D
     readonly List<int>[] _groups = [.. Enumerable.Range(0, 9).Select(_ => new List<int>())];
 
     public string Status { get; private set; } = "";
+
+    /// <summary>A refused order, for the HUD to toast.</summary>
+    public event System.Action<string>? Notice;
 
     public override void _Ready()
     {
@@ -319,6 +322,15 @@ public partial class UnitTool : Node2D
         if (_host.Selected.Count == 0)
             return;
         int[] ids = [.. _host.Selected.Order()];
+        // The sim refuses a tile no selected unit's locomotion can reach (MoveResult.Unreachable); say so here, since
+        // commands return nothing. Every tile has a victory circle, ocean tiles too, and a ground scout can't get there.
+        if (!ids.Any(id => sim.UnitById(id) is { MaxSpeed: > 0 } u && UnitNav.Plan(sim, u, tileId, x, y) != null))
+        {
+            Notice?.Invoke(ids.Any(id => sim.UnitById(id) is { MaxSpeed: > 0 })
+                ? $"Can't reach {sim.Tiles[tileId].Name}: the selected units can't cross the terrain on the way"
+                : "The selected units can't move: no thruster");
+            return;
+        }
         sim.Enqueue(armed == Armed.Patrol
             ? new PatrolUnitsCommand(me, ids, tileId, x, y)
             : new MoveUnitsCommand(me, ids, tileId, x, y));

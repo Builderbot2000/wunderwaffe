@@ -70,6 +70,7 @@ public partial class Hud : Control
         BuildBottom();
         BuildOverlays();
         BuildBlueprints();
+        UnitTool.Notice += text => Toast(text, Ui.Warn);
 
         _seenGoals = MyState?.GoalsDone ?? 0;
         _host.WatchView(this, OnViewChanged);
