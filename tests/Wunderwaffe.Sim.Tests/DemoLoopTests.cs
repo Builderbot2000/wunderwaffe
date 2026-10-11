@@ -34,6 +34,7 @@ public class DemoLoopTests(ITestOutputHelper output)
         Ore(home, "iron_ore", 42, 46);      // West: the same.
         Ore(home, "copper_ore", 46, 51);    // South: copper drill -> smelter -> core.
         Ore(home, "iron_ore", 92, 51);      // East edge: plates for the steel mill.
+        Ore(home, "copper_ore", 94, 42);    // East edge: copper for the fuel press that powers the mill.
         Ore(coal, "coal", 1, 46);
 
         void Do(Command c) => sim.Enqueue(c);
@@ -64,26 +65,43 @@ public class DemoLoopTests(ITestOutputHelper output)
         Assert.Equal(Me, coal.Owner);
         Place(coal, "drill", 1, 46);
         Place(coal, "export_port", 0, 47, West);
+        // The coal drill is far from the new tile's core: wire it in along row 46 (FB-005).
+        var coalCore = coal.Grid.Buildings.Single(b => b.DefId == Simulation.CoreBuildingId);
+        Assert.InRange(coalCore.Y, 44, 46);
+        for (int x = 3; x < coalCore.X; x++)
+            Place(coal, "wire", x, 46);
         Place(home, "import_port", 95, 47, East);
         // A belt from beside the future steel mill back to the core carries steel (and some copper ore) home.
         for (int x = 49; x <= 91; x++)
             Place(home, "conveyor", x, 48, West);
         sim.Step();
-        Assert.Equal(3, coal.Grid.BuildingCount);
+        Assert.Equal(3 + coalCore.X - 3, coal.Grid.BuildingCount);
 
-        // Goal 5: the steel mill, once affordable; it needs plates from its own smelter and coal from the port.
-        Assert.True(RunUntil(() => home.Inventory.Has(sim.Content.Buildings["steel_mill"].Cost), 900),
+        // Goal 5: the steel mill, once affordable; it needs plates from its own smelter and coal from the port. It
+        // draws more than a core gives and stands far from it, so a fuel generator on top of it powers the corner:
+        // copper drill -> fuel press -> generator, all touching (FB-005). A wire along row 47 from the core's east
+        // drill to the mill lets core power start the fuel line, which then carries the mill.
+        string[] corner = ["steel_mill", "smelter", "drill", "drill", "fuel_press", "fuel_generator"];
+        bool CanBuildCorner() => corner.SelectMany(b => sim.Content.Buildings[b].Cost)
+            .GroupBy(kv => kv.Key).All(g => home.Inventory.Get(g.Key) >= g.Sum(kv => kv.Value) + (g.Key == "copper_ore" ? 41 : 0));
+        Assert.True(RunUntil(CanBuildCorner, 900),
             $"steel mill not reached: {me().ProducedOf("iron_plate")} plates, inventory {Inv(home)}");
         Place(home, "steel_mill", 92, 46);
         Place(home, "smelter", 92, 49, recipe: "smelt_iron");
         Place(home, "drill", 92, 51);
+        Place(home, "fuel_generator", 92, 44);
+        Place(home, "fuel_press", 94, 44, recipe: "press_fuel");
+        Place(home, "drill", 94, 42);
+        for (int x = 51; x <= 91; x++)
+            Place(home, "wire", x, 47);
         sim.Step();
         Assert.Equal("steel_mill", home.Grid.BuildingAt(92, 46)?.DefId);
+        Assert.Equal("fuel_press", home.Grid.BuildingAt(94, 44)?.DefId);
 
         // Goal 6: a unit core on frame, lifted off once the steel goal is met and the core is affordable.
         var unitCost = sim.Content.Buildings["unit_core"].Cost;
         Assert.True(RunUntil(() => me().ProducedOf("steel") >= 20 && home.Inventory.Has(unitCost), 900),
-            $"unit core not reached: {me().ProducedOf("steel")} steel, shipped {me().Shipped}, inventory {Inv(home)}");
+            $"unit core not reached: mill {home.Grid.BuildingAt(92, 46)!.Machine!.Status} {home.Grid.BuildingAt(92, 46)!.Machine!.MissingInput}, gen {home.Grid.BuildingAt(92, 44)!.Machine!.Status}, press {home.Grid.BuildingAt(94, 44)!.Machine!.Status} {home.Grid.BuildingAt(94, 44)!.Machine!.PowerPermille}, nets {string.Join(";", home.Grid.Power.Networks.Select(n => $"{n.Members.Count}:{n.Supply}/{n.Demand}"))}; {me().ProducedOf("steel")} steel, shipped {me().Shipped}, inventory {Inv(home)}");
         for (int x = 60; x <= 62; x++)
             Do(new PlaceFrameCommand(Me, home.Id, x, 40));
         Place(home, "unit_core", 61, 40);

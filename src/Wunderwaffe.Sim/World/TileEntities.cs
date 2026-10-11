@@ -135,8 +135,8 @@ internal static class TileEntities
             int i = (m.DumpCursor + k) % around;
             var (x, y) = Perimeter(b, i);
             if (tile.Grid.BuildingAt(x, y) is not { } target || target == b
-                // Two stores side by side would pass items back and forth for ever.
-                || (b.Kind == BuildingKind.Storage && target.Kind == BuildingKind.Storage)
+                // Storage unloads only onto belts leading away, so it never churns items with its neighbours.
+                || (b.Kind == BuildingKind.Storage && target.Kind != BuildingKind.Conveyor)
                 || !TryInsert(sim, tile, target, item, b))
                 continue;
 

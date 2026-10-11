@@ -50,7 +50,7 @@ public enum BuildingKind
     /// <summary>Improves the hosts it touches (FB-016); see <see cref="BoosterDef"/>. No behaviour of its own.</summary>
     Booster,
 
-    /// <summary>Holds up to <see cref="BuildingDef.Storage"/> items and passes them on to its neighbours (FB-007).</summary>
+    /// <summary>Holds up to <see cref="BuildingDef.Storage"/> items of any kind and unloads them onto belts leading away (FB-007).</summary>
     Storage,
 
     /// <summary>Passes items straight across, so two lines can cross (FB-004).</summary>
@@ -130,8 +130,13 @@ public sealed record BuildingDef(
     int Range = 0,
     BoosterDef? Booster = null)
 {
-    /// <summary>Takes part in a power network (FB-005): draws, supplies, stores or conducts.</summary>
-    public bool IsPower => Power > 0 || PowerSupply > 0 || Kind is BuildingKind.Wire or BuildingKind.Battery;
+    /// <summary>
+    /// Takes part in a tile's power network (FB-005): draws, supplies, stores or conducts. Unit cores and thrusters
+    /// only use power on a unit, so they are inert on a tile.
+    /// </summary>
+    public bool IsPower =>
+        Kind is not (BuildingKind.UnitCore or BuildingKind.Thruster)
+        && (Power > 0 || PowerSupply > 0 || Kind is BuildingKind.Wire or BuildingKind.Battery);
 
     /// <summary>Width and height after <paramref name="rotation"/> quarter turns: odd turns swap them.</summary>
     public (int W, int H) Footprint(int rotation) => (rotation & 1) == 0 ? (Width, Height) : (Height, Width);

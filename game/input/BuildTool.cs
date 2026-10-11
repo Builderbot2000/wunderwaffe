@@ -88,7 +88,8 @@ public partial class BuildTool : Node2D
                 _tools.Add(new Tool(def.Id, null, def.Name) { IconId = def.Id });
             }
         }
-        _tools.Add(new Tool(FrameId, null, "Unit Frame") { IconId = Sprites.Frame });
+        // The frame keeps hotkey 0, the tenth slot; buildings past the ninth are picked from the build bar.
+        _tools.Insert(System.Math.Min(InputActions.Slots - 1, _tools.Count), new Tool(FrameId, null, "Unit Frame") { IconId = Sprites.Frame });
     }
 
     public override void _UnhandledInput(InputEvent e)

@@ -146,7 +146,7 @@ public sealed class MachineState(RecipeDef? recipe) : OutputBuffer
         Recipe?.Inputs.Where(kv => Input.GetValueOrDefault(kv.Key) < kv.Value).Select(kv => kv.Key).FirstOrDefault();
 }
 
-/// <summary>A storage building's contents (FB-007): any items up to <see cref="Capacity"/>, passed on to neighbours.</summary>
+/// <summary>A storage building's contents (FB-007): any items up to <see cref="Capacity"/>, unloaded onto adjacent belts.</summary>
 public sealed class StorageState(int capacity) : OutputBuffer
 {
     public int Capacity { get; } = capacity;

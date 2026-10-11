@@ -172,8 +172,8 @@ public sealed class ContentDb
         void Error(string message) => errors.Add($"building '{b.Id}': {message}");
         if (b.Power < 0 || b.PowerSupply < 0 || b.PowerCapacity < 0 || b.Discharge < 0 || b.Storage < 0 || b.Range < 0)
             Error("power, powerSupply, powerCapacity, discharge, storage and range must be >= 0");
-        if (b.PowerSupply > 0 && b.Kind is not (BuildingKind.Core or BuildingKind.Machine))
-            Error("only cores and machines (generators) supply power");
+        if (b.PowerSupply > 0 && b.Kind is not (BuildingKind.Core or BuildingKind.Machine or BuildingKind.UnitCore))
+            Error("only cores, unit cores and machines (generators) supply power");
         if (b.Kind == BuildingKind.Battery && (b.PowerCapacity <= 0 || b.Discharge <= 0))
             Error("a battery needs powerCapacity and discharge > 0");
         if (b.Kind == BuildingKind.Storage && b.Storage <= 0)

@@ -75,7 +75,7 @@ public class StressTests(ITestOutputHelper output)
         // Each tile: 30 rows of drill -> 39 belt cells -> core, all running. About 1,200 buildings and a
         // thousand-plus belt cells carrying items, per tile.
         const int rows = 30;
-        var sim = new Simulation(TestContent.Load());
+        var sim = new Simulation(TestContent.Unpowered());
         for (int t = 0; t < Tiles; t++)
         {
             var tile = sim.AddTile(t, 0, owner: 0);

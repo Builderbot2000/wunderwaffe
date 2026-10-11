@@ -15,6 +15,11 @@ public sealed class PowerNetwork(int id)
     /// <summary>Every member, in id order.</summary>
     public List<PlacedBuilding> Members { get; } = [];
 
+    // Members by role, in id order, so the per-tick balance only visits what matters.
+    internal List<PlacedBuilding> Sources { get; } = [];
+    internal List<PlacedBuilding> Consumers { get; } = [];
+    internal List<PlacedBuilding> Batteries { get; } = [];
+
     /// <summary>Power made this tick by cores and burning generators.</summary>
     public long Supply { get; internal set; }
 
@@ -85,7 +90,10 @@ public sealed class TilePower
                 }
             }
             net.Members.Sort((p, q) => p.Id.CompareTo(q.Id));
-            net.Capacity = net.Members.Sum(m => m.Battery?.Capacity ?? 0);
+            net.Sources.AddRange(net.Members.Where(m => m.Def.PowerSupply > 0));
+            net.Consumers.AddRange(net.Members.Where(m => m.Def.Power > 0));
+            net.Batteries.AddRange(net.Members.Where(m => m.Battery != null));
+            net.Capacity = net.Batteries.Sum(m => m.Battery!.Capacity);
         }
 
         foreach (var m in grid.Machines)
@@ -96,7 +104,7 @@ public sealed class TilePower
 /// <summary>
 /// Power rules (FB-005). Every building with a part in power (it draws, supplies, stores or is a wire) joins every
 /// such building it touches; each connected group is a network. Each tick a network adds up its supply (cores
-/// always, generators while burning) and its demand (machines while working, other consumers always, scaled by
+/// always, generators while burning) and its demand (machines while busy, other consumers always, scaled by
 /// power boosters). A surplus charges batteries and a shortfall drains them, each battery at most
 /// <see cref="BuildingDef.Discharge"/> a tick, lowest id first. Whatever is still short slows every consumer on the
 /// network by the same share.
@@ -118,9 +126,22 @@ public static class PowerNet
     /// </summary>
     public static int OnboardSupply(BuildingDef def) => def.PowerSupply + def.Discharge;
 
-    /// <summary>The power a building asks for this tick, after power boosters.</summary>
+    /// <summary>
+    /// A machine's recipe speed relative to base, in permille: booster speed times power satisfaction. 1000 = one
+    /// batch per <c>Recipe.Ticks</c>. Its output per batch is <c>100 + Boost.Output</c> percent of the recipe's.
+    /// For rate mode (FB-012, FB-014); valid after this tick's <see cref="Step"/>.
+    /// </summary>
+    public static int SpeedPermille(PlacedBuilding b) => b.Machine is { } m
+        ? (int)((long)(100 + m.Boost.Speed) * m.PowerPermille / 100)
+        : 0;
+
+    /// <summary>
+    /// The power a building asks for this tick, after power boosters. A machine asks while it is working or was
+    /// working last tick (so one finishing a batch and starting the next keeps its share); a starved or blocked
+    /// one asks for nothing.
+    /// </summary>
     public static int DrawOf(PlacedBuilding b) => b.Machine is { } m
-        ? m.Working ? BoostStats.Scaled(b.Def.Power, m.Boost.Power) : 0
+        ? m.Working || m.IdleTicks == 0 ? BoostStats.Scaled(b.Def.Power, m.Boost.Power) : 0
         : b.Def.Power;
 
     /// <summary>The power a building makes this tick.</summary>
@@ -133,22 +154,20 @@ public static class PowerNet
         foreach (var net in grid.Power.Networks)
         {
             long supply = 0, demand = 0;
-            foreach (var b in net.Members)
-            {
+            foreach (var b in net.Sources)
                 supply += SupplyOf(b);
+            foreach (var b in net.Consumers)
                 demand += DrawOf(b);
-            }
 
             long flow = 0;
             if (supply >= demand)
             {
                 long spare = supply - demand;
-                foreach (var b in net.Members)
+                foreach (var b in net.Batteries)
                 {
                     if (spare == 0)
                         break;
-                    if (b.Battery is not { } bat)
-                        continue;
+                    var bat = b.Battery!;
                     long put = Math.Min(Math.Min(spare, b.Def.Discharge), bat.Capacity - bat.Charge);
                     bat.Charge += put;
                     spare -= put;
@@ -158,12 +177,11 @@ public static class PowerNet
             else
             {
                 long need = demand - supply;
-                foreach (var b in net.Members)
+                foreach (var b in net.Batteries)
                 {
                     if (need == 0)
                         break;
-                    if (b.Battery is not { } bat)
-                        continue;
+                    var bat = b.Battery!;
                     long take = Math.Min(Math.Min(need, b.Def.Discharge), bat.Charge);
                     bat.Charge -= take;
                     need -= take;
@@ -174,11 +192,14 @@ public static class PowerNet
             net.Supply = supply;
             net.Demand = demand;
             net.FromBatteries = flow;
-            net.Stored = net.Members.Sum(b => b.Battery?.Charge ?? 0);
+            long stored = 0;
+            foreach (var b in net.Batteries)
+                stored += b.Battery!.Charge;
+            net.Stored = stored;
             net.Satisfaction = supply >= demand ? 1000 : (int)((supply + flow) * 1000 / demand);
-            foreach (var b in net.Members)
+            foreach (var b in net.Consumers)
             {
-                if (b.Machine is { } m && b.Def.Power > 0)
+                if (b.Machine is { } m)
                     m.PowerPermille = net.Satisfaction;
             }
         }
