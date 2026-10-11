@@ -15,10 +15,26 @@ public sealed class PowerNetwork(int id)
     /// <summary>Every member, in id order.</summary>
     public List<PlacedBuilding> Members { get; } = [];
 
-    // Members by role, in id order, so the per-tick balance only visits what matters.
-    internal List<PlacedBuilding> Sources { get; } = [];
-    internal List<PlacedBuilding> Consumers { get; } = [];
+    /// <summary>Battery members, in id order: charged and drained lowest id first.</summary>
     internal List<PlacedBuilding> Batteries { get; } = [];
+
+    // Supply and demand as of now. Summed when the network is built; afterwards machines report only their changes
+    // as they work, so the balance needn't visit every consumer each tick (NF-001).
+    internal long LiveSupply, LiveDemand;
+
+    /// <summary>
+    /// Updates the live totals with a machine's supply and draw after its work this tick; the same figures as
+    /// <see cref="PowerNet.SupplyOf"/> and <see cref="PowerNet.DrawOf"/>, from values cached on the machine.
+    /// </summary>
+    internal void Report(MachineState m)
+    {
+        int draw = m.Working || m.IdleTicks == 0 ? m.BoostedDraw : 0;
+        int supply = m.Working ? m.MaxSupply : 0;
+        LiveDemand += draw - m.ReportedDraw;
+        LiveSupply += supply - m.ReportedSupply;
+        m.ReportedDraw = draw;
+        m.ReportedSupply = supply;
+    }
 
     /// <summary>Power made this tick by cores and burning generators.</summary>
     public long Supply { get; internal set; }
@@ -69,6 +85,9 @@ public sealed class TilePower
         _revision = grid.Revision;
         _networks.Clear();
         _byBuilding.Clear();
+        // Boosts first: a machine's draw depends on its power boosters.
+        foreach (var m in grid.Machines)
+            m.Machine!.Boost = Boosters.Stats(grid, m, 0);
 
         foreach (var start in grid.Buildings)
         {
@@ -90,14 +109,27 @@ public sealed class TilePower
                 }
             }
             net.Members.Sort((p, q) => p.Id.CompareTo(q.Id));
-            net.Sources.AddRange(net.Members.Where(m => m.Def.PowerSupply > 0));
-            net.Consumers.AddRange(net.Members.Where(m => m.Def.Power > 0));
             net.Batteries.AddRange(net.Members.Where(m => m.Battery != null));
             net.Capacity = net.Batteries.Sum(m => m.Battery!.Capacity);
+            foreach (var m in net.Members)
+            {
+                // Only machines change their figures tick to tick, and they report them as they work.
+                if (m is { Kind: BuildingKind.Machine, Machine: { } state })
+                {
+                    state.Net = net;
+                    state.Draws = m.Def.Power > 0;
+                    state.BoostedDraw = BoostStats.Scaled(m.Def.Power, state.Boost.Power);
+                    state.MaxSupply = m.Def.PowerSupply;
+                    state.ReportedDraw = state.ReportedSupply = 0;
+                    net.Report(state);
+                }
+                else
+                {
+                    net.LiveSupply += PowerNet.SupplyOf(m);
+                    net.LiveDemand += PowerNet.DrawOf(m);
+                }
+            }
         }
-
-        foreach (var m in grid.Machines)
-            m.Machine!.Boost = Boosters.Stats(grid, m, 0);
     }
 }
 
@@ -153,11 +185,7 @@ public static class PowerNet
         grid.Power.Refresh(grid);
         foreach (var net in grid.Power.Networks)
         {
-            long supply = 0, demand = 0;
-            foreach (var b in net.Sources)
-                supply += SupplyOf(b);
-            foreach (var b in net.Consumers)
-                demand += DrawOf(b);
+            long supply = net.LiveSupply, demand = net.LiveDemand;
 
             long flow = 0;
             if (supply >= demand)
@@ -197,11 +225,6 @@ public static class PowerNet
                 stored += b.Battery!.Charge;
             net.Stored = stored;
             net.Satisfaction = supply >= demand ? 1000 : (int)((supply + flow) * 1000 / demand);
-            foreach (var b in net.Consumers)
-            {
-                if (b.Machine is { } m)
-                    m.PowerPermille = net.Satisfaction;
-            }
         }
     }
 }

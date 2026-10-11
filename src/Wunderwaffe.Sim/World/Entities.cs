@@ -128,9 +128,19 @@ public sealed class MachineState(RecipeDef? recipe) : OutputBuffer
 
     /// <summary>
     /// Power this machine got last tick, in permille of what it asked for (FB-005). 1000 for machines that draw none.
-    /// Derived each tick from the network, so not part of the state hash.
+    /// Read from its network, so not part of the state hash.
     /// </summary>
-    public int PowerPermille { get; internal set; } = 1000;
+    public int PowerPermille => Draws ? Net!.Satisfaction : 1000;
+
+    /// <summary>Its power network, if it has a part in power; set when the tile's networks are rebuilt.</summary>
+    internal PowerNetwork? Net;
+
+    /// <summary>It draws power, so it runs at its network's satisfaction.</summary>
+    internal bool Draws;
+
+    // Power figures cached when networks are rebuilt (draw after boosters, supply while burning), and the ones last
+    // reported to the network (PowerNetwork.Report).
+    internal int BoostedDraw, MaxSupply, ReportedDraw, ReportedSupply;
 
     /// <summary>Its boosted stats (FB-016), refreshed whenever the tile's layout changes. Derived, not hashed.</summary>
     public BoostStats Boost { get; internal set; } = BoostStats.Base;

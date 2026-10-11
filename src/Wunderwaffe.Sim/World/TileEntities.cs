@@ -28,6 +28,7 @@ internal static class TileEntities
         {
             if (Work(tile, b.Machine!) is { } made && tile.Owner != TileState.Unowned)
                 sim.Player(tile.Owner).AddProduced(made);
+            b.Machine!.Net?.Report(b.Machine);
             Dump(sim, tile, b, b.Machine!);
         }
         foreach (var b in grid.ImportPorts)
