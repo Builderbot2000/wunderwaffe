@@ -28,7 +28,11 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   them. Placement-like checks must also test `TileGrid.WreckFree`/`WreckAt` (done in `Placement.Check`, `CheckFrame`,
   `CheckDeploy`).
 - A dead unit block (Hp 0) stays in `Unit.Blocks`; anything that reads block function must skip `Hp <= 0`, and
-  `Unit.RecomputeStats` rebuilds engines/cargo/radius after a block dies or is rebuilt.
+  `Unit.RecomputeStats` rebuilds engines/cargo/radius/locomotion after a block dies or is rebuilt.
+- `Territory.DestroyBuilding` forwards to `Combat.DestroyBuilding`, so every forced removal leaves a wreck.
+- Attack orders are `Unit.Order` with `OrderKind.Attack`/`AttackMove` (building target: `TargetId` -1, cell in
+  TileId/X/Y). Combat steers them only through `UnitSim.Chase`/`Halt`/`Resume`/`MayChase`/`CanFire`.
+
 ## Territory rules (silo A)
 
 - **Presence, not ownership, gates acting on a tile** (WM-015): `Territory.HasPresence(sim, player, tile)` (owns it, or

@@ -260,6 +260,7 @@ public partial class Hud : Control
         "    K over a unit core records its design · B opens the blueprint library · R turns and F mirrors a picked blueprint",
         "    Click a unit factory to select it, then pick a blueprint for it to build within its radius",
         "    H hold · P then right-click patrols · X retreats · Q makes a squad · T formation · V stance · E escorts the unit under the cursor",
+        "    Right-click an enemy unit or building attacks it · Z then right-click attack-moves (fights on the way)",
         "    Ctrl+1-9 stores a control group, Alt+1-9 recalls it · Y over a unit core, then right-click: its rally point",
         "",
         "Camera: WASD or arrows pan · wheel zooms · middle-drag pans",
