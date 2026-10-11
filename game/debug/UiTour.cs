@@ -63,7 +63,7 @@ public partial class UiTour : Node
         Step(5, "production stats", () => Key(Godot.Key.O));
         Step(10, "production stats shot", () =>
         {
-            var panel = GetTree().Root.FindChild("Hud", true, false) is Hud ? Find(GetTree().Root, "Close  O") : null;
+            var panel = Find(GetTree().Root, "Close  O");
             Log(panel != null ? "production stats open" : "FAIL: O didn't open the production stats");
             Shot("05d_production");
             Key(Godot.Key.O);
