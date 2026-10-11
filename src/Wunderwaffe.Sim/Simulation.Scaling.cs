@@ -11,9 +11,10 @@ public sealed partial class Simulation
 
     /// <summary>
     /// Tiles nobody views run in rate mode and units on them travel abstractly. On for <see cref="NewGame"/>; off by
-    /// default for hand-built sims, so entity tests see every tile fully simulated.
+    /// default for hand-built sims, so entity tests see every tile fully simulated. Set it before the first
+    /// <see cref="Step"/>; it is part of how the match was made, not something that changes in play.
     /// </summary>
-    public bool RateModeEnabled { get; init; }
+    public bool RateModeEnabled { get; set; }
 
     /// <summary>Ticks between automatic snapshots (NF-008); 0 turns them off. Five minutes of play by default.</summary>
     public int SnapshotIntervalTicks { get; set; } = 5 * 60 * TicksPerSecond;

@@ -23,6 +23,9 @@ public static class AbstractTravel
 {
     const int S = Unit.CellScale;
 
+    /// <summary>How far abstract travel time may stray from the full sim's, in percent (UC-009); tests hold it to this.</summary>
+    public const int TolerancePercent = 15;
+
     /// <summary>Cruise speed of an abstract unit, sub-cells per tick: what the flight controller flies at.</summary>
     public static int Speed(Unit u) => u.MaxSpeed;
 
