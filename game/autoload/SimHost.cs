@@ -111,7 +111,19 @@ public partial class SimHost : Node
         if (View != ViewMode.World)
             ToggleCount++;
         View = ViewMode.World;
+        SyncView();
         ViewChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Tells the sim which tile the local player looks at (FB-013): only viewed or Contested tiles run the full entity
+    /// sim, the rest rate mode. It is lockstep input, so it goes through a command, and only when it changes.
+    /// </summary>
+    void SyncView()
+    {
+        int viewed = View == ViewMode.Tile ? _viewedTileId : -1;
+        if (Sim.PlayerOrNull(LocalPlayer)?.ViewedTile != viewed)
+            Sim.Enqueue(new SetViewedTileCommand(LocalPlayer, viewed));
     }
 
     /// <summary>Opens one of the local player's tiles. Returns false for tiles they don't own.</summary>
@@ -123,6 +135,7 @@ public partial class SimHost : Node
         if (View != ViewMode.Tile)
             ToggleCount++;
         View = ViewMode.Tile;
+        SyncView();
         ViewChanged?.Invoke();
         return true;
     }
@@ -150,6 +163,13 @@ public partial class SimHost : Node
     public void StartNew(GameSetup setup, ViewMode view = ViewMode.World)
     {
         Begin(Simulation.NewGame(Content, setup), view);
+        GoTo(GameScene);
+    }
+
+    /// <summary>Debug: opens an already built sim (the stress scene, which has no <see cref="GameSetup"/>, so no saves).</summary>
+    public void StartWith(Simulation sim, ViewMode view)
+    {
+        Begin(sim, view);
         GoTo(GameScene);
     }
 
@@ -215,6 +235,7 @@ public partial class SimHost : Node
         _viewedTileId = home.Id;
         ToggleCount = 0;
         View = view;
+        SyncView();
         GetTree().Paused = false;
     }
 
@@ -230,10 +251,10 @@ public partial class SimHost : Node
         if (drive < 0 && !stress)
             return false;
 
-        // The NF-001 stress scene wants about 200 tiles: the largest world.
-        StartNew(stress ? GameSetup.Default with { Width = GameSetup.MaxSize, Height = GameSetup.MaxSize } : GameSetup.Default, ViewMode.Tile);
         if (stress)
             DebugTools.StressWorld(this);
+        else
+            StartNew(GameSetup.Default, ViewMode.Tile);
         // Plays a scripted unit session through the input path (needs a window).
         if (drive >= 0)
             DebugDriver.Attach(this, drive + 1 < args.Length ? args[drive + 1] : null);

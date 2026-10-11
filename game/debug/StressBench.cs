@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using Godot;
 using Wunderwaffe.Sim.World;
@@ -11,10 +10,7 @@ public partial class StressBench : Node
     const int BenchTicks = 600;
 
     /// <summary>The first tick measured: the one after the stress fill lands, so placing it isn't counted.</summary>
-    public long StartTick { get; set; }
-
-    /// <summary>Runs once at <see cref="StartTick"/> (to build on what the fill made); measuring starts a tick later.</summary>
-    public Action? Prepare { get; set; }
+    public long StartTick { get; init; }
 
     double _startMs = -1;
 
@@ -23,13 +19,6 @@ public partial class StressBench : Node
         var host = SimHost.Instance;
         if (host.Sim.Tick < StartTick)
             return;
-        if (Prepare is { } prepare)
-        {
-            Prepare = null;
-            prepare();
-            StartTick = host.Sim.Tick + 1;
-            return;
-        }
         if (_startMs < 0)
             _startMs = host.TotalStepMs;
         if (host.Sim.Tick - StartTick < BenchTicks)

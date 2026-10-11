@@ -12,8 +12,8 @@ namespace Wunderwaffe.Sim.Tests;
 [Collection(TimingCollection.Name)]
 public class StressTests(ITestOutputHelper output)
 {
-    const int Tiles = 8;
-    const int BuildingsPerTile = 2000;
+    const int Tiles = StressScene.FullTiles;
+    const int BuildingsPerTile = StressScene.BuildingsPerTile;
 
     /// <summary>Starts a measurement from a clean heap, so garbage from earlier tests (generated worlds are large) isn't counted.</summary>
     static void Settle()
@@ -43,26 +43,11 @@ public class StressTests(ITestOutputHelper output)
         return best;
     }
 
-    /// <summary>Covers each tile with <see cref="BuildingsPerTile"/> producers: drills on ore, iron smelters elsewhere.</summary>
+    /// <summary>Covers each tile with <see cref="StressScene.BuildingsPerTile"/> producers and applies them.</summary>
     static void Fill(Simulation sim, IEnumerable<TileState> tiles)
     {
         foreach (var tile in tiles)
-        {
-            int placed = 0;
-            for (int y = 0; y < tile.Grid.Height - 1 && placed < BuildingsPerTile; y += 2)
-            {
-                for (int x = 0; x < tile.Grid.Width - 1 && placed < BuildingsPerTile; x += 2)
-                {
-                    if (!tile.Grid.IsFree(x, y, 2, 2))
-                        continue;
-                    var drill = Placement.Check(sim, tile, 0, "drill", x, y, 0, null, out _);
-                    sim.Enqueue(drill == PlaceResult.Ok
-                        ? new PlaceBuildingCommand(0, tile.Id, "drill", x, y)
-                        : new PlaceBuildingCommand(0, tile.Id, "smelter", x, y, RecipeId: "smelt_iron"));
-                    placed++;
-                }
-            }
-        }
+            StressScene.Fill(sim, tile);
         sim.Step();
     }
 
@@ -123,68 +108,12 @@ public class StressTests(ITestOutputHelper output)
         Assert.True(msPerTick < 2.0, $"{msPerTick:F4} ms/tick");
     }
 
-    /// <summary>
-    /// A small factory on a 16-cell tile: copper drill into the core, iron drill through a smelter into it, and either an
-    /// iron drill shipping east (even columns) or an import port belting into the core (odd columns).
-    /// </summary>
-    static void SmallFactory(Simulation sim, TileState t, bool exporter)
-    {
-        Harness.Ore(t, "copper_ore", 9, 6);
-        Harness.Ore(t, "iron_ore", 6, 11);
-        Place(sim, t, "core", 6, 6);
-        Place(sim, t, "drill", 9, 6);
-        Place(sim, t, "smelter", 6, 9, recipe: "smelt_iron");
-        Place(sim, t, "drill", 6, 11);
-        if (exporter)
-        {
-            Harness.Ore(t, "iron_ore", 11, 4);
-            Place(sim, t, "drill", 11, 4);
-            Place(sim, t, "export_port", 13, 4);
-        }
-        else
-        {
-            Place(sim, t, "import_port", 2, 7);
-            Harness.Belt(sim, t, 3, 7, 3);
-        }
-    }
-
-    static void Place(Simulation sim, TileState t, string building, int x, int y, string? recipe = null) =>
-        sim.Enqueue(new PlaceBuildingCommand(0, t.Id, building, x, y, 0, recipe));
-
     [Fact]
     public void EightFullTilesAndTwoHundredRateTilesHoldSixtyUps()
     {
         // NF-001: 8 full-sim tiles x 2,000 buildings plus 200 rate-mode tiles at 60 UPS or better.
-        const int smallSize = 16, columns = 20, rows = 10;
-        var sim = new Simulation(TestContent.Load()) { RateModeEnabled = true };
         var build = Stopwatch.StartNew();
-        var big = new List<TileState>();
-        for (int t = 0; t < Tiles; t++)
-        {
-            var tile = sim.AddStartingTile(t, 0, owner: 0, seed: (ulong)t);
-            tile.Inventory.Add("copper_ore", 1_000_000);
-            tile.Inventory.Add("iron_ore", 1_000_000);
-            big.Add(tile);
-        }
-        var small = new List<TileState>();
-        int top = Simulation.DefaultTileSize / smallSize;
-        for (int r = 0; r < rows; r++)
-        {
-            for (int c = 0; c < columns; c++)
-            {
-                var tile = sim.AddTile(c, top + r, owner: 0, size: smallSize);
-                tile.Inventory.Add("copper_ore", 1_000);
-                tile.Inventory.Add("iron_ore", 1_000);
-                small.Add(tile);
-            }
-        }
-        for (int i = 0; i < small.Count; i++)
-            SmallFactory(sim, small[i], exporter: i % 2 == 0);
-        // Players 0-7 each watch one big tile; nobody watches the small ones.
-        for (int p = 0; p < Tiles; p++)
-            sim.Enqueue(new SetViewedTileCommand(p, big[p].Id));
-        sim.Step();
-        Fill(sim, big);
+        var (sim, big, small) = StressScene.Build(TestContent.Load());
         build.Stop();
 
         Assert.All(big, t => Assert.True(t.Grid.BuildingCount > BuildingsPerTile, $"tile {t.Id}: {t.Grid.BuildingCount}"));

@@ -153,12 +153,7 @@ public class SnapshotTests(ITestOutputHelper output)
     public void ThirtyMinutesWithRateModeAndSwitchingAreDeterministic()
     {
         // NF-004: the same inputs reproduce the same state hash after 30 minutes, with rate-mode tiles, promotion and
-        // demotion, and abstract travel. Skipped unless WUNDERWAFFE_LONG_TESTS=1 (or filter Category=Long and set it).
-        if (Environment.GetEnvironmentVariable("WUNDERWAFFE_LONG_TESTS") != "1")
-        {
-            output.WriteLine("skipped: set WUNDERWAFFE_LONG_TESTS=1");
-            return;
-        }
+        // demotion, and abstract travel. Takes a few seconds (most tiles are in rate mode); filter out Category=Long to skip.
         var sw = Stopwatch.StartNew();
         var a = new Match(snapshotEvery: 5 * Minute);
         var b = new Match(snapshotEvery: 5 * Minute);

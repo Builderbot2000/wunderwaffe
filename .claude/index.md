@@ -13,7 +13,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `Content/Defs.cs` | JSON records: `ItemDef`, `RecipeDef` (empty inputs = extraction), `BuildingDef` (`Hp` per block, +`Footprint(rotation)`), `BuildingKind` enum, `UnlockCondition` (goal conditions: `produce`/`claim`/`ship`/`launch`), `GoalDef`, `TerrainDef` (bands, deposit weights). |
 | `Content/ContentDb.cs` | Loads + validates all JSON (`FromJson`, throws `ContentException` with every error). Lookups: `Items`, `Recipes`, `Buildings`, `BuildingList` (menu order), `Goals`, `TerrainList`, `RecipesByBuilding`, `DefaultTerrain`, `RiverTerrain`, `Classify(elev, moist)`. |
 | `Core/Command.cs` | Every player action as a JSON-polymorphic record with `Apply(sim)`: place/remove building, claim, place/remove frame, activate/deploy/move units, debug grant. No tech tree, so no unlock command. `LoggedCommand`. |
-| `Core/SaveFile.cs` | `SaveFile` (setup + log + hash, `CurrentVersion`), `Replay` (sliced re-simulation, `Matches`), `SaveException`. |
+| `Core/SaveFile.cs` | `SaveFile` (setup + log + hash, `CurrentVersion`), `Replay` (sliced re-simulation, `Matches`; starts from the save's `Snapshot` when it hash-checks, else full replay, `FromSnapshot`), `SaveException`. |
 | `Core/StateHash.cs` | FNV-1a over tiles, buildings, entity state, players, units. Must cover all sim state. |
 | `Core/Inventory.cs` | Sorted item counts (long); `Add`, `Has`, `TryTake` (all or nothing). Throws on underflow. |
 | `Core/Rng.cs` | SplitMix64, seeded; `Next`, `Range`. |
@@ -26,7 +26,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/PortRules.cs` | `ZoneDepth`, `TransitTicksPerTile`, `ZoneOf(footprint)`, `PartnerOf(port)`. |
 | `World/Expansion.cs` | `Expansion.Check` → `ClaimResult` + paying neighbour tile. |
 | `World/Progression.cs` | Goal chain progress: `Progress`, `IsMet`, `CurrentGoal`, `Step` (end of tick). No tech tree (TT-001). |
-| `World/PlayerState.cs` | Per-player counters (`Produced`, `Shipped`, `Launched`), goal completion ticks. |
+| `World/PlayerState.cs` | Per-player counters (`Produced`, `Shipped`, `Launched`), goal completion ticks, `ViewedTile` (set by `SetViewedTileCommand` "view_tile", lockstep input; drives rate mode). |
 | `World/WorldMap.cs` | Global grid: terrain, elevation, tile id per cell; adjacency (`MinBorderCells`=3), `BorderCells(from,to)`, `Grow` for hand-built worlds. |
 | `World/TileGenerator.cs` | Deposit patches on a tile, weighted by terrain (`GenerateDeposits`, `exclude` for regional items). |
 | `World/Direction.cs` | N/E/S/W, `Dx`/`Dy`, `FromRotation` (0=east, clockwise), `Opposite`. |
@@ -41,6 +41,13 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Gen/Zones.cs` | Phase 3: per-tile I/O zones by multi-source BFS from borders. |
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
+| `Simulation.Scaling.cs` | Partial (C): `RateModeEnabled` (on for `NewGame`, off for hand-built test sims), per-tile `TileRateState`, abstract nodes (`Abstract`, `IsAbstract`), `SnapshotIntervalTicks`/`LatestSnapshot` (taken at tick start), snapshot restore helpers. |
+| `Core/Snapshot.cs` | NF-008 state snapshot (`Capture`, `Restore`): tiles, buildings + entity state, rate accumulators, players, units, abstract nodes. Every new piece of sim state needs a field here too, or snapshot loads fall back to full replay. |
+| `World/RateMode.cs` | FB-012..014 tick phase 6: steps rate-mode tiles at their rates (stalls when an import buffer or export link can't cover a tick), runs `AbstractTravel`, then picks each tile's mode for the next tick (viewed by any player or `ContestedTiles` → full). `IsFullSim`, `RatesOf`. Belts/machines freeze in rate mode, so switching is lossless. |
+| `World/RateModel.cs` | Solves per-item rates from the building/belt graph (OQ-14), per group of port-linked tiles, iterating until imports/exports agree, so shortfalls propagate (FB-014). Fixed point: `One` = 1 item/tick (`Shift`=24). |
+| `World/TileRates.cs` | `FlowKind` (Core, Made, Draw, Export), `Flow` (sorted, hashed, saved), `TileRates` (`Flows`, `RateOf`, `Total`). |
+| `World/AbstractTravel.cs` | UC-009: units on rate-mode tiles become `AbstractNode`s moving along planned waypoints at cruise speed with no physics; materialise on promotion. `Eta`, `TolerancePercent`. |
+| `World/StressScene.cs` | NF-001 benchmark world (8 viewed full-sim tiles x 2,000 buildings + 200 rate-mode factories), shared by `StressTests` and `--stress`; `Fill`. |
 
 ## game/ (Godot project; namespaces `Wunderwaffe.Game[.Input/.Render/.Screens/.Debug]`)
 
@@ -49,7 +56,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `project.godot` | Main scene `scenes/title.tscn`, autoload `SimHost`, 1920x1080 canvas_items stretch. |
 | `scenes/title.tscn` | Root Control with `TitleScreen`. |
 | `scenes/main.tscn` | Match scene; node order matters for input (PauseMenu first sees Esc last). Wires `[Export]`s: UnitTool→BuildTool, Camera→WorldMapView, Hud→BuildTool/WorldMapView/UnitTool/PauseMenu. |
-| `autoload/SimHost.cs` | `SimHost.Instance`. Owns `Content`, `Sim`, tick loop (`_Process`, max 8 ticks/frame), `ViewMode` (Tile/World) + `ViewedTile`, `Selected` units, `WatchView`/`ShowOnlyIn` helpers, new/save/load (`BeginLoad` replays over frames), quit, CLI flags (`--tour`, `--stress`, `--drive`), F3/F4/Tab. |
+| `autoload/SimHost.cs` | `SimHost.Instance`. Owns `Content`, `Sim`, tick loop (`_Process`, max 8 ticks/frame), `ViewMode` (Tile/World) + `ViewedTile`, `Selected` units, `WatchView`/`ShowOnlyIn` helpers, new/save/load (`BeginLoad` replays over frames), quit, CLI flags (`--tour`, `--stress`, `--drive`), F3/F4/Tab. `SyncView` sends `view_tile` on every view change; `StartWith` opens a prebuilt sim. |
 | `input/InputActions.cs` | Action names + default key bindings (registered in code). |
 | `input/BuildTool.cs` | Build palette (`Tools`, one per building or per recipe for multi-recipe crafters, + frame), selection, `BuildRotation`, placement/removal on mouse, ghost and port-zone drawing, `Preview`, `HoveredZone`, `PickedIsPort`, `HoveredCell`. |
 | `input/UnitTool.cs` | Unit selection (click/box, Shift adds), move orders (tile and world map), G = lift off / land, `Status` text. Active when no building is picked. |
@@ -73,7 +80,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `ui/PauseMenu.cs` | Esc menu (pauses tree), save/load/settings/quit; `LoadMenu` (save list, shared with title). |
 | `ui/GameSettings.cs` | `user://settings.cfg`: fullscreen, vsync, world-map snapshot interval; settings panel. |
 | `ui/SaveSlots.cs` | `user://saves/*.json` listing (`SaveInfo`), new path, delete. |
-| `debug/DebugTools.cs` | `Cheat` (F4, items only), `StressFill` (F3 / `--stress`). |
+| `debug/DebugTools.cs` | `Cheat` (F4, items only), `StressFill` (F3, the viewed tile), `StressWorld` (`--stress`, opens `StressScene`). |
 | `debug/StressBench.cs` | Node that prints ms/tick over 600 ticks after a stress fill; quits if headless. |
 | `debug/DebugDriver.cs` | `--drive`: scripted unit session through injected input, screenshot. |
 | `debug/UiTour.cs` | `--tour`: scripted click-through of all screens with screenshots; cleans up its saves. |
@@ -96,8 +103,11 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `UnitTests.cs` | Frames, lift-off, physics, pathing, borders, collisions, landing. |
 | `SaveTests.cs` | Save/replay round trip, every command kind serialises, divergence detection. |
 | `SimulationTests.cs` | Determinism, starting tile. |
-| `StressTests.cs` | NF-001 tick budget with thousands of buildings. |
+| `StressTests.cs` | NF-001 tick budget with thousands of buildings, and the `StressScene` (8 full + 200 rate-mode tiles) under 4 ms/tick. Best of several windows. |
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats: content changes that break the loop fail here. |
+| `RateModeTests.cs` | Rate mode vs full sim within 5% over 5 min, rates from the graph, promotion/demotion (view, Contested) loses nothing, import shortfalls propagate along a chain. |
+| `AbstractTravelTests.cs` | Abstract nodes, travel time vs physics, materialising when viewed or Contested. |
+| `SnapshotTests.cs` | Snapshot restore matches, latest snapshot + later commands match a full replay, 30-minute determinism (`Category=Long`, a few seconds). |
 
 ## Other
 
