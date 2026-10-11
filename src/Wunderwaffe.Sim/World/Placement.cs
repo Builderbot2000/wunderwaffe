@@ -18,6 +18,9 @@ public enum PlaceResult
 
     /// <summary>Some cell of the footprint is terrain buildings can't stand on, such as water or peaks (FB-002).</summary>
     BadTerrain,
+
+    /// <summary>A wreck lies on the footprint; deconstruct it first (CB-006).</summary>
+    Wreck,
 }
 
 /// <summary>A placement that passed every check, ready to apply.</summary>
@@ -49,6 +52,8 @@ public static class Placement
             return PlaceResult.Blocked;
         if (!grid.Buildable(x, y, w, h))
             return PlaceResult.BadTerrain;
+        if (!grid.WreckFree(x, y, w, h))
+            return PlaceResult.Wreck;
 
         if (def.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && PortRules.ZoneOf(grid, x, y, w, h) < 0)
             return PlaceResult.NotInPortZone;

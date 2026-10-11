@@ -81,23 +81,50 @@ public sealed class Unit
         X = x - LocalCentre(coreGX) + (int)comX;
         Y = y - LocalCentre(coreGY) + (int)comY;
 
-        var thrusters = new List<Thruster>();
-        foreach (var b in blocks)
+        BlockCombat = blocks.Select(b => defs[b.DefId] is { Kind: BuildingKind.Weapon or BuildingKind.Shield or BuildingKind.Repair } d
+            ? new CombatState { Charge = d.Shield?.Capacity ?? 0, AmmoItem = d.Weapon?.Ammo } : null).ToArray();
+        CoreBlock = -1;
+        for (int i = 0; i < blocks.Count; i++)
         {
-            if (defs[b.DefId] is { Kind: BuildingKind.Thruster } t)
-                thrusters.Add(new Thruster(t.Thrust, (b.Rotation & 3) * Trig.Quarter));
+            if (blocks[i].GX == coreGX && blocks[i].GY == coreGY)
+                CoreBlock = i;
+        }
+        RecomputeStats(defs);
+    }
+
+    /// <summary>
+    /// Derived stats from the blocks still alive (UD-007): engines, top speed, cargo room and resource radius. Called
+    /// when built and whenever a block is destroyed or rebuilt. Dead blocks stay attached as wrecks and keep their mass.
+    /// </summary>
+    internal void RecomputeStats(IReadOnlyDictionary<string, BuildingDef> defs)
+    {
+        var thrusters = new List<Thruster>();
+        int storage = 0, supply = 0;
+        foreach (var b in Blocks)
+        {
+            if (b.Hp <= 0)
+                continue;
+            var def = defs[b.DefId];
+            if (def.Kind == BuildingKind.Thruster)
+                thrusters.Add(new Thruster(def.Thrust, (b.Rotation & 3) * Trig.Quarter));
+            storage += def.Storage;
+            supply = Math.Max(supply, def.SupplyRadius);
         }
         Thrusters = thrusters;
         TotalThrust = thrusters.Sum(t => t.Thrust);
+        CargoCapacity = storage;
+        SupplyRadius = supply;
 
         // The strongest engine (first on ties) is the one the unit turns toward its goal.
+        MainDir = 0;
+        MaxSpeed = 0;
         if (thrusters.Count > 0)
         {
             var main = thrusters.MaxBy(t => t.Thrust);
             MainDir = main.Dir;
             long push = thrusters.Sum(t => (long)t.Thrust * Math.Max(0, Trig.Cos(t.Dir - main.Dir)) / Trig.One);
             // Terminal speed under drag, with a margin so the engines keep some authority.
-            MaxSpeed = (int)(push * ThrustScale * DragDiv * 9 / (10 * mass));
+            MaxSpeed = (int)(push * ThrustScale * DragDiv * 9 / (10 * (long)Mass));
         }
     }
 
@@ -121,18 +148,36 @@ public sealed class Unit
 
     public IReadOnlyList<UnitBlock> Blocks { get; }
     public IReadOnlyList<UnitCell> Cells { get; }
-    public IReadOnlyList<Thruster> Thrusters { get; }
+    public IReadOnlyList<Thruster> Thrusters { get; private set; } = [];
     public int Mass { get; }
     public long Inertia { get; }
 
     /// <summary>Distance from the centre of mass to the edge of the farthest cell.</summary>
     public int Radius { get; }
 
-    public int TotalThrust { get; }
-    public int MainDir { get; }
+    public int TotalThrust { get; private set; }
+    public int MainDir { get; private set; }
 
     /// <summary>Speed it settles at flying straight, in sub-cells per tick. 0 means it cannot move.</summary>
-    public int MaxSpeed { get; }
+    public int MaxSpeed { get; private set; }
+
+    /// <summary>Combat state of each block, by index into <see cref="Blocks"/>; null for blocks that don't fight.</summary>
+    public IReadOnlyList<CombatState?> BlockCombat { get; }
+
+    /// <summary>Index of the unit core in <see cref="Blocks"/>. Destroying it destroys the unit (UD-007).</summary>
+    public int CoreBlock { get; }
+
+    /// <summary>Onboard storage (CB-004, FB-018): ammo and other stock, up to <see cref="CargoCapacity"/> items.</summary>
+    public Core.Inventory Cargo { get; } = new();
+
+    /// <summary>Items <see cref="Cargo"/> holds at most: the sum of its live storage blocks.</summary>
+    public int CargoCapacity { get; private set; }
+
+    /// <summary>Cells within which this unit shares its cargo with friendlies (FB-018); 0 for none.</summary>
+    public int SupplyRadius { get; private set; }
+
+    /// <summary>Combat's stand-in for the shared order (see <c>CombatOrders</c>); replaced by movement's order at merge.</summary>
+    internal CombatOrder? AttackOrder { get; set; }
 
     /// <summary>The unit core's cell in the unit grid, and its offset from the centre of mass.</summary>
     public int CoreGX { get; }

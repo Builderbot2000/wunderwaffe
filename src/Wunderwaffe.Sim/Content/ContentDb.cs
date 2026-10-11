@@ -150,12 +150,51 @@ public sealed class ContentDb
                 errors.Add($"building '{b.Id}': ports must be 1x1");
             if (b.Hp <= 0)
                 errors.Add($"building '{b.Id}': hp must be > 0");
+            ValidateCombat(b, errors);
         }
 
         foreach (var g in Goals)
             ValidateCondition(g.Condition, $"goal '{g.Id}'", errors);
 
         ValidateTerrain(errors);
+    }
+
+    /// <summary>Weapons, shields, repair and supply fields (CB-001, CB-002, CB-004, CB-005, FB-010, FB-018).</summary>
+    void ValidateCombat(BuildingDef b, List<string> errors)
+    {
+        string at = $"building '{b.Id}'";
+        if ((b.Kind == BuildingKind.Weapon) != (b.Weapon != null))
+            errors.Add($"{at}: a weapon needs a 'weapon' block, and only weapons may have one");
+        if (b.Weapon is { } w)
+        {
+            if (w.Range <= 0 || w.Damage <= 0 || w.Cooldown <= 0 || w.Speed < 0)
+                errors.Add($"{at}: weapon range, damage and cooldown must be > 0, speed >= 0");
+            if (w.Ammo != null && (!Items.ContainsKey(w.Ammo) || w.Magazine <= 0))
+                errors.Add($"{at}: weapon ammo must be a known item with a magazine > 0");
+        }
+        var types = Buildings.Values.Where(x => x.Weapon != null).Select(x => x.Weapon!.Type).ToHashSet();
+        foreach (var (type, pct) in b.Resist ?? [])
+        {
+            if (!types.Contains(type))
+                errors.Add($"{at}: resist names damage type '{type}', which no weapon deals");
+            if (pct > 100)
+                errors.Add($"{at}: resist '{type}' is over 100%");
+        }
+        if ((b.Kind == BuildingKind.Shield) != (b.Shield != null))
+            errors.Add($"{at}: a shield needs a 'shield' block, and only shields may have one");
+        if (b.Shield is { } s && (s.Radius <= 0 || s.Capacity <= 0 || s.Regen < 0))
+            errors.Add($"{at}: shield radius and capacity must be > 0, regen >= 0");
+        if ((b.Kind == BuildingKind.Repair) != (b.Repair != null))
+            errors.Add($"{at}: a repair block needs a 'repair' block, and only repair blocks may have one");
+        if (b.Repair is { } r)
+        {
+            if (r.Radius <= 0 || r.Rate <= 0 || r.Per <= 0)
+                errors.Add($"{at}: repair radius, rate and per must be > 0");
+            foreach (var id in r.Cost.Keys.Where(id => !Items.ContainsKey(id)))
+                errors.Add($"{at}: unknown repair cost item '{id}'");
+        }
+        if (b.SupplyRadius < 0 || b.Storage < 0)
+            errors.Add($"{at}: supply and storage must be >= 0");
     }
 
     void ValidateTerrain(List<string> errors)

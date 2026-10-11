@@ -7,5 +7,13 @@
   { "id": "export_port", "name": "Export Port", "kind": "export_port", "width": 1, "height": 1, "power": 0,  "hp": 80, "cost": { "copper_ore": 5 } },
   { "id": "import_port", "name": "Import Port", "kind": "import_port", "width": 1, "height": 1, "power": 0,  "hp": 80, "cost": { "copper_ore": 5 } },
   { "id": "unit_core", "name": "Unit Core", "kind": "unit_core", "width": 1, "height": 1, "power": 0, "hp": 300, "cost": { "copper_plate": 10, "steel": 5 } },
-  { "id": "thruster", "name": "Thruster", "kind": "thruster", "thrust": 60, "width": 1, "height": 1, "power": 0, "hp": 120, "cost": { "iron_plate": 10, "steel": 5 } }
+  { "id": "thruster", "name": "Thruster", "kind": "thruster", "thrust": 60, "width": 1, "height": 1, "power": 0, "hp": 120, "cost": { "iron_plate": 10, "steel": 5 } },
+  { "id": "munitions_works", "name": "Munitions Works", "width": 2, "height": 2, "power": 0, "hp": 250, "cost": { "iron_plate": 10, "copper_plate": 10 } },
+  { "id": "gun_turret", "name": "Gun Turret", "kind": "weapon", "width": 1, "height": 1, "power": 0, "hp": 250, "cost": { "iron_plate": 10, "copper_plate": 5 }, "resist": { "kinetic": 25 }, "weapon": { "range": 10, "damage": 12, "cooldown": 20, "type": "kinetic", "speed": 30, "ammo": "shell", "magazine": 20 } },
+  { "id": "laser_turret", "name": "Laser Turret", "kind": "weapon", "width": 1, "height": 1, "power": 20, "hp": 150, "cost": { "copper_plate": 20, "steel": 5 }, "weapon": { "range": 12, "damage": 6, "cooldown": 10, "type": "energy" } },
+  { "id": "wall", "name": "Wall", "kind": "wall", "width": 1, "height": 1, "power": 0, "hp": 600, "cost": { "iron_plate": 3 }, "resist": { "kinetic": 50, "energy": 20 } },
+  { "id": "shield_generator", "name": "Shield Generator", "kind": "shield", "width": 2, "height": 2, "power": 40, "hp": 200, "cost": { "copper_plate": 20, "steel": 10 }, "shield": { "radius": 6, "capacity": 400, "regen": 40 } },
+  { "id": "repair_bay", "name": "Repair Bay", "kind": "repair", "width": 2, "height": 2, "power": 10, "hp": 200, "cost": { "iron_plate": 20, "copper_plate": 10 }, "repair": { "radius": 8, "rate": 30, "cost": { "iron_plate": 1 }, "per": 50 } },
+  { "id": "supply_depot", "name": "Supply Depot", "kind": "storage", "width": 2, "height": 2, "power": 0, "hp": 300, "cost": { "iron_plate": 20 }, "supplyRadius": 12, "storage": 60 },
+  { "id": "ammo_rack", "name": "Ammo Rack", "kind": "storage", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": { "iron_plate": 5 }, "storage": 40 }
 ]

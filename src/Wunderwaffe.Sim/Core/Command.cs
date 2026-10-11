@@ -17,6 +17,9 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(DeployUnitCommand), "deploy_unit")]
 [JsonDerivedType(typeof(MoveUnitsCommand), "move_units")]
 [JsonDerivedType(typeof(DebugGrantCommand), "debug_grant")]
+[JsonDerivedType(typeof(AttackCommand), "attack")]
+[JsonDerivedType(typeof(AttackBuildingCommand), "attack_building")]
+[JsonDerivedType(typeof(AttackMoveCommand), "attack_move")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -100,7 +103,15 @@ public sealed record DeployUnitCommand(int Player, int UnitId) : Command(Player)
 /// </summary>
 public sealed record MoveUnitsCommand(int Player, int[] UnitIds, int TileId, int X, int Y) : Command(Player)
 {
-    internal override void Apply(Simulation sim) => UnitSim.Order(sim, Player, UnitIds, TileId, X, Y);
+    internal override void Apply(Simulation sim)
+    {
+        foreach (int id in UnitIds)
+        {
+            if (sim.UnitById(id) is { } u && u.Owner == Player)
+                CombatOrders.Clear(u);
+        }
+        UnitSim.Order(sim, Player, UnitIds, TileId, X, Y);
+    }
 }
 
 /// <summary>Debug only: adds items to a tile. Must be disabled in multiplayer.</summary>
@@ -111,4 +122,34 @@ public sealed record DebugGrantCommand(int Player, int TileId, string ItemId, in
         if (sim.TryGetTile(TileId) is { } tile && sim.Content.Items.ContainsKey(ItemId) && Amount > 0)
             tile.Inventory.Add(ItemId, Amount);
     }
+}
+
+/// <summary>Sends units after an enemy unit until it is destroyed (CB-001). They close to weapon range and fire.</summary>
+public sealed record AttackCommand(int Player, int[] UnitIds, int TargetUnitId) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.UnitById(TargetUnitId) is not { } target || target.Owner == Player)
+            return;
+        var (gx, gy) = ((int)(target.X / Unit.CellScale), (int)(target.Y / Unit.CellScale));
+        var tile = sim.Tiles[target.TileId];
+        CombatOrders.Issue(sim, Player, UnitIds, CombatOrderKind.Attack, tile.Id, gx - tile.OriginX, gy - tile.OriginY, TargetUnitId);
+    }
+}
+
+/// <summary>Sends units to destroy the enemy building covering cell (X, Y) of a tile (CB-001, IO-006).</summary>
+public sealed record AttackBuildingCommand(int Player, int[] UnitIds, int TileId, int X, int Y) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile && tile.Grid.BuildingAt(X, Y) is { } b && b.Owner != Player)
+            CombatOrders.Issue(sim, Player, UnitIds, CombatOrderKind.Attack, TileId, X, Y);
+    }
+}
+
+/// <summary>Moves units to a cell, stopping to fight whatever comes into weapon range on the way (CB-001).</summary>
+public sealed record AttackMoveCommand(int Player, int[] UnitIds, int TileId, int X, int Y) : Command(Player)
+{
+    internal override void Apply(Simulation sim) =>
+        CombatOrders.Issue(sim, Player, UnitIds, CombatOrderKind.AttackMove, TileId, X, Y);
 }

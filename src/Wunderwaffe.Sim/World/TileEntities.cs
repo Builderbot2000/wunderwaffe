@@ -191,6 +191,10 @@ internal static class TileEntities
             case BuildingKind.ExportPort:
                 return Send(sim, tile, target, item);
 
+            case BuildingKind.Weapon when sim.Content.Buildings[target.DefId].Weapon is { } w && w.Ammo == item && target.Combat!.Ammo < w.Magazine:
+                target.Combat.Ammo++;
+                return true;
+
             default:
                 return false;
         }
@@ -285,5 +289,7 @@ internal static class TileEntities
             foreach (var s in link.InFlight)
                 inv.Add(s.ItemId, 1);
         }
+        if (b.Combat is { Ammo: > 0, AmmoItem: { } ammo } c)
+            inv.Add(ammo, c.Ammo);
     }
 }

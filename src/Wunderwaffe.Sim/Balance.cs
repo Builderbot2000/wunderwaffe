@@ -30,6 +30,15 @@ public static class Balance
     /// <summary>A neighbour counts as land, for the start and for regional deposits, with this share of buildable ground.</summary>
     public const int LandPercent = 30;
 
+    /// <summary>Share of a building's cost returned for deconstructing its wreck (CB-006).</summary>
+    public const int WreckRefundPercent = 25;
+
+    /// <summary>
+    /// A tile core's resource radius in cells (FB-018). Kept here rather than on the core in buildings.json so the
+    /// shared core line stays untouched; move it to <c>supplyRadius</c> there once things settle.
+    /// </summary>
+    public const int CoreSupplyRadius = 16;
+
     static IReadOnlyDictionary<string, int> Items(params (string Id, int N)[] items) =>
         new SortedDictionary<string, int>(items.ToDictionary(i => i.Id, i => i.N), StringComparer.Ordinal);
 }

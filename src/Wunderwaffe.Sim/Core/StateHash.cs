@@ -22,6 +22,7 @@ internal sealed class StateHash
             s.MixPlayer(p);
         foreach (var u in sim.Units)
             s.MixUnit(u);
+        s.MixProjectiles(sim);
         return s._h;
     }
 
@@ -87,6 +88,14 @@ internal sealed class StateHash
             Mix(b.Hp);
             MixEntity(b);
         }
+        foreach (var w in g.Wrecks)
+        {
+            Mix(w.Id);
+            Mix(w.DefId);
+            Mix(w.Owner);
+            Mix(w.Y * g.Width + w.X);
+            Mix(w.Rotation);
+        }
     }
 
     void MixEntity(PlacedBuilding b)
@@ -118,6 +127,7 @@ internal sealed class StateHash
                 Mix(s.ItemId);
             }
         }
+        MixCombat(b.Combat);
     }
 
     void MixPlayer(PlayerState p)
@@ -150,6 +160,17 @@ internal sealed class StateHash
             Mix(blk.Rotation);
             Mix(blk.Hp);
         }
+        foreach (var c in u.BlockCombat)
+            MixCombat(c);
+        Mix(u.Cargo.Entries);
+        if (u.AttackOrder is { } order)
+        {
+            Mix((int)order.Kind);
+            Mix(order.TileId);
+            Mix(order.X);
+            Mix(order.Y);
+            Mix(order.TargetId);
+        }
         if (u.Route is { } route)
         {
             Mix(u.RouteIndex);
@@ -162,6 +183,42 @@ internal sealed class StateHash
         else
         {
             Mix(-1);
+        }
+    }
+
+    void MixCombat(World.CombatState? c)
+    {
+        if (c == null)
+            return;
+        Mix(c.Ammo);
+        Mix(c.Cooldown);
+        Mix(c.Charge);
+        Mix((int)c.Status);
+        Mix(c.Target.Unit);
+        Mix(c.Target.Block);
+        Mix(c.Target.Tile);
+        Mix(c.Target.Building);
+        Mix(c.RepairDebt);
+    }
+
+    void MixProjectiles(Simulation sim)
+    {
+        Mix(sim.NextProjectileId);
+        foreach (var p in sim.Projectiles)
+        {
+            Mix(p.Id);
+            Mix(p.Owner);
+            Mix(p.X);
+            Mix(p.Y);
+            Mix(p.VX);
+            Mix(p.VY);
+            Mix(p.FromX);
+            Mix(p.FromY);
+            Mix(p.Damage);
+            Mix(p.Type);
+            Mix(p.Life);
+            Mix(p.Shooter);
+            Mix(p.Done ? 1 : 0);
         }
     }
 }

@@ -41,6 +41,9 @@ public class SaveTests(ITestOutputHelper output)
             new PlaceBuildingCommand(Me, home.Id, "thruster", ux + 2, uy));
         At(5, new ActivateUnitCommand(Me, home.Id, ux + 1, uy));
         At(6, new MoveUnitsCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY));
+        // Combat orders with nothing hostile around: the attacks are no-ops, the attack-move flies to the same point.
+        At(7, new AttackMoveCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY),
+            new AttackCommand(Me, [1], 99), new AttackBuildingCommand(Me, [1], home.Id, x0, y0));
         At(20, new DeployUnitCommand(Me, 1));
         At(30);
         return sim;

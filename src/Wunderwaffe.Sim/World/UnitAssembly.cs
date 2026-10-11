@@ -57,6 +57,8 @@ public static class UnitAssembly
             return PlaceResult.Blocked;
         if (!tile.Grid.Buildable(x, y))
             return PlaceResult.BadTerrain;
+        if (tile.Grid.WreckAt(x, y) != null)
+            return PlaceResult.Wreck;
         return tile.Inventory.Has(Balance.FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
     }
 
@@ -202,7 +204,7 @@ public static class UnitAssembly
         {
             var (dx, dy) = Turn(c.GX - unit.CoreGX, c.GY - unit.CoreGY, q);
             int cx = coreX + dx, cy = coreY + dy;
-            if (!grid.Buildable(cx, cy) || grid.BuildingAt(cx, cy) != null || grid.HasFrame(cx, cy))
+            if (!grid.Buildable(cx, cy) || grid.BuildingAt(cx, cy) != null || grid.HasFrame(cx, cy) || grid.WreckAt(cx, cy) != null)
                 return DeployResult.Blocked;
             cells.Add((cx, cy));
         }
@@ -234,12 +236,13 @@ public static class UnitAssembly
             var recipe = block.RecipeId == null ? null : sim.Content.Recipes[block.RecipeId];
             tile.Grid.Add(sim.Content.Buildings[block.DefId], unit.Owner, x, y, w, h, rotation, recipe, block.Hp);
         }
+        tile.Inventory.Add(unit.Cargo.Entries.ToDictionary(e => e.Key, e => (int)e.Value));
         sim.RemoveUnit(unit);
         return DeployResult.Ok;
     }
 
     /// <summary>Quarter turns clockwise (y down): east becomes south.</summary>
-    static (int X, int Y) Turn(int x, int y, int quarters) => (quarters & 3) switch
+    internal static (int X, int Y) Turn(int x, int y, int quarters) => (quarters & 3) switch
     {
         0 => (x, y),
         1 => (-y, x),

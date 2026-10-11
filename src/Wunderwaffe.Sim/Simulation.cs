@@ -137,6 +137,7 @@ public sealed partial class Simulation(ContentDb content)
 
         foreach (var tile in _tiles)
             TileEntities.Step(this, tile);
+        Combat.Step(this);
         UnitPhysics.Step(this);
         Progression.Step(this);
 
@@ -178,6 +179,8 @@ public sealed partial class Simulation(ContentDb content)
 
     internal bool TryRemove(TileState tile, int player, int x, int y)
     {
+        if (tile.Grid.BuildingAt(x, y) == null && tile.Grid.WreckAt(x, y) != null)
+            return Combat.ClearWreck(this, tile, player, x, y);
         if (tile.Owner != player || tile.Grid.BuildingAt(x, y) is not { } b || b.DefId == CoreBuildingId)
             return false;
 

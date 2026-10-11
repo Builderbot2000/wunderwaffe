@@ -4,5 +4,6 @@
   { "id": "coal",         "name": "Coal",         "tier": 1, "regional": true },
   { "id": "copper_plate", "name": "Copper Plate", "tier": 2 },
   { "id": "iron_plate",   "name": "Iron Plate",   "tier": 2 },
-  { "id": "steel",        "name": "Steel",        "tier": 3 }
+  { "id": "steel",        "name": "Steel",        "tier": 3 },
+  { "id": "shell",        "name": "Shell",        "tier": 2 }
 ]
