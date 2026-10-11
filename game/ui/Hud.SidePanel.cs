@@ -15,7 +15,7 @@ public partial class Hud
 {
     TileState SelectedWorldTile() => Sim.TryGetTile(WorldMap.SelectedTileId) ?? _host.ViewedTile;
 
-    void ClaimSelected() => Sim.Enqueue(new ClaimTileCommand(Me, SelectedWorldTile().Id));
+    void ClaimSelected() => _host.Send(new ClaimTileCommand(Me, SelectedWorldTile().Id));
 
     static string InventoryKey(TileState tile) => string.Join(",", tile.Inventory.Entries.Select(kv => kv.Key + kv.Value));
 

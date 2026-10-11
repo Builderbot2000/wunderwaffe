@@ -98,10 +98,10 @@ public sealed class AiPlayer(int player)
         public int Lines(int tile, string recipe, string sinkDef) =>
             Outlets[tile].Count(kv => Buildings[tile][kv.Key].RecipeId == recipe && Buildings[tile].TryGetValue(kv.Value, out var o) && o.DefId == sinkDef);
 
-        readonly Dictionary<int, TileView> _tiles = [];
+        readonly Dictionary<int, TileInfo> _tiles = [];
 
         /// <summary>The tile's view, computed once per decision.</summary>
-        public TileView Tile(int tile)
+        public TileInfo Tile(int tile)
         {
             if (!_tiles.TryGetValue(tile, out var view))
                 _tiles[tile] = view = Q.Tile(tile)!;

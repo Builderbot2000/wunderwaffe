@@ -5,7 +5,8 @@ using Wunderwaffe.Game.Input;
 namespace Wunderwaffe.Game.Screens;
 
 /// <summary>
-/// Esc menu: pauses the match (the sim stops with the scene tree) and offers save, load, settings and quitting.
+/// Esc menu: pauses the match (the sim stops with the scene tree) and offers save, load, settings and quitting. In
+/// multiplayer nothing pauses (OQ-32): the menu opens over a running match and loading is off.
 /// Placed first in the scene so it only sees Esc after the build and unit tools have had their turn to use it.
 /// </summary>
 public partial class PauseMenu : CanvasLayer
@@ -15,6 +16,8 @@ public partial class PauseMenu : CanvasLayer
     Control _main = null!;
     Control? _sub;
     Label _status = null!;
+    Label _heading = null!;
+    Button _load = null!;
 
     public bool IsOpen => _root.Visible;
 
@@ -33,10 +36,12 @@ public partial class PauseMenu : CanvasLayer
         AddChild(_root);
 
         var col = Ui.Column(10);
-        col.AddChild(Ui.Label("Paused", 30, Ui.Accent));
+        _heading = Ui.Label("Paused", 30, Ui.Accent);
+        col.AddChild(_heading);
         col.AddChild(Ui.Button("Resume", Close, 280));
         col.AddChild(Ui.Button("Save game", Save));
-        col.AddChild(Ui.Button("Load game", () => Show(LoadMenu.Build(Load, Back))));
+        _load = Ui.Button("Load game", () => Show(LoadMenu.Build(Load, Back)));
+        col.AddChild(_load);
         col.AddChild(Ui.Button("Settings", () => Show(GameSettings.BuildPanel(Back))));
         col.AddChild(Ui.Button("Quit to title", () => _host.QuitToTitle()));
         col.AddChild(Ui.Button("Quit to desktop", () => GetTree().Quit()));
@@ -50,7 +55,10 @@ public partial class PauseMenu : CanvasLayer
     {
         _status.Text = "";
         _root.Visible = true;
-        GetTree().Paused = true;
+        bool online = _host.IsMultiplayer;
+        _heading.Text = online ? "Menu · the match goes on" : "Paused";
+        _load.Disabled = online;
+        GetTree().Paused = !online;
     }
 
     public void Close()

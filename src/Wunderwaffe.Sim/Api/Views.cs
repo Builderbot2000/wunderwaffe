@@ -33,7 +33,7 @@ public sealed record TileSummary(
 /// <param name="Ports">Per neighbour with ports: (neighbour id, exports, imports).</param>
 /// <param name="Claim">What claiming it would do for the asking player.</param>
 /// <param name="ClaimPayer">The tile that would pay for the claim, or -1.</param>
-public sealed record TileView(
+public sealed record TileInfo(
     int Id, string Name, int Owner, string Biome, int OriginX, int OriginY, int Width, int Height,
     int Area, int Buildable, IReadOnlyList<int> Neighbors, IReadOnlyList<TerrainShare> Terrain,
     IReadOnlyDictionary<string, int> Deposits, IReadOnlyList<string> MissingRegional,
@@ -64,7 +64,7 @@ public sealed record BuildingView(
 /// <summary>A unit.</summary>
 /// <param name="CellX">World cell under the unit's centre of mass.</param>
 /// <param name="DestTileId">Where it is headed, or -1 when not moving.</param>
-public sealed record UnitView(
+public sealed record UnitInfo(
     int Id, int Owner, int TileId, int CellX, int CellY, int Blocks, int Hp, int MaxHp, int Mass, int MaxSpeed,
     bool Moving, int DestTileId, int DestX, int DestY);
 

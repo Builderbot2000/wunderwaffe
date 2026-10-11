@@ -12,7 +12,7 @@ public static class DebugTools
     public static void Cheat(SimHost host)
     {
         foreach (var item in host.Content.Items.Keys)
-            host.Sim.Enqueue(new DebugGrantCommand(host.LocalPlayer, host.ViewedTile.Id, item, 1000));
+            host.Send(new DebugGrantCommand(host.LocalPlayer, host.ViewedTile.Id, item, 1000));
     }
 
     /// <summary>

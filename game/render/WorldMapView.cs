@@ -98,7 +98,7 @@ public partial class WorldMapView : Node2D
         }
         else if (e.IsActionPressed(InputActions.WorldClaim))
         {
-            _host.Sim.Enqueue(new ClaimTileCommand(_host.LocalPlayer, SelectedTileId));
+            _host.Send(new ClaimTileCommand(_host.LocalPlayer, SelectedTileId));
         }
     }
 

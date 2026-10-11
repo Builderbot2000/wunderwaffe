@@ -125,7 +125,7 @@ public partial class BuildTool : Node2D
                 : Placement.Check(_host.Sim, tile, _host.LocalPlayer, tool.BuildingId, x, y, _rotation, tool.RecipeId, out _);
             if (!overUi && Godot.Input.IsMouseButtonPressed(MouseButton.Left) && cell != _lastActionCell && _preview == PlaceResult.Ok)
             {
-                _host.Sim.Enqueue(tool.IsFrame
+                _host.Send(tool.IsFrame
                     ? new PlaceFrameCommand(_host.LocalPlayer, tile.Id, x, y)
                     : new PlaceBuildingCommand(_host.LocalPlayer, tile.Id, tool.BuildingId, x, y, _rotation, tool.RecipeId));
                 _lastActionCell = cell;
@@ -133,7 +133,7 @@ public partial class BuildTool : Node2D
         }
         if (_selected >= 0 && !overUi && Godot.Input.IsMouseButtonPressed(MouseButton.Right) && cell != _lastActionCell)
         {
-            _host.Sim.Enqueue(_tools[_selected].IsFrame
+            _host.Send(_tools[_selected].IsFrame
                 ? new RemoveFrameCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y)
                 : new RemoveBuildingCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y));
             _lastActionCell = cell;

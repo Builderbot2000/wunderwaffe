@@ -5,11 +5,14 @@ using System.Linq;
 using Godot;
 using Wunderwaffe.Game.Debug;
 using Wunderwaffe.Game.Input;
+using Wunderwaffe.Game.Net;
 using Wunderwaffe.Game.Render;
 using Wunderwaffe.Game.Screens;
 using Wunderwaffe.Sim;
+using Wunderwaffe.Sim.Ai;
 using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
+using Wunderwaffe.Sim.Net;
 using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game;
@@ -23,8 +26,12 @@ public enum ViewMode
 /// <summary>
 /// The autoload that owns the match (<see cref="Instance"/>): starts a new one or rebuilds a saved one, then advances it
 /// at a fixed tick rate, independent of frame rate. Frame delta is only used to decide how many ticks to run; it never
-/// enters sim state. Pausing the scene tree pauses the sim too. Also holds what every view shares: which layer is shown,
-/// the viewed tile and the unit selection.
+/// enters sim state. Pausing the scene tree pauses the sim too (single player only: multiplayer never pauses, OQ-32).
+/// Also holds what every view shares: which layer is shown, the viewed tile and the unit selection.
+/// <para>
+/// Every player action goes through <see cref="Send"/>: straight into the sim alone, through <see cref="Lockstep"/> in
+/// multiplayer (MP-003). The match's AI seats run here, on the host only (MP-002).
+/// </para>
 /// </summary>
 public partial class SimHost : Node
 {
@@ -40,6 +47,7 @@ public partial class SimHost : Node
     double _accumulator;
     Replay? _replay;
     int _viewedTileId;
+    AiDirector? _ai;
 
     public static SimHost Instance { get; private set; } = null!;
 
@@ -49,7 +57,29 @@ public partial class SimHost : Node
     public Simulation Sim { get; private set; } = null!;
 
     public bool HasGame { get; private set; }
-    public int LocalPlayer => 0;
+
+    /// <summary>The seat this machine plays: 0 alone, the lobby's seat in multiplayer.</summary>
+    public int LocalPlayer { get; private set; }
+
+    /// <summary>The multiplayer link (lobby and transport). Lives as long as the game.</summary>
+    public NetSession Net { get; private set; } = null!;
+
+    /// <summary>The running multiplayer match's lockstep, or null alone.</summary>
+    public Lockstep? Lockstep { get; private set; }
+
+    public bool IsMultiplayer => Lockstep != null;
+
+    /// <summary>
+    /// Issues a command for the local player: into the sim's next tick alone, or into lockstep in multiplayer, where it
+    /// applies a few turns later on every machine at once. Never call <see cref="Simulation.Enqueue"/> from the game.
+    /// </summary>
+    public void Send(Command command)
+    {
+        if (Lockstep is { } lockstep)
+            lockstep.Submit(command);
+        else
+            Sim.Enqueue(command);
+    }
 
     /// <summary>Ids of the local player's selected units. Shared by the tile view and the world map.</summary>
     public HashSet<int> Selected { get; } = [];
@@ -65,6 +95,12 @@ public partial class SimHost : Node
     /// pictures of the tiles every <see cref="GameSettings.SnapshotEvery"/> switches.
     /// </summary>
     public int ToggleCount { get; private set; }
+
+    /// <summary>
+    /// A world cell the camera should centre on at its next frame (alerts and the armies list jump here), or null.
+    /// The camera clears it.
+    /// </summary>
+    public Vector2I? FocusCell { get; set; }
 
     /// <summary>Raised after <see cref="View"/> or <see cref="ViewedTile"/> changes. Prefer <see cref="WatchView"/>.</summary>
     public event Action? ViewChanged;
@@ -111,6 +147,7 @@ public partial class SimHost : Node
         if (View != ViewMode.World)
             ToggleCount++;
         View = ViewMode.World;
+        Send(new SetViewedTileCommand(LocalPlayer, -1));
         ViewChanged?.Invoke();
     }
 
@@ -123,6 +160,8 @@ public partial class SimHost : Node
         if (View != ViewMode.Tile)
             ToggleCount++;
         View = ViewMode.Tile;
+        // Lockstep input too: the sim runs viewed tiles in full detail (scaling's rate mode).
+        Send(new SetViewedTileCommand(LocalPlayer, tile.Id));
         ViewChanged?.Invoke();
         return true;
     }
@@ -131,6 +170,8 @@ public partial class SimHost : Node
     {
         Instance = this;
         InputActions.Register();
+        Net = new NetSession { Name = "Net" };
+        AddChild(Net);
     }
 
     public override void _Ready()
@@ -150,6 +191,17 @@ public partial class SimHost : Node
     public void StartNew(GameSetup setup, ViewMode view = ViewMode.World)
     {
         Begin(Simulation.NewGame(Content, setup), view);
+        GoTo(GameScene);
+    }
+
+    /// <summary>
+    /// Starts a multiplayer match on every machine at once (the lobby calls it): same setup, this machine's seat. The
+    /// host also runs the AI seats and passes their moves on as its own input.
+    /// </summary>
+    public void StartMultiplayer(GameSetup setup, int seat, bool isHost, IEnumerable<int> clientSeats)
+    {
+        var sim = Simulation.NewGame(Content, setup);
+        Begin(sim, ViewMode.World, seat, new Lockstep(sim, seat, isHost, clientSeats));
         GoTo(GameScene);
     }
 
@@ -200,14 +252,22 @@ public partial class SimHost : Node
     {
         HasGame = false;
         _replay = null;
+        Lockstep = null;
+        _ai = null;
+        Net.Leave();
         GetTree().Paused = false;
         GoTo(TitleScene);
     }
 
-    void Begin(Simulation sim, ViewMode view)
+    void Begin(Simulation sim, ViewMode view, int seat = 0, Lockstep? lockstep = null)
     {
         Sim = sim;
         HasGame = true;
+        LocalPlayer = seat;
+        Lockstep = lockstep;
+        _ai = sim.Setup is { AiPlayers: > 0 } setup && lockstep?.IsHost != false ? new AiDirector(setup) : null;
+        if (lockstep != null && _ai is { } ai)
+            lockstep.HostInputs = (s, ticks) => ai.Collect(s, ticks);
         Selected.Clear();
         _accumulator = 0;
         StepMs = TotalStepMs = 0;
@@ -225,6 +285,13 @@ public partial class SimHost : Node
     public bool TryAutoStart()
     {
         var args = OS.GetCmdlineUserArgs();
+        // `-- --net-smoke host|join`: two local instances play a short online match (MP-003).
+        int smoke = Array.IndexOf(args, "--net-smoke");
+        if (smoke >= 0)
+        {
+            NetSmoke.Attach(this, smoke + 1 < args.Length ? args[smoke + 1] : "host");
+            return true;
+        }
         int drive = Array.IndexOf(args, "--drive");
         bool stress = args.Contains("--stress");
         if (drive < 0 && !stress)
@@ -243,9 +310,9 @@ public partial class SimHost : Node
     {
         if (!HasGame)
             return;
-        if (e.IsActionPressed(InputActions.DebugCheat))
+        if (e.IsActionPressed(InputActions.DebugCheat) && !IsMultiplayer)
             DebugTools.Cheat(this);
-        else if (e.IsActionPressed(InputActions.Stress) && View == ViewMode.Tile)
+        else if (e.IsActionPressed(InputActions.Stress) && View == ViewMode.Tile && !IsMultiplayer)
             DebugTools.StressFill(this);
         else if (e.IsActionPressed(InputActions.WorldToggle))
         {
@@ -271,15 +338,35 @@ public partial class SimHost : Node
         while (_accumulator >= TickSeconds && steps < MaxTicksPerFrame)
         {
             long t0 = Stopwatch.GetTimestamp();
-            Sim.Step();
+            if (Lockstep is { } lockstep)
+            {
+                // Waiting for a turn from the host (or, on the host, for a slow client): time stands still.
+                if (lockstep.Advance(1) == 0)
+                {
+                    _accumulator = Math.Min(_accumulator, TickSeconds);
+                    break;
+                }
+            }
+            else
+            {
+                if (_ai != null)
+                {
+                    foreach (var command in _ai.Collect(Sim))
+                        Sim.Enqueue(command);
+                }
+                Sim.Step();
+            }
             double ms = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
             StepMs = StepMs == 0 ? ms : StepMs * 0.95 + ms * 0.05;
             TotalStepMs += ms;
             _accumulator -= TickSeconds;
             steps++;
         }
+        // Falling behind: alone, drop time rather than spiral; in multiplayer catch up over the next frames instead.
         if (steps == MaxTicksPerFrame)
-            _accumulator = 0; // Falling behind: drop time rather than spiral.
+            _accumulator = IsMultiplayer ? Math.Min(_accumulator, 1.0) : 0;
+        if (Lockstep is { } ls)
+            Net.Flush(ls);
     }
 
     void AdvanceLoad()

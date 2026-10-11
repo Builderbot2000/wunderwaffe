@@ -3,12 +3,24 @@ using Godot;
 
 namespace Wunderwaffe.Game.Screens;
 
+/// <summary>Which alert groups the HUD lists (UI-003).</summary>
+[Flags]
+public enum AlertFilter
+{
+    Combat = 1,
+    Production = 2,
+    Units = 4,
+    Territory = 8,
+    All = Combat | Production | Units | Territory,
+}
+
 /// <summary>Player settings, kept in <c>user://settings.cfg</c> and applied at startup.</summary>
 public static class GameSettings
 {
     const string Path = "user://settings.cfg";
     const string Section = "display";
     const string MapSection = "map";
+    const string HudSection = "hud";
 
     public const int MaxSnapshotEvery = 20;
 
@@ -17,6 +29,9 @@ public static class GameSettings
 
     /// <summary>The world map redraws its blurred pictures of the tiles every this many switches between views.</summary>
     public static int SnapshotEvery { get; private set; } = 3;
+
+    /// <summary>Alert groups shown in the HUD's alert list.</summary>
+    public static AlertFilter Alerts { get; private set; } = AlertFilter.All;
 
     /// <summary>Raised after any setting changes, so open settings panels can refresh.</summary>
     public static event Action? Changed;
@@ -29,6 +44,7 @@ public static class GameSettings
             Fullscreen = (bool)cfg.GetValue(Section, "fullscreen", false);
             VSync = (bool)cfg.GetValue(Section, "vsync", true);
             SnapshotEvery = Math.Clamp((int)cfg.GetValue(MapSection, "snapshot_every", 3), 1, MaxSnapshotEvery);
+            Alerts = (AlertFilter)(int)cfg.GetValue(HudSection, "alerts", (int)AlertFilter.All) & AlertFilter.All;
         }
         Apply();
     }
@@ -54,6 +70,12 @@ public static class GameSettings
         Changed?.Invoke();
     }
 
+    public static void SetAlert(AlertFilter filter, bool on)
+    {
+        Alerts = on ? Alerts | filter : Alerts & ~filter;
+        Save();
+    }
+
     static void Apply()
     {
         // Headless runs have no window to change.
@@ -70,6 +92,7 @@ public static class GameSettings
         cfg.SetValue(Section, "fullscreen", Fullscreen);
         cfg.SetValue(Section, "vsync", VSync);
         cfg.SetValue(MapSection, "snapshot_every", SnapshotEvery);
+        cfg.SetValue(HudSection, "alerts", (int)Alerts);
         cfg.Save(Path);
     }
 

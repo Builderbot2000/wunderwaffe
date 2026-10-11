@@ -43,7 +43,9 @@ public partial class UiTour : Node
             _savesBefore = SaveSlots.List().Select(s => s.Path).ToHashSet();
             Shot("01_title");
         });
-        Step(1, "new game", () => Press("New game"));
+        Step(1, "multiplayer", () => Press("Multiplayer"));
+        Step(10, "multiplayer page", () => { Shot("01b_multiplayer"); Press("Back"); });
+        Step(5, "new game", () => Press("New game"));
         Step(10, "setup", () => { Shot("02_new_game"); Press("Start"); });
         Step(40, "world", () => Shot("03_world"));
         Step(1, "enter", () => _host.EnterTile(_host.ViewedTile.Id));

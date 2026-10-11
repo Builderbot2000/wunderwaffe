@@ -13,7 +13,7 @@ namespace Wunderwaffe.Sim.Api;
 /// </summary>
 public sealed partial class GameQuery(Simulation sim, int player)
 {
-    /// <summary>Whose eyes this query sees through: <see cref="TileView.Claim"/> and the checks are for them.</summary>
+    /// <summary>Whose eyes this query sees through: <see cref="TileInfo.Claim"/> and the checks are for them.</summary>
     public int Player { get; } = player;
 
     public ContentDb Content => sim.Content;
@@ -90,7 +90,7 @@ public sealed partial class GameQuery(Simulation sim, int player)
     /// <summary>The tile under a world cell, or -1.</summary>
     public int TileAtCell(int worldX, int worldY) => sim.TileAtCell(worldX, worldY)?.Id ?? -1;
 
-    public TileView? Tile(int tileId)
+    public TileInfo? Tile(int tileId)
     {
         if (sim.TryGetTile(tileId) is not { } t)
             return null;
@@ -119,7 +119,7 @@ public sealed partial class GameQuery(Simulation sim, int player)
                 ports.Add(new PortLink(n, exports, imports));
         }
         var claim = Expansion.Check(sim, Player, t.Id, out var payer);
-        return new TileView(
+        return new TileInfo(
             t.Id, t.Name, t.Owner, t.Biome, t.OriginX, t.OriginY, grid.Width, grid.Height, grid.Area, grid.BuildableCount,
             t.Neighbors, terrain, deposits, missing, InventoryOf(t), grid.BuildingCount, ports, claim, payer?.Id ?? -1);
     }
@@ -224,12 +224,12 @@ public sealed partial class GameQuery(Simulation sim, int player)
     // ---- Units ----
 
     /// <summary>Units in id order: all of them, or only <paramref name="owner"/>'s.</summary>
-    public IReadOnlyList<UnitView> Units(int? owner = null) =>
+    public IReadOnlyList<UnitInfo> Units(int? owner = null) =>
         sim.Units.Where(u => owner == null || u.Owner == owner).Select(View).ToList();
 
-    public UnitView? Unit(int unitId) => sim.UnitById(unitId) is { } u ? View(u) : null;
+    public UnitInfo? Unit(int unitId) => sim.UnitById(unitId) is { } u ? View(u) : null;
 
-    UnitView View(Unit u)
+    UnitInfo View(Unit u)
     {
         int hp = 0, max = 0;
         foreach (var b in u.Blocks)
@@ -237,7 +237,7 @@ public sealed partial class GameQuery(Simulation sim, int player)
             hp += b.Hp;
             max += sim.Content.Buildings[b.DefId].Hp;
         }
-        return new UnitView(
+        return new UnitInfo(
             u.Id, u.Owner, u.TileId, (int)IntMath.FloorDiv(u.X, World.Unit.CellScale), (int)IntMath.FloorDiv(u.Y, World.Unit.CellScale),
             u.Blocks.Count, hp, max, u.Mass, u.MaxSpeed, u.Moving, u.Moving ? u.DestTileId : -1, u.DestX, u.DestY);
     }

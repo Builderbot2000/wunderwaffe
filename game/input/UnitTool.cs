@@ -173,7 +173,7 @@ public partial class UnitTool : Node2D
     }
 
     void Send(int tileId, int x, int y) =>
-        _host.Sim.Enqueue(new MoveUnitsCommand(_host.LocalPlayer, [.. _host.Selected.Order()], tileId, x, y));
+        _host.Send(new MoveUnitsCommand(_host.LocalPlayer, [.. _host.Selected.Order()], tileId, x, y));
 
     Vector2I HoveredCell() => TileView.CellAt(GetGlobalMousePosition());
 
@@ -184,11 +184,11 @@ public partial class UnitTool : Node2D
         var tile = _host.ViewedTile;
         if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.UnitCore })
         {
-            _host.Sim.Enqueue(new ActivateUnitCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y));
+            _host.Send(new ActivateUnitCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y));
             return;
         }
         foreach (int id in _host.Selected.Order())
-            _host.Sim.Enqueue(new DeployUnitCommand(_host.LocalPlayer, id));
+            _host.Send(new DeployUnitCommand(_host.LocalPlayer, id));
         _host.Selected.Clear();
     }
 }

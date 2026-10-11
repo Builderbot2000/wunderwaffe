@@ -16,6 +16,9 @@ namespace Wunderwaffe.Game.Screens;
 /// <item><c>Hud.SidePanel.cs</c>: the viewed tile's inventory, or the selected world tile with claim/open (left).</item>
 /// <item><c>Hud.BuildBar.cs</c>: build bar and what the picked building would do (bottom centre).</item>
 /// <item><c>Hud.Hover.cs</c>: what's under the cursor (bottom left).</item>
+/// <item><c>Hud.World.cs</c>: resource summary and armies (UI-001).</item>
+/// <item><c>Hud.Alerts.cs</c>: cross-tile alerts with a filter, click to jump (UI-003).</item>
+/// <item><c>Hud.Match.cs</c>: end screen (MP-001) and multiplayer status (MP-003).</item>
 /// </list>
 /// F1 opens the controls, F2 the performance line.
 /// </summary>
@@ -126,6 +129,8 @@ public partial class Hud : Control
         buttons.AddChild(_enter);
         side.AddChild(buttons);
         col.AddChild(Ui.Panel(side));
+        BuildMatch(top);
+        BuildWorldHud(top, col);
     }
 
     void BuildRight()
@@ -148,6 +153,7 @@ public partial class Hud : Control
         goal.AddChild(_goalText);
         goal.AddChild(bar);
         col.AddChild(Ui.Panel(goal));
+        BuildAlerts(col);
 
         _toasts = Ui.Column(6);
         col.AddChild(_toasts);
@@ -281,6 +287,7 @@ public partial class Hud : Control
             _stats.Text = $"{Engine.GetFramesPerSecond()} fps · sim {_host.StepMs:F3} ms/tick · tick {Sim.Tick}";
         UpdateBuildBar();
         CheckProgress();
+        UpdateMatch(delta);
 
         // A new tile picked on the world map shows at once rather than at the next slow refresh.
         int selected = _host.View == ViewMode.World ? WorldMap.SelectedTileId : -1;
@@ -297,6 +304,8 @@ public partial class Hud : Control
     void RefreshSlow()
     {
         RefreshGoal();
+        RefreshAlerts();
+        RefreshWorldHud();
         if (_host.View == ViewMode.Tile)
         {
             _title.Text = _host.ViewedTile.Name;

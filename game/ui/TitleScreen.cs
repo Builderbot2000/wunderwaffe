@@ -1,17 +1,18 @@
+using System.Linq;
 using Godot;
+using Wunderwaffe.Game.Net;
 using Wunderwaffe.Game.Render;
 using Wunderwaffe.Sim;
 
 namespace Wunderwaffe.Game.Screens;
 
 /// <summary>
-/// The first screen: new game (seed and map size), continue the newest save, load, settings, quit. Also shows load
-/// progress while <see cref="SimHost"/> replays a save, whether it was picked here or in the pause menu.
+/// The first screen: new game (match settings, MP-005), multiplayer (host/join lobby, MP-003), continue the newest
+/// save, load, settings, quit. Also shows load progress while <see cref="SimHost"/> replays a save, whether it was
+/// picked here or in the pause menu.
 /// </summary>
 public partial class TitleScreen : Control
 {
-    static readonly (string Name, int Size)[] MapSizes = [("Small · 5 × 5", 5), ("Medium · 7 × 7", 7), ("Large · 9 × 9", 9)];
-
     SimHost _host = null!;
     Control _pages = null!;
     Control _menu = null!;
@@ -54,6 +55,8 @@ public partial class TitleScreen : Control
             _host.PendingLoad = null;
             Load(path);
         }
+        _host.Net.Changed += OnNetChanged;
+        TreeExiting += () => _host.Net.Changed -= OnNetChanged;
     }
 
     void BuildBackground()
@@ -96,6 +99,7 @@ public partial class TitleScreen : Control
     {
         var col = Ui.Column(10);
         col.AddChild(Ui.Button("New game", () => Show(BuildNewGame()), 320));
+        col.AddChild(Ui.Button("Multiplayer", () => Show(BuildMultiplayer())));
         var newest = SaveSlots.Newest();
         var cont = Ui.Button("Continue", () => Load(newest!.Path));
         cont.Disabled = newest == null;
@@ -114,41 +118,127 @@ public partial class TitleScreen : Control
     {
         var col = Ui.Column(10);
         col.AddChild(Ui.Heading("New game"));
-
-        col.AddChild(Ui.Label("Seed", Ui.SmallFont, Ui.Muted));
-        var seedRow = Ui.Row();
-        var seed = new LineEdit { Text = RandomSeed(), CustomMinimumSize = new Vector2(260, 0), PlaceholderText = "number or any text" };
-        seedRow.AddChild(seed);
-        seedRow.AddChild(Ui.Button("Random", () => seed.Text = RandomSeed()));
-        col.AddChild(seedRow);
-
-        col.AddChild(Ui.Label("Map size", Ui.SmallFont, Ui.Muted));
-        var size = new OptionButton { FocusMode = FocusModeEnum.None };
-        foreach (var (name, _) in MapSizes)
-            size.AddItem(name);
-        size.Selected = 0;
-        col.AddChild(size);
-
-        col.AddChild(Ui.Label("You start in the middle of the map with one tile, a core and some ore. " +
-                              "Follow the objectives in the top right.", Ui.SmallFont, Ui.Muted, 400));
+        var form = new MatchSettings(MatchSettings.NewDefault(), 1);
+        col.AddChild(form.Root);
+        col.AddChild(Ui.Label("You start with one tile, a core and some ore. Follow the objectives in the top right. " +
+                              "AI opponents start on their own tiles elsewhere on the map.", Ui.SmallFont, Ui.Muted, 400));
         var row = Ui.Row();
-        row.AddChild(Ui.Button("Start", () =>
-        {
-            int n = MapSizes[size.Selected].Size;
-            _host.StartNew(new GameSetup(n, n, GameSetup.ParseSeed(seed.Text.Length == 0 ? "3037" : seed.Text)));
-        }, 160));
+        row.AddChild(Ui.Button("Start", () => _host.StartNew(form.Read()), 160));
         row.AddChild(Ui.Button("Back", Back));
         col.AddChild(row);
         return Ui.Panel(col);
     }
+
+    // ---- Multiplayer (MP-003) ----
+
+    string _playerName = "Commander", _address = "127.0.0.1";
+    int _port = NetSession.DefaultPort;
+    Control? _lobbyPage;
+
+    /// <summary>Name, address and port; host or join.</summary>
+    Control BuildMultiplayer()
+    {
+        var col = Ui.Column(10);
+        col.AddChild(Ui.Heading("Multiplayer"));
+        var grid = new GridContainer { Columns = 2, MouseFilter = MouseFilterEnum.Ignore };
+        grid.AddThemeConstantOverride("h_separation", 14);
+        var name = new LineEdit { Text = _playerName, CustomMinimumSize = new Vector2(260, 0) };
+        var address = new LineEdit { Text = _address, PlaceholderText = "host address" };
+        var port = new SpinBox { MinValue = 1024, MaxValue = 65535, Value = _port, FocusMode = FocusModeEnum.None };
+        grid.AddChild(Ui.Label("Your name", Ui.SmallFont, Ui.Muted));
+        grid.AddChild(name);
+        grid.AddChild(Ui.Label("Host address", Ui.SmallFont, Ui.Muted));
+        grid.AddChild(address);
+        grid.AddChild(Ui.Label("Port", Ui.SmallFont, Ui.Muted));
+        grid.AddChild(port);
+        col.AddChild(grid);
+        var error = Ui.Label(_host.Net.Notice ?? "", Ui.SmallFont, Ui.Warn, 400);
+        void Remember() => (_playerName, _address, _port) = (name.Text, address.Text, (int)port.Value);
+
+        var row = Ui.Row();
+        row.AddChild(Ui.Button("Host game", () =>
+        {
+            Remember();
+            if (_host.Net.Host(_playerName, _port, MatchSettings.NewDefault()) is { } why)
+                error.Text = why;
+            else
+                Show(BuildLobby());
+        }, 160));
+        row.AddChild(Ui.Button("Join", () =>
+        {
+            Remember();
+            if (_host.Net.Join(_playerName, _address, _port) is { } why)
+                error.Text = why;
+            else
+                Show(BuildLobby());
+        }, 120));
+        row.AddChild(Ui.Button("Back", Back));
+        col.AddChild(row);
+        col.AddChild(error);
+        col.AddChild(Ui.Label("Everyone runs the same match in lockstep; nothing pauses. Players on other machines need " +
+                              "the host's address and an open UDP port.", Ui.SmallFont, Ui.Muted, 400));
+        return Ui.Panel(col);
+    }
+
+    /// <summary>The lobby: who is in and the match settings, editable by the host only.</summary>
+    Control BuildLobby()
+    {
+        var net = _host.Net;
+        var col = Ui.Column(10);
+        col.AddChild(Ui.Heading(net.IsHost ? $"Hosting on port {_port}" : $"Lobby · {_address}:{_port}"));
+        var lobby = net.Lobby;
+        if (lobby == null)
+        {
+            col.AddChild(Ui.Label(net.State == NetState.Joining ? "Connecting…" : "Waiting for the host…", Ui.FontSize, Ui.Text));
+        }
+        else
+        {
+            var players = Ui.Column(4);
+            for (int i = 0; i < lobby.Names.Count; i++)
+                players.AddChild(Ui.Label($"{i + 1}. {lobby.Names[i]}{(i == 0 ? "  (host)" : "")}", Ui.FontSize, Palette.Owner(i)));
+            for (int i = 0; i < lobby.Final.AiPlayers; i++)
+                players.AddChild(Ui.Label($"{lobby.Names.Count + i + 1}. AI", Ui.FontSize, Palette.Owner(lobby.Names.Count + i)));
+            col.AddChild(players);
+            if (net.IsHost)
+            {
+                MatchSettings? form = null;
+                form = new MatchSettings(lobby.Setup, lobby.Names.Count, () => net.SetSetup(form!.Read()));
+                col.AddChild(form.Root);
+            }
+            else
+            {
+                col.AddChild(Ui.Label(MatchSettings.Describe(lobby.Final), Ui.SmallFont, Ui.Text, 400));
+            }
+        }
+        var row = Ui.Row();
+        if (net.IsHost)
+            row.AddChild(Ui.Button("Start", net.Start, 160));
+        row.AddChild(Ui.Button("Leave", () => { net.Leave(); Show(BuildMultiplayer()); }));
+        col.AddChild(row);
+        return _lobbyPage = Ui.Panel(col);
+    }
+
+    /// <summary>Redraws the lobby on news from the network; back to the join page if the link failed.</summary>
+    void OnNetChanged()
+    {
+        if (_page == null || _page != _lobbyPage)
+            return;
+        var net = _host.Net;
+        if (net.State == NetState.Offline)
+            Show(BuildMultiplayer());
+        // The host's own edits come back here too; rebuilding would steal the field being typed in.
+        else if (!net.IsHost || net.Lobby?.Names.Count != _shownNames)
+            Show(BuildLobby());
+        _shownNames = net.Lobby?.Names.Count ?? 0;
+    }
+
+    int _shownNames;
 
     static T FullRect<T>(T c) where T : Control
     {
         c.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         return c;
     }
-
-    static string RandomSeed() => (GD.Randi() % 1_000_000).ToString();
 
     void Show(Control page)
     {

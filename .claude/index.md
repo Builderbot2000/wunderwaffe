@@ -42,7 +42,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
 | `Api/GameQuery.cs` | NF-009 read-only observation API for one player (`new GameQuery(sim, player)`): match, players, tiles, cells, buildings, units, goal, events, checks (`CheckPlace`, `CheckClaim`, `CheckActivate`), `Revision`, planner wrappers. Returns `Views` records. The GUI, AI and external drivers all read through it. |
-| `Api/Views.cs` | Plain records `GameQuery` returns (`MatchView`, `PlayerView`, `TileSummary`, `TileView`, `CellView`, `BuildingView`, `UnitView`, `GoalView`, `Spot`, `BeltStep`). Copies, JSON-serialisable. |
+| `Api/Views.cs` | Plain records `GameQuery` returns (`MatchView`, `PlayerView`, `TileSummary`, `TileInfo`, `CellView`, `BuildingView`, `UnitInfo`, `GoalView`, `Spot`, `BeltStep`). Copies, JSON-serialisable. |
 | `Api/Planner.cs` | Read-only layout searches: `FindSpot`, `RouteBelt` (may merge into a belt already ending at the target), `PlanLine` (drill or first stage, stages, belt; optional zone), `FindFrame`, `OutletOf`. Never places; avoids cross-feeding neighbours. |
 | `Ai/AiPlayer.cs` | MP-002 AI seat: stateless `Think` reads `GameQuery`, returns ordinary commands. Priority list Clean/Economy/Steel/Units/Expand/Outposts/Attack. `Expand` is the claim seam (A's scout flow replaces it), `Attack` the combat seam (F). |
 | `Ai/AiDirector.cs` | Runs the AI seats (`GameSetup.IsAi`): `Collect` / `BeforeStep` before each step on the host; replays never run it. |
@@ -60,11 +60,11 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `project.godot` | Main scene `scenes/title.tscn`, autoload `SimHost`, 1920x1080 canvas_items stretch. |
 | `scenes/title.tscn` | Root Control with `TitleScreen`. |
 | `scenes/main.tscn` | Match scene; node order matters for input (PauseMenu first sees Esc last). Wires `[Export]`s: UnitTool→BuildTool, Camera→WorldMapView, Hud→BuildTool/WorldMapView/UnitTool/PauseMenu. |
-| `autoload/SimHost.cs` | `SimHost.Instance`. Owns `Content`, `Sim`, tick loop (`_Process`, max 8 ticks/frame), `ViewMode` (Tile/World) + `ViewedTile`, `Selected` units, `WatchView`/`ShowOnlyIn` helpers, new/save/load (`BeginLoad` replays over frames), quit, CLI flags (`--tour`, `--stress`, `--drive`), F3/F4/Tab. |
+| `autoload/SimHost.cs` | `SimHost.Instance`. Owns `Content`, `Sim`, tick loop (`_Process`, max 8 ticks/frame), `ViewMode` (Tile/World) + `ViewedTile`, `Selected` units, `WatchView`/`ShowOnlyIn` helpers, new/save/load (`BeginLoad` replays over frames), quit, CLI flags (`--tour`, `--stress`, `--drive`), F3/F4/Tab. `LocalPlayer` (seat), `Send(command)` (the only way the game issues commands: sim alone, `Lockstep` online), `Lockstep`/`IsMultiplayer`, AI seats (`AiDirector`, host only), `view_tile` sent on view changes, `FocusCell` (camera jump), `Net` child, `StartMultiplayer`, `--net-smoke`. |
 | `input/InputActions.cs` | Action names + default key bindings (registered in code). |
 | `input/BuildTool.cs` | Build palette (`Tools`, one per building or per recipe for multi-recipe crafters, + frame), selection, `BuildRotation`, placement/removal on mouse, ghost and port-zone drawing, `Preview`, `HoveredZone`, `PickedIsPort`, `HoveredCell`. |
 | `input/UnitTool.cs` | Unit selection (click/box, Shift adds), move orders (tile and world map), G = lift off / land, `Status` text. Active when no building is picked. |
-| `input/CameraController.cs` | Pan/zoom; keeps separate camera per view; fits the world map. |
+| `input/CameraController.cs` | Pan/zoom; keeps separate camera per view; fits the world map. Consumes `SimHost.FocusCell`. |
 | `render/Palette.cs` | `CellPx`=16, placeholder colours (spread by id), terrain colours, `Zone`, `Owner`. |
 | `render/Sprites.cs` | `res://assets/sprites/{id}.png` lookup with cache; null if missing (callers fall back to colours). |
 | `render/TileView.cs` | Tile layer: terrain image, MultiMesh layers (ground, deposits, frames, buildings, belt items), outline/zones. Redraws on `Revision`. `Rect` (quad transform), `CellAt` (canvas pos → cell). |
@@ -75,20 +75,26 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `render/WorldSnapshot.cs` | Downsampled picture of every tile's contents for the world map; `Refresh` repaints changed tiles. |
 | `ui/Ui.cs` | Theme, colours, font sizes, control builders (`Label`, `Button`, `Panel`, `Row`, `Column`, `Icon`, `Items`, `Pin`, `Overlay`, `Clear`, `Clock`). |
 | `ui/GameText.cs` | Player-facing wording: `ItemName`, `Cost`, `Recipe`, `ConditionUnit`, `TerrainName`, `Plural`. |
-| `ui/Hud.cs` | HUD layout, help/complete overlays, per-frame update, `RefreshSlow` (5 Hz). |
+| `ui/Hud.cs` | HUD layout, help/complete overlays, per-frame update, `RefreshSlow` (5 Hz). Calls the `Hud.World`/`Alerts`/`Match` partials. |
 | `ui/Hud.Objectives.cs` | Goal panel, toasts (`Toast`), goal notifications. |
 | `ui/Hud.SidePanel.cs` | Left panel: tile inventory; world-map tile profile/deposits/ports/claim. Cached by `_sideKey`. |
 | `ui/Hud.BuildBar.cs` | Build buttons, afford tinting, tooltips, placement message per `PlaceResult`. |
 | `ui/Hud.Hover.cs` | Hover panel: building/deposit under cursor, machine status, port problems. |
-| `ui/TitleScreen.cs` | Title menu, new game form, load progress bar, handles `SimHost.PendingLoad`. |
-| `ui/PauseMenu.cs` | Esc menu (pauses tree), save/load/settings/quit; `LoadMenu` (save list, shared with title). |
-| `ui/GameSettings.cs` | `user://settings.cfg`: fullscreen, vsync, world-map snapshot interval; settings panel. |
+| `ui/TitleScreen.cs` | Title menu, new game (`MatchSettings`), multiplayer page (name/address/port, host/join) and lobby (players, host-editable settings, Start), load progress bar, handles `SimHost.PendingLoad`. |
+| `ui/PauseMenu.cs` | Esc menu (pauses tree alone; never online, OQ-32, and no loading there), save/load/settings/quit; `LoadMenu` (save list, shared with title). |
+| `ui/GameSettings.cs` | `user://settings.cfg`: fullscreen, vsync, world-map snapshot interval; settings panel. `AlertFilter` flags (`Alerts`, `SetAlert`). |
 | `ui/SaveSlots.cs` | `user://saves/*.json` listing (`SaveInfo`), new path, delete. |
 | `debug/DebugTools.cs` | `Cheat` (F4, items only), `StressFill` (F3 / `--stress`). |
 | `debug/StressBench.cs` | Node that prints ms/tick over 600 ticks after a stress fill; quits if headless. |
 | `debug/DebugDriver.cs` | `--drive`: scripted unit session through injected input, screenshot. |
 | `debug/UiTour.cs` | `--tour`: scripted click-through of all screens with screenshots; cleans up its saves. |
 | `data/*.json` | Content: items, recipes, buildings (order = build menu), goals (order = chain), terrain (order = classification; supports `//` comments). |
+| `net/NetSession.cs` | MP-003 ENet link (child of SimHost): `NetState`, `LobbyInfo` (setup + names, `Final` adds AI seats), `Host`/`Join`/`SetSetup`/`Start`/`Leave`, `Flush(lockstep)`, RPCs `Hello`/`LobbyUpdate`/`StartMatch`/`Deliver` (lockstep JSON). Seats: host 0, clients by join order, AI last. `Notice` for failures and leavers. |
+| `ui/MatchSettings.cs` | MP-005 form: seed, map size, AI count, capture time, victory share, richness → `Read()` a `GameSetup`; `Describe` for clients. |
+| `ui/Hud.World.cs` | UI-001: resource summary over owned tiles (top left), armies list on the world map (click selects and jumps). `Query` = `GameQuery` for the local seat. |
+| `ui/Hud.Alerts.cs` | UI-003: alert list from `GameQuery.AllEvents`, filter toggles per group, combat alerts toast, click jumps (`JumpTo*`), `PlayerName`. |
+| `ui/Hud.Match.cs` | MP-001 end screen (winner, reason, per-player stats); MP-003 status line (waiting, leaver, desync). |
+| `debug/NetSmoke.cs` | `--net-smoke host` / `--net-smoke join`: two headless instances play 1200 ticks over ENet with an AI and report tick, hash, desync. |
 
 ## tests/Wunderwaffe.Sim.Tests (xUnit, real `game/data` content)
 

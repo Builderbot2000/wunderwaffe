@@ -85,6 +85,15 @@ public partial class CameraController : Camera2D
 
     public override void _Process(double delta)
     {
+        if (_host.FocusCell is { } focus)
+        {
+            // A jump from the HUD: centre on that world cell in whichever view is up.
+            _host.FocusCell = null;
+            var tile = _host.ViewedTile;
+            Position = _host.View == ViewMode.Tile
+                ? new Vector2(focus.X - tile.OriginX + 0.5f, focus.Y - tile.OriginY + 0.5f) * Palette.CellPx
+                : new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * WorldMapView.CellPx;
+        }
         var dir = Godot.Input.GetVector(InputActions.CamLeft, InputActions.CamRight, InputActions.CamUp, InputActions.CamDown);
         Position += dir * PanSpeed * (float)delta / Zoom.X;
     }
