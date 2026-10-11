@@ -33,4 +33,8 @@ public sealed partial class GameQuery
             s.Items.Select(i => new ItemRate(i, s.MadePerMinute(i), s.UsedPerMinute(i))).ToList(),
             s.Partners.Select(p => new PartnerRate(p, s.SentPerMinute(p))).ToList());
     }
+
+    /// <summary>One item's made and used counts per 10 s bucket over the last 10 minutes, oldest first (FB-011).</summary>
+    public HistoryView? ProductionHistory(int tileId, string itemId) =>
+        Sim.TryGetTile(tileId) is { } t ? new(t.Stats.MadeHistory(itemId), t.Stats.UsedHistory(itemId)) : null;
 }

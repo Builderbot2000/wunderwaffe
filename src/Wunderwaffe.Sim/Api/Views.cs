@@ -111,3 +111,13 @@ public sealed record ProductionView(IReadOnlyList<ItemRate> Items, IReadOnlyList
 public sealed record ItemRate(string Item, long MadePerMinute, long UsedPerMinute);
 
 public sealed record PartnerRate(int Partner, long SentPerMinute);
+
+/// <summary>A unit's command state (silo E): <paramref name="Order"/> null when idle; <paramref name="SquadId"/> 0 and <paramref name="EscortId"/> -1 when none.</summary>
+public sealed record UnitOrderView(
+    int Id, OrderKind? Order, Stance Stance, int SquadId, int EscortId, LocomotionClass Locomotion, bool Unsupplied);
+
+/// <summary>A design's locomotion (UD-004): <paramref name="Class"/> means something only when <paramref name="Result"/> is Ok.</summary>
+public sealed record LocomotionView(LocomotionResult Result, LocomotionClass Class);
+
+/// <summary>Per-10 s made and used counts over the last 10 minutes, oldest first (FB-011).</summary>
+public sealed record HistoryView(long[] Made, long[] Used);

@@ -26,4 +26,12 @@ public sealed partial class GameQuery
 
     public RallyResult CheckRally(int tileId, int x, int y, int rallyTileId, int rallyX, int rallyY, int squadId = 0) =>
         UnitSim.CheckRally(Sim, Player, tileId, x, y, rallyTileId, rallyX, rallyY, squadId);
+
+    public SquadResult CheckSquad(int squadId) => UnitSim.CheckSquad(Sim, Player, squadId);
+
+    /// <summary>A unit's command state: current order, stance, squad, escort, locomotion and upkeep (UD-013), or null.</summary>
+    public UnitOrderView? UnitOrders(int unitId) =>
+        Sim.UnitById(unitId) is { } u
+            ? new UnitOrderView(u.Id, u.Order?.Kind, u.Stance, u.SquadId, u.EscortId, u.Locomotion, u.Unsupplied)
+            : null;
 }

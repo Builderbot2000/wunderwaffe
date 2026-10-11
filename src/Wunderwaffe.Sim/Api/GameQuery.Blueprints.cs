@@ -23,6 +23,10 @@ public sealed partial class GameQuery
     /// <summary>Derived stats of a design (UD-002): mass, HP, power, cost, build time, DPS, upkeep.</summary>
     public UnitStats BlueprintStats(Blueprint blueprint) => UnitStats.Of(Content, blueprint);
 
+    /// <summary>Where a design could go (UD-004): its locomotion class, or the reason it has none.</summary>
+    public LocomotionView BlueprintLocomotion(Blueprint blueprint) =>
+        new(Locomotion.Check(Content.Buildings, blueprint.Blocks.Select(b => b.DefId), out var cls), cls);
+
     /// <summary>Derived stats of a unit in play, or null.</summary>
     public UnitStats? UnitStatsOf(int unitId) => Sim.UnitById(unitId) is { } u ? UnitStats.Of(Content, u) : null;
 
