@@ -15,7 +15,8 @@ public sealed record Stage(string BuildingId, string? RecipeId = null);
 /// Every placement they return passes <see cref="Placement.Check"/> on the current state except for cost, and keeps
 /// items where they belong: nothing it adds would push items into, or take items from, a building of another line
 /// (machines dump into every neighbour that accepts, so a careless neighbour steals or jams). Deterministic: candidates
-/// are tried nearest first, ties by row then column.
+/// are tried nearest first, ties by row then column. Lines come with the wire that joins their machines to a powered
+/// network (FB-005), when the tile has one.
 /// </summary>
 public static class Planner
 {
@@ -59,7 +60,8 @@ public static class Planner
     /// A whole production line, placed together: a drill on <paramref name="depositItem"/>, or the existing building
     /// <paramref name="source"/>, or (with neither) the first stage anywhere, inside the I/O zone facing tile
     /// <paramref name="zone"/> if given; then each of <paramref name="stages"/> touching the one before, then a belt
-    /// into building <paramref name="sink"/>. Null if no layout fits. The caller places them in order in one tick.
+    /// into building <paramref name="sink"/>, then wire from any machine that would sit off the power to the nearest
+    /// powered network. Null if no layout fits. The caller places them in order in one tick.
     /// </summary>
     public static IReadOnlyList<PlannedBuilding>? PlanLine(Simulation sim, TileState tile, int player, string? depositItem, int source,
         IReadOnlyList<Stage> stages, int sink, int zone = -1)
@@ -381,6 +383,17 @@ public static class Planner
                 if (Route(prev, target) is not { } belt)
                     return null;
                 plan.AddRange(belt.Select(s => new PlannedBuilding("conveyor", s.X, s.Y, s.Rotation, null)));
+                // The belt's cells are taken too, for the wiring.
+                var conveyor = sim.Content.Buildings["conveyor"];
+                foreach (var s in belt)
+                {
+                    Push(new Node(s.X, s.Y, 1, 1, conveyor, null, null));
+                    pushed++;
+                }
+                var machines = _planned.Skip(_planned.Count - pushed).Prepend(start).Where(n => n.Real == null && n.Def.Power > 0).ToList();
+                if (Wire(player, machines) is not { } wires)
+                    return null;
+                plan.AddRange(wires.Select(w => new PlannedBuilding("wire", w.X, w.Y, 0, null)));
                 return plan;
             }
             finally
@@ -389,6 +402,114 @@ public static class Planner
                     Pop();
             }
         }
+
+        /// <summary>
+        /// Wire cells that join every one of <paramref name="machines"/> to a network with a power supply: for each one
+        /// not joined yet, the shortest run of free cells from beside it to beside a joined building. Networks fed by
+        /// a unit on frame count only when there is no other: a unit may lift off and take its power with it. Empty if
+        /// they already are joined, or if the tile has no supplied network to join; null if one can't be reached.
+        /// </summary>
+        List<(int X, int Y)>? Wire(int player, List<Node> machines)
+        {
+            var wires = new List<(int X, int Y)>();
+            var sources = _g.Buildings.Where(b => Supplied(b) && !_g.HasFrame(b.X, b.Y)).ToList();
+            if (sources.Count == 0)
+                sources = _g.Buildings.Where(Supplied).ToList();
+            if (!sim.Content.Buildings.TryGetValue("wire", out var wire) || sources.Count == 0)
+                return wires;
+            int added = 0;
+            try
+            {
+                foreach (var m in machines)
+                {
+                    var joined = Joined(sources);
+                    if (joined.Contains(m))
+                        continue;
+                    if (WireRoute(player, wire, m, joined) is not { } run)
+                        return null;
+                    foreach (var (x, y) in run)
+                    {
+                        Push(new Node(x, y, 1, 1, wire, null, null));
+                        added++;
+                        wires.Add((x, y));
+                    }
+                }
+                return wires;
+            }
+            finally
+            {
+                for (int i = 0; i < added; i++)
+                    Pop();
+            }
+        }
+
+        /// <summary>A real building on a network with something that makes power.</summary>
+        bool Supplied(PlacedBuilding b) => _g.Power.NetworkOf(b) is { } net && net.Members.Any(m => m.Def.PowerSupply > 0);
+
+        /// <summary>Every node, real or planned, joined by touching to one of <paramref name="sources"/>.</summary>
+        HashSet<Node> Joined(List<PlacedBuilding> sources)
+        {
+            var joined = new HashSet<Node>();
+            var stack = new Stack<Node>();
+            foreach (var b in sources)
+            {
+                var n = Wrap(b);
+                if (joined.Add(n))
+                    stack.Push(n);
+            }
+            while (stack.Count > 0)
+            {
+                var n = stack.Pop();
+                foreach (var (x, y) in Perimeter(n.X, n.Y, n.W, n.H))
+                {
+                    if (At(x, y) is { } next && next.Def.IsPower && joined.Add(next))
+                        stack.Push(next);
+                }
+            }
+            return joined;
+        }
+
+        /// <summary>The shortest run of free cells from beside <paramref name="m"/> to beside a joined node, or null.</summary>
+        List<(int X, int Y)>? WireRoute(int player, BuildingDef wire, Node m, HashSet<Node> joined)
+        {
+            int w = _g.Width;
+            var prev = new int[w * _g.Height];
+            Array.Fill(prev, -2);
+            var queue = new Queue<int>();
+            foreach (var (x, y) in Perimeter(m.X, m.Y, m.W, m.H))
+            {
+                if (WireCell(player, wire, x, y) && prev[y * w + x] == -2)
+                {
+                    prev[y * w + x] = -1;
+                    queue.Enqueue(y * w + x);
+                }
+            }
+            while (queue.Count > 0)
+            {
+                int i = queue.Dequeue();
+                int cx = i % w, cy = i / w;
+                if (Directions.All.Any(d => At(cx + d.Dx(), cy + d.Dy()) is { } n && joined.Contains(n)))
+                {
+                    var run = new List<(int X, int Y)>();
+                    for (int k = i; k >= 0; k = prev[k])
+                        run.Add((k % w, k / w));
+                    return run;
+                }
+                foreach (var d in Directions.All)
+                {
+                    int nx = cx + d.Dx(), ny = cy + d.Dy();
+                    if (_g.InRect(nx, ny) && prev[ny * w + nx] == -2 && WireCell(player, wire, nx, ny))
+                    {
+                        prev[ny * w + nx] = i;
+                        queue.Enqueue(ny * w + nx);
+                    }
+                }
+            }
+            return null;
+        }
+
+        bool WireCell(int player, BuildingDef wire, int x, int y) =>
+            Free(x, y) && Placement.Check(sim, tile, player, wire.Id, x, y, 0, null, out _) is PlaceResult.Ok or PlaceResult.CannotAfford;
 
         static bool Touches(Node n, int x, int y) =>
             (x >= n.X && x < n.X + n.W && (y == n.Y - 1 || y == n.Y + n.H)) || (y >= n.Y && y < n.Y + n.H && (x == n.X - 1 || x == n.X + n.W));

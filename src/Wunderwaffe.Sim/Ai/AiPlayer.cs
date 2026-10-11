@@ -173,7 +173,7 @@ public sealed class AiPlayer(int player)
     }
 
     /// <summary>
-    /// Steel: coal mined on a neighbouring tile and shipped home through a port pair, a mill beside the import port fed
+    /// Steel: coal mined on a neighbouring tile (powered by the unit core of the scout that claimed it) and shipped home through a port pair, a mill beside the import port fed
     /// plates by its own smelter line, and a belt from the mill to the core.
     /// </summary>
     IReadOnlyList<Command>? Steel(Context c)
@@ -182,7 +182,7 @@ public sealed class AiPlayer(int player)
         var linked = c.Buildings[h].Values.Where(b => b.DefId == ImportPort).Select(b => b.Partner).ToHashSet();
         int coal = c.Owned.Where(t => t != h && c.Tile(h).Neighbors.Contains(t) && c.HasDeposit(t, Coal))
             .OrderBy(t => linked.Contains(t) ? 0 : 1).ThenBy(t => t).DefaultIfEmpty(-1).First();
-        if (coal < 0 || c.Find(coal, Core) == null)
+        if (coal < 0)
             return null;
 
         // The coal tile: an export port facing home, a coal drill belted into it.
