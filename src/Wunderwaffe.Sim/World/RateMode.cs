@@ -45,28 +45,6 @@ public static class RateMode
         return Ensure(sim, tile);
     }
 
-    /// <summary>
-    /// Tiles that are Contested (WM-004): owned with a unit of another player on them, or unowned with units of two
-    /// players. Seam until territory's own query (Territory.ContestedTiles) is merged; same rule.
-    /// </summary>
-    public static bool[] ContestedTiles(Simulation sim)
-    {
-        var contested = new bool[sim.Tiles.Count];
-        var first = new int[sim.Tiles.Count];
-        Array.Fill(first, -1);
-        foreach (var u in sim.Units)
-        {
-            var tile = sim.Tiles[u.TileId];
-            if (tile.Owner != TileState.Unowned)
-                contested[tile.Id] |= u.Owner != tile.Owner;
-            else if (first[tile.Id] < 0)
-                first[tile.Id] = u.Owner;
-            else
-                contested[tile.Id] |= first[tile.Id] != u.Owner;
-        }
-        return contested;
-    }
-
     internal static void Step(Simulation sim)
     {
         if (!sim.RateModeEnabled)
@@ -260,7 +238,7 @@ public static class RateMode
     /// </summary>
     static void UpdateModes(Simulation sim)
     {
-        var full = ContestedTiles(sim);
+        var full = Territory.ContestedTiles(sim);
         foreach (var p in sim.Players)
         {
             if (p.ViewedTile >= 0 && p.ViewedTile < full.Length)

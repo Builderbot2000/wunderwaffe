@@ -275,7 +275,8 @@ public static class Combat
     /// </summary>
     static void UpdateOrder(Simulation sim, Unit u)
     {
-        if (u.Order is not { Kind: OrderKind.Attack or OrderKind.AttackMove } order || (sim.Tick + u.Id) % OrderTicks != 0)
+        // Abstract units (UC-009) are world-map nodes on tiles nobody contests: no chasing.
+        if (u.Order is not { Kind: OrderKind.Attack or OrderKind.AttackMove } order || (sim.Tick + u.Id) % OrderTicks != 0 || sim.IsAbstract(u))
             return;
         int range = WeaponRange(sim, u);
         if (order.Kind == OrderKind.Attack)
@@ -348,6 +349,8 @@ public static class Combat
 
     static void FireUnit(Simulation sim, TargetIndex targets, Unit u)
     {
+        if (sim.IsAbstract(u))
+            return;
         var preferred = Preferred(sim, u);
         // An explicit attack order fires even on hold-fire stance; otherwise the stance decides (UC-004).
         bool canFire = UnitSim.CanFire(u) || u.Order?.Kind == OrderKind.Attack;
@@ -725,6 +728,9 @@ public static class Combat
             _sim = sim;
             foreach (var u in sim.Units)
             {
+                // Abstract units (UC-009) can't be seen or hit until they materialise.
+                if (sim.IsAbstract(u))
+                    continue;
                 long r = u.Radius + S;
                 for (long by = FloorDiv(u.Y - r, Bucket); by <= FloorDiv(u.Y + r, Bucket); by++)
                 {

@@ -102,9 +102,63 @@ public class AbstractTravelTests(ITestOutputHelper output)
         for (int i = 0; i < 5000 && u.TileId != a.Id; i++)
             sim.Step();
         Assert.Equal(a.Id, u.TileId);
-        Assert.True(RateMode.ContestedTiles(sim)[a.Id]);
+        Assert.True(Territory.ContestedTiles(sim)[a.Id]);
         Assert.True(RateMode.IsFullSim(sim, a));
         Assert.False(sim.IsAbstract(u));
         Assert.False(RateMode.IsFullSim(sim, b));
+    }
+
+    [Fact]
+    public void AnAbstractPatrolTurnsRoundAtEachEnd()
+    {
+        // UC-001 orders behave the same as nodes: arriving hands over to movement, which sends the patrol back.
+        var sim = NewSim();
+        sim.RateModeEnabled = true;
+        var a = Tile(sim, 0, 0);
+        var far = Tile(sim, 2, 0);
+        Tile(sim, 1, 0);
+        var u = Scout(sim, a, 4, 15);
+        sim.Enqueue(new PatrolUnitsCommand(Me, [u.Id], far.Id, 25, 15));
+        sim.Step();
+        Assert.True(sim.IsAbstract(u));
+        for (int i = 0; i < 20_000 && !u.PatrolReturning; i++)
+            sim.Step();
+        Assert.Equal(far.Id, u.TileId);
+        sim.Step();
+        Assert.Equal(OrderKind.Patrol, u.Order?.Kind);
+        Assert.True(u.PatrolReturning);
+        Assert.True(u.Moving);
+        Assert.True(sim.IsAbstract(u));
+    }
+
+    [Fact]
+    public void TurretsCanNotSeeAnAbstractUnitUntilItMaterialises()
+    {
+        // A laser by the border of my viewed tile, an enemy scout parked just across it on their own unviewed tile.
+        var sim = NewSim();
+        sim.RateModeEnabled = true;
+        var a = Tile(sim, 0, 0);
+        var b = Tile(sim, 1, 0, owner: Them);
+        sim.Enqueue(new PlaceBuildingCommand(Me, a.Id, "laser_turret", a.Grid.Width - 2, 15));
+        sim.Enqueue(new SetViewedTileCommand(Me, a.Id));
+        sim.Step();
+        var u = Scout(sim, b, 3, 15, Them);
+        Run(sim, 2);
+        Assert.True(sim.IsAbstract(u));
+        for (int i = 0; i < 300; i++)
+        {
+            sim.Step();
+            Assert.Empty(sim.Projectiles);
+        }
+
+        sim.Enqueue(new SetViewedTileCommand(Them, b.Id));
+        bool fired = false;
+        for (int i = 0; i < 300 && !fired; i++)
+        {
+            sim.Step();
+            fired = sim.Projectiles.Count > 0;
+        }
+        Assert.False(sim.IsAbstract(u));
+        Assert.True(fired);
     }
 }

@@ -78,8 +78,12 @@ public static class AbstractTravel
             }
             (u.X, u.Y) = ((int)x, (int)y);
             UpdateTile(sim, u, node);
-            if (node.Next >= node.Waypoints.Count)
+            if (node.Next >= node.Waypoints.Count && u.Route != null)
+            {
+                // As the physics step: moves end, patrols turn round (a new route, replanned next tick).
                 u.Route = null;
+                UnitSim.Arrived(sim, u);
+            }
         }
     }
 
