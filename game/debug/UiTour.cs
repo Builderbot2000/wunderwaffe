@@ -27,6 +27,7 @@ public partial class UiTour : Node
     // Where Build put the smelter. Tiles are irregular, so it goes on the first open ground near the middle.
     (int X, int Y) _smelter = (44, 40);
     HashSet<string> _savesBefore = [];
+    string? _blueprintId;
 
     public static void Attach(SimHost host, string dir)
     {
@@ -54,6 +55,9 @@ public partial class UiTour : Node
         Step(10, "hover shot", () => Shot("05b_hover"));
         Step(1, "port zones", ShowPortZones);
         Step(10, "port zones shot", () => { Shot("05c_port_zones"); Key(Godot.Key.Escape); });
+        Step(5, "blueprint library", () => { RecordBlueprint(); Press("Blueprints"); });
+        Step(10, "library shot", () => { Shot("05d_blueprints"); Press("Place"); HoverBelow(); });
+        Step(10, "ghost shot", () => { Shot("05e_blueprint_ghost"); Key(Godot.Key.Escape); });
         Step(5, "world again", () => { Key(Godot.Key.Tab); });
         Step(10, "select coal tile", SelectCoalNeighbour);
         Step(1, "lift off scout", LiftOffScout);
@@ -88,6 +92,8 @@ public partial class UiTour : Node
             // Leave the player's saves folder as it was.
             foreach (var save in SaveSlots.List().Where(s => !_savesBefore.Contains(s.Path)))
                 SaveSlots.Delete(save.Path);
+            if (_blueprintId != null)
+                BlueprintLibrary.Delete(_blueprintId);
             GetTree().Quit();
         });
     }
@@ -165,6 +171,24 @@ public partial class UiTour : Node
         Log($"{zones.Count} I/O zones: {string.Join(", ", zones.Select(z => $"tile {z.Neighbor} ({z.Cells} cells)"))}");
         if (zones.Count > 0)
             GetViewport().WarpMouse(GetViewport().GetCanvasTransform() * (zones[0].Label * Palette.CellPx));
+    }
+
+    /// <summary>Records the smelter and its belt as a blueprint, as Capture area would (removed again at the end).</summary>
+    void RecordBlueprint()
+    {
+        var bp = Blueprints.FromArea(_host.ViewedTile, _smelter.X - 4, _smelter.Y, 7, 5)
+                 ?? throw new InvalidOperationException("nothing to record around the smelter");
+        _blueprintId = BlueprintLibrary.Add("Tour blueprint", bp, ["tour"]).Id;
+        Log($"recorded a blueprint of {bp.Blocks.Length} buildings");
+    }
+
+    /// <summary>Moves the mouse below the smelter, where a picked blueprint's ghost then shows.</summary>
+    void HoverBelow()
+    {
+        var at = GetViewport().GetCanvasTransform() * (new Vector2(_smelter.X, _smelter.Y + 9) * Palette.CellPx);
+        GetViewport().WarpMouse(at);
+        var tool = GetTree().Root.FindChild("BlueprintTool", true, false) as BlueprintTool ?? throw new InvalidOperationException("no BlueprintTool");
+        Log(tool.Mode == BlueprintMode.Place ? $"blueprint picked: {tool.Status.Text}" : "FAIL: Place didn't pick the blueprint");
     }
 
     void HoverSmelter()

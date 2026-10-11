@@ -56,6 +56,8 @@ public partial class Hud
             b.TooltipText = ToolTooltip(tool);
         }
 
+        if (ShowBlueprintStatus())
+            return;
         if (BuildTool.Selected is not { } picked)
         {
             _placePanel.Visible = false;

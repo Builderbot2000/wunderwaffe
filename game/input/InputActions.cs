@@ -23,6 +23,26 @@ public static class InputActions
     public const string WorldEnter = "world_enter";
     public const string WorldClaim = "world_claim";
     public const string UnitToggle = "unit_toggle";
+    /// <summary>B: opens or closes the blueprint library (FB-009).</summary>
+    public const string BlueprintLibrary = "blueprint_library";
+    /// <summary>F: mirrors the blueprint being placed.</summary>
+    public const string BlueprintFlip = "blueprint_flip";
+    /// <summary>K: records the design at the hovered unit core into the library (UD-001).</summary>
+    public const string BlueprintRecord = "blueprint_record";
+    public const string UnitHold = "unit_hold";
+    /// <summary>Arms a patrol: the next right-click patrols there.</summary>
+    public const string UnitPatrol = "unit_patrol";
+    public const string UnitRetreat = "unit_retreat";
+    /// <summary>Makes the selection a new squad.</summary>
+    public const string UnitSquad = "unit_squad";
+    /// <summary>Cycles the selected squad's formation.</summary>
+    public const string UnitFormation = "unit_formation";
+    /// <summary>Cycles the selection's stance: aggressive, defensive, hold fire.</summary>
+    public const string UnitStance = "unit_stance";
+    /// <summary>The selection escorts the unit under the cursor.</summary>
+    public const string UnitEscort = "unit_escort";
+    /// <summary>Over a unit core or factory: arms its rally point, set by the next right-click.</summary>
+    public const string UnitRally = "unit_rally";
     public const int Slots = 10;
 
     /// <summary>Slots 1-9 are the number keys; the tenth is 0.</summary>
@@ -44,6 +64,17 @@ public static class InputActions
         Add(WorldEnter, Key.Enter, Key.KpEnter);
         Add(WorldClaim, Key.C);
         Add(UnitToggle, Key.G);
+        Add(BlueprintLibrary, Key.B);
+        Add(BlueprintFlip, Key.F);
+        Add(BlueprintRecord, Key.K);
+        Add(UnitHold, Key.H);
+        Add(UnitPatrol, Key.P);
+        Add(UnitRetreat, Key.X);
+        Add(UnitSquad, Key.Q);
+        Add(UnitFormation, Key.T);
+        Add(UnitStance, Key.V);
+        Add(UnitEscort, Key.E);
+        Add(UnitRally, Key.Y);
         for (int i = 0; i < Slots; i++)
             Add(Slot(i), i == 9 ? Key.Key0 : Key.Key1 + i);
     }

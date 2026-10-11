@@ -56,6 +56,9 @@ public sealed partial class Simulation(ContentDb content)
     /// <summary>All units, in id order.</summary>
     public IReadOnlyList<Unit> Units => _units;
 
+    /// <summary>Squads and factory rally settings (UC-002, UC-006).</summary>
+    public Squads Squads { get; } = new();
+
     /// <summary>
     /// A whole match: the world from <paramref name="setup"/>, with each of its players (ids 0 up) settled on their
     /// starting tile. Player 0 starts in the middle.
@@ -138,6 +141,8 @@ public sealed partial class Simulation(ContentDb content)
         Expansion.Step(this);
         foreach (var tile in _tiles)
             TileEntities.Step(this, tile);
+        UnitFactory.Step(this);
+        UnitUpkeep.Step(this);
         UnitPhysics.Step(this);
         Progression.Step(this);
 

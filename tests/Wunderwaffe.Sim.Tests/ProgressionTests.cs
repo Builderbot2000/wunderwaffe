@@ -110,6 +110,7 @@ public class ProgressionTests
         for (int x = 9; x <= 11; x++)
             sim.Enqueue(new PlaceFrameCommand(Me, a.Id, x, 5));
         Place(sim, a, "unit_core", 10, 5);
+        Place(sim, a, "thruster", 11, 5);
         sim.Step();
         sim.Enqueue(new ActivateUnitCommand(Me, a.Id, 10, 5));
         sim.Step();

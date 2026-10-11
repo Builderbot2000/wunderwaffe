@@ -102,6 +102,11 @@ public class DemoLoopTests(ITestOutputHelper output)
             Do(new PlaceFrameCommand(Me, home.Id, x, 40));
         Place(home, "unit_core", 61, 40);
         sim.Step();
+        // Lift-off needs a way to move (UD-003): one thruster.
+        var thrusterCost = sim.Content.Buildings["thruster"].Cost;
+        Assert.True(RunUntil(() => home.Inventory.Has(thrusterCost), 900), $"thruster not reached: inventory {Inv(home)}");
+        Place(home, "thruster", 62, 40);
+        sim.Step();
         Do(new ActivateUnitCommand(Me, home.Id, 61, 40));
         sim.Step();
 

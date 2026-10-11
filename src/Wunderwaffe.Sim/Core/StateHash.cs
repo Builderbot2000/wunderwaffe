@@ -22,6 +22,7 @@ internal sealed class StateHash
             s.MixPlayer(p);
         foreach (var u in sim.Units)
             s.MixUnit(u);
+        s.MixSquads(sim.Squads);
         return s._h;
     }
 
@@ -134,6 +135,25 @@ internal sealed class StateHash
                 Mix(s.ItemId);
             }
         }
+        if (b.Factory is { } f)
+        {
+            Mix(f.OX);
+            Mix(f.OY);
+            Mix(f.Steps.Count);
+            foreach (var step in f.Steps)
+            {
+                Mix(step.Block);
+                Mix(step.X);
+                Mix(step.Y);
+                Mix(step.Block < 0 ? null : f.Projected!.Blocks[step.Block].DefId);
+                Mix(step.Block < 0 ? 0 : f.Projected!.Blocks[step.Block].Rotation);
+            }
+            Mix(f.Next);
+            Mix(f.Working ? f.Progress + 1 : 0);
+            Mix(f.Buffer);
+            Mix((int)f.Status);
+            Mix(f.Built);
+        }
     }
 
     void MixPlayer(PlayerState p)
@@ -178,6 +198,70 @@ internal sealed class StateHash
         else
         {
             Mix(-1);
+        }
+        Mix(u.UpkeepDue);
+        Mix(u.Unsupplied ? 1 : 0);
+        foreach (int r in u.RouteRegions ?? [])
+            Mix(r);
+        MixOrder(u.Order);
+        Mix(u.SlotX);
+        Mix(u.SlotY);
+        Mix(u.PatrolReturning ? 1 : 0);
+        Mix(u.Chasing ? 1 : 0);
+        Mix((int)u.Stance);
+        Mix(u.AnchorX);
+        Mix(u.AnchorY);
+        Mix(u.EscortId);
+        Mix(u.SquadId);
+    }
+
+    void MixOrder(UnitOrder? o)
+    {
+        if (o == null)
+        {
+            Mix(-1);
+            return;
+        }
+        Mix((int)o.Kind);
+        Mix(o.TileId);
+        Mix(o.X);
+        Mix(o.Y);
+        Mix(o.TargetId);
+        Mix(o.BackTileId);
+        Mix(o.BackX);
+        Mix(o.BackY);
+    }
+
+    void MixSquads(Squads squads)
+    {
+        Mix(squads.NextId);
+        foreach (var s in squads.All)
+        {
+            Mix(s.Id);
+            Mix(s.Owner);
+            Mix(s.Name);
+            Mix((int)s.Formation);
+            Mix((int)s.Stance);
+            Mix(s.TargetId);
+            MixOrder(s.Order);
+            Mix(s.Members.Count);
+            foreach (int id in s.Members)
+                Mix(id);
+            foreach (var (x, y) in s.Custom)
+            {
+                Mix(x);
+                Mix(y);
+            }
+        }
+        foreach (var r in squads.Rallies)
+        {
+            Mix(r.TileId);
+            Mix(r.BuildingId);
+            Mix(r.Owner);
+            Mix(r.RallyTileId);
+            Mix(r.RallyX);
+            Mix(r.RallyY);
+            Mix(r.SquadId);
         }
     }
 }

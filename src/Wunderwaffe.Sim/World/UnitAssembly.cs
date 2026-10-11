@@ -27,6 +27,15 @@ public enum AssembleResult
     InvalidBlock,
 
     TooLarge,
+
+    /// <summary>Onboard batteries and generators can't cover what the blocks draw (UD-003).</summary>
+    NoPower,
+
+    /// <summary>No block gives the design a way to move (UD-003, UD-004).</summary>
+    NoLocomotion,
+
+    /// <summary>A hull and wheels together, with no rotor: neither naval nor ground (UD-004).</summary>
+    ConflictingLocomotion,
 }
 
 public enum DeployResult
@@ -50,7 +59,8 @@ public static class UnitAssembly
 {
     public const int MaxCells = 64;
 
-    public static PlaceResult CheckFrame(TileState tile, int player, int x, int y)
+    /// <param name="ignoreCost">Skip the cost check, for callers that pay a total themselves.</param>
+    public static PlaceResult CheckFrame(TileState tile, int player, int x, int y, bool ignoreCost = false)
     {
         if (tile.Owner != player)
             return PlaceResult.NotOwner;
@@ -60,7 +70,7 @@ public static class UnitAssembly
             return PlaceResult.Blocked;
         if (!tile.Grid.Buildable(x, y))
             return PlaceResult.BadTerrain;
-        return tile.Inventory.Has(Balance.FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
+        return ignoreCost || tile.Inventory.Has(Balance.FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
     }
 
     internal static void PlaceFrame(TileState tile, int player, int x, int y)
@@ -82,9 +92,20 @@ public static class UnitAssembly
     /// <summary>Everything an activation would take, found by walking the frame out from the core.</summary>
     public sealed record Plan(List<(int X, int Y)> Cells, List<PlacedBuilding> Buildings, PlacedBuilding Core);
 
-    public static AssembleResult CheckActivate(Simulation sim, TileState tile, int player, int x, int y, out Plan? plan)
+    public static AssembleResult CheckActivate(Simulation sim, TileState tile, int player, int x, int y, out Plan? plan) =>
+        CheckActivate(sim, tile, player, x, y, MaxCells, out plan, out _);
+
+    /// <summary>
+    /// Lift-off validation (UD-003): the frame joined to the core is connected and at most <paramref name="cap"/> cells
+    /// (<see cref="MaxCells"/> by hand, the factory's block cap from a factory), every building on it lies wholly on it,
+    /// there is one unit core and no tile core or port, onboard power covers what the blocks draw, and the design has a
+    /// locomotion class. <paramref name="offending"/> lists the blocks behind a refusal, for the UI to point at.
+    /// </summary>
+    public static AssembleResult CheckActivate(
+        Simulation sim, TileState tile, int player, int x, int y, int cap, out Plan? plan, out List<PlacedBuilding> offending)
     {
         plan = null;
+        offending = [];
         if (tile.Owner != player)
             return AssembleResult.NotOwner;
         var grid = tile.Grid;
@@ -103,44 +124,90 @@ public static class UnitAssembly
                 var next = (cells[i].X + d.Dx(), cells[i].Y + d.Dy());
                 if (!grid.HasFrame(next.Item1, next.Item2) || !seen.Add(next))
                     continue;
-                if (cells.Count == MaxCells)
+                if (cells.Count == cap)
                     return AssembleResult.TooLarge;
                 cells.Add(next);
             }
         }
         cells.Sort((a, b) => a.Y != b.Y ? a.Y.CompareTo(b.Y) : a.X.CompareTo(b.X));
 
+        // Every bad block is listed, for the first kind of problem found.
         var buildings = new List<PlacedBuilding>();
         var counted = new HashSet<int>();
+        var first = AssembleResult.Ok;
         foreach (var (cx, cy) in cells)
         {
             if (grid.BuildingAt(cx, cy) is not { } b || !counted.Add(b.Id))
                 continue;
-            for (int by = b.Y; by < b.Y + b.Height; by++)
+            var problem = BlockProblem(b, core, seen);
+            if (problem == AssembleResult.Ok)
             {
-                for (int bx = b.X; bx < b.X + b.Width; bx++)
-                {
-                    if (!seen.Contains((bx, by)))
-                        return AssembleResult.PartialBuilding;
-                }
+                buildings.Add(b);
+                continue;
             }
-            if (b.Kind == BuildingKind.Core)
-                return AssembleResult.ContainsTileCore;
-            if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort)
-                return AssembleResult.InvalidBlock;
-            if (b.Kind == BuildingKind.UnitCore && b != core)
-                return AssembleResult.MultipleCores;
-            buildings.Add(b);
+            if (first == AssembleResult.Ok)
+                first = problem;
+            if (problem == first)
+                offending.Add(b);
+        }
+        if (first != AssembleResult.Ok)
+            return first;
+        buildings.Sort((a, b) => a.Y != b.Y ? a.Y.CompareTo(b.Y) : a.X.CompareTo(b.X));
+
+        var defs = sim.Content.Buildings;
+        var stats = UnitStats.Of(sim.Content, buildings.Select(b => (b.DefId, b.Hp)), cells.Count);
+        if (stats.PowerDraw > stats.PowerSupply)
+        {
+            offending.AddRange(buildings.Where(b => defs[b.DefId].Power > 0));
+            return AssembleResult.NoPower;
+        }
+        var locomotion = Locomotion.Check(defs, buildings.Select(b => b.DefId), out _);
+        if (locomotion == LocomotionResult.None)
+        {
+            offending.Add(core);
+            return AssembleResult.NoLocomotion;
+        }
+        if (locomotion == LocomotionResult.Conflicting)
+        {
+            offending.AddRange(buildings.Where(b => defs[b.DefId].Locomotion is LocomotionClass.Ground or LocomotionClass.Naval));
+            return AssembleResult.ConflictingLocomotion;
         }
 
-        buildings.Sort((a, b) => a.Y != b.Y ? a.Y.CompareTo(b.Y) : a.X.CompareTo(b.X));
         plan = new Plan(cells, buildings, core);
         return AssembleResult.Ok;
     }
 
-    internal static AssembleResult Activate(Simulation sim, TileState tile, int player, int x, int y)
+    static AssembleResult BlockProblem(PlacedBuilding b, PlacedBuilding core, HashSet<(int, int)> frame)
     {
-        var result = CheckActivate(sim, tile, player, x, y, out var plan);
+        for (int by = b.Y; by < b.Y + b.Height; by++)
+        {
+            for (int bx = b.X; bx < b.X + b.Width; bx++)
+            {
+                if (!frame.Contains((bx, by)))
+                    return AssembleResult.PartialBuilding;
+            }
+        }
+        if (b.Kind == BuildingKind.Core)
+            return AssembleResult.ContainsTileCore;
+        if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort)
+            return AssembleResult.InvalidBlock;
+        if (b.Kind == BuildingKind.UnitCore && b != core)
+            return AssembleResult.MultipleCores;
+        return AssembleResult.Ok;
+    }
+
+    internal static AssembleResult Activate(Simulation sim, TileState tile, int player, int x, int y) =>
+        Launch(sim, tile, player, x, y, MaxCells, null, out _);
+
+    /// <summary>
+    /// Lifts the design at the unit core (x, y) off as a unit, if <see cref="CheckActivate(Simulation, TileState, int, int, int, int, out Plan?, out List{PlacedBuilding})"/>
+    /// passes with <paramref name="cap"/>. <paramref name="factory"/> is the factory that built it, if any.
+    /// </summary>
+    internal static AssembleResult Launch(
+        Simulation sim, TileState tile, int player, int x, int y, int cap, PlacedBuilding? factory, out Unit? unit)
+    {
+        unit = null;
+        var result = CheckActivate(sim, tile, player, x, y, cap, out var plan, out _);
         if (result != AssembleResult.Ok)
             return result;
 
@@ -168,7 +235,8 @@ public static class UnitAssembly
         var body = cells.Select(c => (c.X - core.X, c.Y - core.Y, mass[c])).ToList();
         var (gx, gy) = tile.ToGlobal(core.X, core.Y);
         int px = gx * Unit.CellScale + Unit.CellScale / 2, py = gy * Unit.CellScale + Unit.CellScale / 2;
-        sim.SpawnUnit(player, tile.Id, px, py, blocks, body, 0, 0);
+        unit = sim.SpawnUnit(player, tile.Id, px, py, blocks, body, 0, 0);
+        unit.UpkeepDue = sim.Tick + Balance.UpkeepPeriod;
         sim.Player(player).Launched++;
 
         // The buildings are the unit now: lift them off, keeping any items they held on the tile.
@@ -179,7 +247,18 @@ public static class UnitAssembly
         }
         foreach (var (cx, cy) in cells)
             tile.Grid.SetFrame(cx, cy, false);
+        Built(sim, unit, tile, factory ?? core);
         return AssembleResult.Ok;
+    }
+
+    /// <summary>
+    /// Called once for every unit that lifts off, by hand (<paramref name="source"/> is its unit core, now gone) or from
+    /// a factory (<paramref name="source"/> is the factory). The hook for rally and auto-squad (UC-006,
+    /// <c>UnitSim.OnUnitBuilt</c>) and the unit-completed alert (UI-003, <c>sim.Raise</c>).
+    /// </summary>
+    static void Built(Simulation sim, Unit unit, TileState tile, PlacedBuilding source)
+    {
+        UnitSim.OnUnitBuilt(sim, unit, tile.Id, source.Id);
     }
 
     /// <summary>Where a unit's blocks would land: its heading is rounded to the nearest quarter turn.</summary>
@@ -248,7 +327,7 @@ public static class UnitAssembly
     }
 
     /// <summary>Quarter turns clockwise (y down): east becomes south.</summary>
-    static (int X, int Y) Turn(int x, int y, int quarters) => (quarters & 3) switch
+    internal static (int X, int Y) Turn(int x, int y, int quarters) => (quarters & 3) switch
     {
         0 => (x, y),
         1 => (-y, x),

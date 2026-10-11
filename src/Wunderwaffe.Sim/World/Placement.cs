@@ -39,7 +39,7 @@ public static class Placement
 {
     public static PlaceResult Check(
         Simulation sim, TileState tile, int player, string buildingId, int x, int y, int rotation,
-        string? recipeId, out PlacementPlan plan)
+        string? recipeId, out PlacementPlan plan, bool ignoreCost = false)
     {
         plan = default;
         var content = sim.Content;
@@ -76,7 +76,9 @@ public static class Placement
         if (resolved.Error != PlaceResult.Ok)
             return resolved.Error;
 
-        if (Territory.Payer(sim, tile, player, def.Cost) is not { } payer)
+        // With the cost ignored (a blueprint pays its total at once), the plan's payer is just the tile.
+        var payer = ignoreCost ? tile : Territory.Payer(sim, tile, player, def.Cost);
+        if (payer == null)
             return PlaceResult.CannotAfford;
 
         plan = new PlacementPlan(def, x, y, w, h, rotation, resolved.RecipeId, payer);
