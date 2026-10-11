@@ -16,7 +16,7 @@ namespace Wunderwaffe.Game.Screens;
 /// <item><c>Hud.SidePanel.cs</c>: the viewed tile's inventory, or the selected world tile with claim/open (left).</item>
 /// <item><c>Hud.BuildBar.cs</c>: build bar and what the picked building would do (bottom centre).</item>
 /// <item><c>Hud.Hover.cs</c>: what's under the cursor (bottom left).</item>
-/// <item><c>Hud.Stats.cs</c>: the viewed tile's production statistics (P, centred).</item>
+/// <item><c>Hud.Stats.cs</c>: the viewed tile's production statistics (O, centred).</item>
 /// </list>
 /// F1 opens the controls, F2 the performance line.
 /// </summary>
@@ -57,7 +57,7 @@ public partial class Hud : Control
     Control? _welcome;
     bool _showStats;
     double _slowTimer;
-    int _shownTileId = -1;
+    int _shownTileId = -1, _shownSelection;
     string _sideKey = "";
 
     public override void _Ready()
@@ -72,6 +72,8 @@ public partial class Hud : Control
         BuildBottom();
         BuildOverlays();
         BuildStatsPanel();
+        BuildBlueprints();
+        UnitTool.Notice += text => Toast(text, Ui.Warn);
 
         _seenGoals = MyState?.GoalsDone ?? 0;
         _host.WatchView(this, OnViewChanged);
@@ -125,7 +127,7 @@ public partial class Hud : Control
         _sideInfo = Ui.Column(4);
         side.AddChild(_sideInfo);
         var buttons = Ui.Row();
-        _claim = Ui.Button("Claim (C)", ClaimSelected);
+        _claim = Ui.Button("Send units (C)", SendToCircle);
         _enter = Ui.Button("Open tile (Enter)", () => _host.EnterTile(SelectedWorldTile().Id));
         buttons.AddChild(_claim);
         buttons.AddChild(_enter);
@@ -191,6 +193,7 @@ public partial class Hud : Control
         right.AddChild(_hints);
         var buttons = Ui.Row(6);
         buttons.Alignment = BoxContainer.AlignmentMode.End;
+        buttons.AddChild(Ui.Button("Blueprints  B", ToggleLibrary));
         buttons.AddChild(Ui.Button("Help  F1", () => Toggle(_help)));
         buttons.AddChild(Ui.Button("Menu  Esc", PauseMenu.Open));
         right.AddChild(buttons);
@@ -257,12 +260,17 @@ public partial class Hud : Control
         "    Water and peaks can't be built on.",
         "    Power: machines draw power. A core powers what touches it; power buildings that touch share a network,",
         "    and wire joins them across gaps. Fuel generators burn fuel for more; batteries store the surplus.",
-        "    Boosters touching a building improve it (hover to see). F sets the hovered sorter's item. P shows production.",
+        "    Boosters touching a building improve it (hover to see). I sets the hovered sorter's item. O shows production.",
         "",
         "Units",
         "    Lay frame (0) under a unit core and thrusters, hover the core with no building picked and press G",
         "    Left-click / drag selects units · right-click moves them · past the border goes to the next tile",
         "    G with units selected lands them",
+        "    K over a unit core records its design · B opens the blueprint library · R turns and F mirrors a picked blueprint",
+        "    Click a unit factory to select it, then pick a blueprint for it to build within its radius",
+        "    H hold · P then right-click patrols · X retreats · Q makes a squad · T formation · V stance · E escorts the unit under the cursor",
+        "    Right-click an enemy unit or building attacks it · Z then right-click attack-moves (fights on the way)",
+        "    Ctrl+1-9 stores a control group, Alt+1-9 recalls it · Y over a unit core, then right-click: its rally point",
         "",
         "Camera: WASD or arrows pan · wheel zooms · middle-drag pans",
         "Debug: F2 performance · F3 stress test · F4 add 1000 of each item",
@@ -280,6 +288,10 @@ public partial class Hud : Control
             _stats.Visible = _showStats = !_showStats;
         else if (e.IsActionPressed(InputActions.Cancel) && _help.Visible)
             _help.Visible = false;
+        else if (e.IsActionPressed(InputActions.BlueprintLibrary) && _host.View == ViewMode.Tile)
+            ToggleLibrary();
+        else if (e.IsActionPressed(InputActions.Cancel) && _library.Visible)
+            _library.Visible = false;
         else
             return;
         GetViewport().SetInputAsHandled();
@@ -293,12 +305,13 @@ public partial class Hud : Control
         UpdateBuildBar();
         CheckProgress();
 
-        // A new tile picked on the world map shows at once rather than at the next slow refresh.
+        // A new tile picked on the world map, or a changed unit selection, shows at once rather than at the next slow refresh.
         int selected = _host.View == ViewMode.World ? WorldMap.SelectedTileId : -1;
         _slowTimer -= delta;
-        if (_slowTimer <= 0 || selected != _shownTileId)
+        if (_slowTimer <= 0 || selected != _shownTileId || _host.Selected.Count != _shownSelection)
         {
             _shownTileId = selected;
+            _shownSelection = _host.Selected.Count;
             _slowTimer = SlowRefresh;
             RefreshSlow();
         }
@@ -308,6 +321,7 @@ public partial class Hud : Control
     void RefreshSlow()
     {
         RefreshGoal();
+        RefreshBlueprints();
         if (_host.View == ViewMode.Tile)
         {
             _title.Text = _host.ViewedTile.Name;

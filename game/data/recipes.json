@@ -5,6 +5,7 @@
   { "id": "smelt_copper",    "building": "smelter",    "ticks": 120, "inputs": { "copper_ore": 2 },                "outputs": { "copper_plate": 1 } },
   { "id": "smelt_iron",      "building": "smelter",    "ticks": 120, "inputs": { "iron_ore": 2 },                  "outputs": { "iron_plate": 1 } },
   { "id": "make_steel",      "building": "steel_mill", "ticks": 240, "inputs": { "iron_plate": 2, "coal": 1 },     "outputs": { "steel": 1 } },
+  { "id": "make_shells",     "building": "munitions_works", "ticks": 60, "inputs": { "iron_plate": 1 },             "outputs": { "shell": 5 } },
   { "id": "press_fuel",      "building": "fuel_press",     "ticks": 120, "inputs": { "copper_ore": 2 },                "outputs": { "fuel": 1 } },
   { "id": "press_coal_fuel", "building": "fuel_press",     "ticks": 60,  "inputs": { "coal": 1 },                      "outputs": { "fuel": 2 } },
   { "id": "burn_fuel",       "building": "fuel_generator", "ticks": 240, "inputs": { "fuel": 1 },                      "outputs": {} }

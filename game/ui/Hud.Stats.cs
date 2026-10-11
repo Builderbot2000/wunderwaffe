@@ -6,7 +6,7 @@ using Wunderwaffe.Sim.World;
 namespace Wunderwaffe.Game.Screens;
 
 /// <summary>
-/// Production statistics for the viewed tile (FB-011), toggled with P: per item, made and used per minute over the
+/// Production statistics for the viewed tile (FB-011), toggled with O: per item, made and used per minute over the
 /// last full minute, and a 10-minute history graph.
 /// </summary>
 public partial class Hud
@@ -27,12 +27,12 @@ public partial class Hud
         _statsBody = Ui.Column(6);
         col.AddChild(_statsBody);
         _statsPanel = Ui.Pin(Ui.Panel(col, 640), LayoutPreset.Center);
-        head.AddChild(Ui.Button("Close  P", () => _statsPanel.Visible = false));
+        head.AddChild(Ui.Button("Close  O", () => _statsPanel.Visible = false));
         _statsPanel.Visible = false;
         AddChild(_statsPanel);
     }
 
-    /// <summary>Opens or closes the panel; P in the tile view.</summary>
+    /// <summary>Opens or closes the panel; O in the tile view.</summary>
     public void ToggleStats()
     {
         _statsPanel.Visible = !_statsPanel.Visible && _host.View == ViewMode.Tile;

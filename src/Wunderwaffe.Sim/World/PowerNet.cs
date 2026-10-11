@@ -28,12 +28,19 @@ public sealed class PowerNetwork(int id)
     /// </summary>
     internal void Report(MachineState m)
     {
+        // Writes only on a change: most machines report the same figures tick after tick.
         int draw = m.Working || m.IdleTicks == 0 ? m.BoostedDraw : 0;
+        if (draw != m.ReportedDraw)
+        {
+            LiveDemand += draw - m.ReportedDraw;
+            m.ReportedDraw = draw;
+        }
         int supply = m.Working ? m.MaxSupply : 0;
-        LiveDemand += draw - m.ReportedDraw;
-        LiveSupply += supply - m.ReportedSupply;
-        m.ReportedDraw = draw;
-        m.ReportedSupply = supply;
+        if (supply != m.ReportedSupply)
+        {
+            LiveSupply += supply - m.ReportedSupply;
+            m.ReportedSupply = supply;
+        }
     }
 
     /// <summary>Power made this tick by cores and burning generators.</summary>

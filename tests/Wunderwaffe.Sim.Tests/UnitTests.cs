@@ -114,12 +114,12 @@ public class UnitTests
     }
 
     [Fact]
-    public void FramesNeedAnOwnedCellInsideTheTile()
+    public void FramesNeedPresenceAndACellInsideTheTile()
     {
         var sim = NewSim();
         var tile = Tile(sim, size: 10);
-        Assert.Equal(PlaceResult.OutOfBounds, UnitAssembly.CheckFrame(tile, Me, 10, 0));
-        Assert.Equal(PlaceResult.NotOwner, UnitAssembly.CheckFrame(tile, Them, 1, 1));
+        Assert.Equal(PlaceResult.OutOfBounds, UnitAssembly.CheckFrame(sim, tile, Me, 10, 0));
+        Assert.Equal(PlaceResult.NoPresence, UnitAssembly.CheckFrame(sim, tile, Them, 1, 1));
     }
 
     [Fact]
@@ -256,6 +256,7 @@ public class UnitTests
         Harness.Ore(tile, "iron_ore", 12, 10);
         Frame(sim, tile, 10, 10, 4, 2);
         Place(sim, tile, "unit_core", 10, 10);
+        Place(sim, tile, "thruster", 11, 10);
         Place(sim, tile, "drill", 12, 10);
         Run(sim, 61); // one iron ore in the drill's output buffer
         long before = Items(tile, "iron_ore");
@@ -418,17 +419,11 @@ public class UnitTests
         sim.Step();
         Assert.False(unit.Moving);
 
-        // A block with a core but no engine can't be steered.
+        // A block with a core but no engine has no locomotion, so it can't lift off at all (UD-003).
         Frame(sim, a, 2, 2);
         Place(sim, a, "unit_core", 2, 2);
         sim.Step();
-        sim.Enqueue(new ActivateUnitCommand(Me, a.Id, 2, 2));
-        sim.Step();
-        var dead = sim.Units.Single(u => u.Thrusters.Count == 0);
-        Assert.Equal(0, dead.MaxSpeed);
-        Move(sim, dead, a, 15, 15);
-        sim.Step();
-        Assert.False(dead.Moving);
+        Assert.Equal(AssembleResult.NoLocomotion, UnitAssembly.CheckActivate(sim, a, Me, 2, 2, out _));
     }
 
     [Fact]

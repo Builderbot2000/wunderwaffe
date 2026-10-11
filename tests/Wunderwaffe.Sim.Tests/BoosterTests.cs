@@ -9,7 +9,7 @@ public class BoosterTests
 {
     const string Iron = "iron_ore";
 
-    static long Made(TileState tile, string item) => tile.Stats.TotalMade.GetValueOrDefault(item);
+    static long Made(TileState tile, string item) => tile.Stats.MadeTotal(item);
 
     static BoostStats Stats(Simulation sim, TileState tile, int x, int y) =>
         Boosters.StatsOf(sim, tile, tile.Grid.BuildingAt(x, y)!);

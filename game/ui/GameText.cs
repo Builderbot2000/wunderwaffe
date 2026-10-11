@@ -69,4 +69,29 @@ public static class GameText
         content.TerrainList.FirstOrDefault(t => t.Id == terrainId)?.Name ?? terrainId;
 
     public static string Plural(int n, string one, string many) => n == 1 ? $"1 {one}" : $"{n} {many}";
+
+    /// <summary>Why a design won't lift off (UD-003).</summary>
+    public static string Assemble(Sim.World.AssembleResult r) => r switch
+    {
+        Sim.World.AssembleResult.Ok => "ready to lift off",
+        Sim.World.AssembleResult.NotOwner => "not your tile",
+        Sim.World.AssembleResult.NoCore => "no unit core there",
+        Sim.World.AssembleResult.NoFrame => "the unit core isn't on frame",
+        Sim.World.AssembleResult.MultipleCores => "more than one unit core on the frame",
+        Sim.World.AssembleResult.PartialBuilding => "a building is only partly on the frame",
+        Sim.World.AssembleResult.ContainsTileCore => "the tile core is on the frame",
+        Sim.World.AssembleResult.InvalidBlock => "ports can't ride on a unit",
+        Sim.World.AssembleResult.TooLarge => "the frame is too big",
+        Sim.World.AssembleResult.NoPower => "not enough onboard power for the engines: add batteries or generators",
+        Sim.World.AssembleResult.NoLocomotion => "nothing to move it: add thrusters",
+        Sim.World.AssembleResult.ConflictingLocomotion => "a hull and wheels together: pick one, or add a rotor",
+        _ => r.ToString(),
+    };
+
+    /// <summary>"1:05" for a tick count, as build times.</summary>
+    public static string Duration(long ticks)
+    {
+        long s = (ticks + Simulation.TicksPerSecond - 1) / Simulation.TicksPerSecond;
+        return s >= 60 ? $"{s / 60}:{s % 60:00}" : $"{s} s";
+    }
 }

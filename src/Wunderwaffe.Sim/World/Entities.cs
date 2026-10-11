@@ -143,7 +143,20 @@ public sealed class MachineState(RecipeDef? recipe) : OutputBuffer
     internal int BoostedDraw, MaxSupply, ReportedDraw, ReportedSupply;
 
     /// <summary>Its boosted stats (FB-016), refreshed whenever the tile's layout changes. Derived, not hashed.</summary>
-    public BoostStats Boost { get; internal set; } = BoostStats.Base;
+    public BoostStats Boost
+    {
+        get => _boost;
+        internal set
+        {
+            _boost = value;
+            SpeedPercent = 100 + value.Speed;
+            OutputBonus = value.Output;
+        }
+    }
+    BoostStats _boost = BoostStats.Base;
+
+    /// <summary>Boosted recipe speed and extra output, in percent, cached from <see cref="Boost"/> for the per-tick work.</summary>
+    internal int SpeedPercent = 100, OutputBonus;
 
     public MachineStatus Status =>
         Recipe == null ? MachineStatus.Idle

@@ -9,7 +9,7 @@ public class PowerTests
 {
     const string Iron = "iron_ore", Copper = "copper_ore";
 
-    static long Made(TileState tile, string item) => tile.Stats.TotalMade.GetValueOrDefault(item);
+    static long Made(TileState tile, string item) => tile.Stats.MadeTotal(item);
 
     [Fact]
     public void CorePowerRunsADrillTouchingIt()
@@ -103,7 +103,7 @@ public class PowerTests
         }
         Assert.True(burning, "the generator never burned");
         Assert.True(gen.Machine!.Working);
-        Assert.True(tile.Stats.TotalUsed.GetValueOrDefault("fuel") >= 1);
+        Assert.True(tile.Stats.UsedTotal("fuel") >= 1);
     }
 
     [Fact]
@@ -137,13 +137,31 @@ public class PowerTests
     }
 
     [Fact]
-    public void UnitPartsAreInertOnATileAndOnboardSupplyIsGeneratorPlusBattery()
+    public void ThrustersAreInertOnATileUnitCoresSupplyAndOnboardSupplyIsGeneratorPlusBattery()
     {
         var content = TestContent.Load();
         Assert.False(content.Buildings["thruster"].IsPower);
-        Assert.False(content.Buildings["unit_core"].IsPower);
+        Assert.True(content.Buildings["unit_core"].IsPower);
         Assert.Equal(10, PowerNet.OnboardSupply(content.Buildings["unit_core"]));
         Assert.Equal(content.Buildings["battery"].Discharge, PowerNet.OnboardSupply(content.Buildings["battery"]));
         Assert.Equal(40, PowerNet.OnboardSupply(content.Buildings["fuel_generator"]));
+    }
+
+    [Fact]
+    public void AUnitFactoryBuildsOnlyWhilePoweredAndALandedUnitCorePowersATile()
+    {
+        var sim = PoweredSim();
+        var tile = Tile(sim, size: 40);
+        Place(sim, tile, "unit_factory", 10, 10);
+        Run(sim, 2);
+        var factory = tile.Grid.BuildingAt(10, 10)!;
+        Assert.Equal(0, UnitFactory.BuildSpeed(sim, tile, factory));
+
+        // No core on the tile: a unit core touching the factory supplies its 10 (a landed scout on a claimed tile).
+        Place(sim, tile, "unit_core", 13, 10);
+        Run(sim, 2);
+        Assert.Equal(100, UnitFactory.BuildSpeed(sim, tile, factory));
+        Assert.Equal(10, PowerNet.Networks(tile).Single().Supply);
+        Assert.True(PowerNet.IsPowered(tile, factory));
     }
 }

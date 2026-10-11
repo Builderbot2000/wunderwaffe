@@ -26,10 +26,14 @@ internal static class TileEntities
 
         foreach (var b in grid.Machines)
         {
-            if (Work(tile, b.Machine!) is { } made && tile.Owner != TileState.Unowned)
+            var m = b.Machine!;
+            // Draw and supply change only when these flip (PowerNet.DrawOf, SupplyOf): report only then (NF-001).
+            bool drew = m.Working || m.IdleTicks == 0, worked = m.Working;
+            if (Work(tile, m) is { } made && tile.Owner != TileState.Unowned)
                 sim.Player(tile.Owner).AddProduced(made);
-            b.Machine!.Net?.Report(b.Machine);
-            Dump(sim, tile, b, b.Machine!);
+            if ((m.Working || m.IdleTicks == 0) != drew || m.Working != worked)
+                m.Net?.Report(m);
+            Dump(sim, tile, b, m);
         }
         foreach (var b in grid.ImportPorts)
             Dump(sim, tile, b, b.Machine!);
@@ -60,7 +64,7 @@ internal static class TileEntities
             return null;
 
         int rate = m.Working || TryStart(tile, m, recipe)
-            ? (int)((long)MachineState.ProgressPerTick * (100 + m.Boost.Speed) * m.PowerPermille / 100_000)
+            ? MachineState.ProgressPerTick * m.SpeedPercent / 100 * m.PowerPermille / 1000
             : 0;
         if (rate <= 0)
         {
@@ -76,7 +80,7 @@ internal static class TileEntities
         m.Working = false;
 
         int batches = 1;
-        m.OutputCredit += m.Boost.Output;
+        m.OutputCredit += m.OutputBonus;
         for (; m.OutputCredit >= 100; m.OutputCredit -= 100)
             batches++;
         var made = batches == 1 ? recipe.Outputs : recipe.Outputs.ToDictionary(kv => kv.Key, kv => kv.Value * batches);
@@ -231,6 +235,13 @@ internal static class TileEntities
 
             case BuildingKind.ExportPort:
                 return Send(sim, tile, target, item);
+
+            case BuildingKind.Weapon when sim.Content.Buildings[target.DefId].Weapon is { } w && w.Ammo == item && target.Combat!.Ammo < w.Magazine:
+                target.Combat.Ammo++;
+                return true;
+
+            case BuildingKind.UnitFactory:
+                return UnitFactory.TryInsert(target, item);
 
             case BuildingKind.Storage:
             {
@@ -449,6 +460,10 @@ internal static class TileEntities
             foreach (var s in link.InFlight)
                 inv.Add(s.ItemId, 1);
         }
+        if (b.Combat is { Ammo: > 0, AmmoItem: { } ammo } c)
+            inv.Add(ammo, c.Ammo);
+        if (b.Factory is { } factory)
+            UnitFactory.Drain(tile, factory);
         if (b.Storage is { } store)
         {
             foreach (var (id, n) in store.Output)

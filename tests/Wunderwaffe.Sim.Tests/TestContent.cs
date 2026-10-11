@@ -16,9 +16,9 @@ static class TestContent
     /// </summary>
     public static ContentDb Unpowered(params string[] extraBuildings) => Build(power: false, extraBuildings);
 
-    static ContentDb Build(bool power, string[] extraBuildings)
+    static ContentDb Build(bool power, string[] extraBuildings, string? buildingsJson = null)
     {
-        var buildings = JsonNode.Parse(Read("buildings.json"), documentOptions: new() { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })!.AsArray();
+        var buildings = JsonNode.Parse(buildingsJson ?? Read("buildings.json"), documentOptions: new() { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })!.AsArray();
         if (!power)
         {
             foreach (var b in buildings)
@@ -32,4 +32,16 @@ static class TestContent
     /// <summary>A plain 3x3 host in the <c>factory</c> category, standing in for the unit factory in booster tests.</summary>
     public const string TestFactory =
         """{ "id": "test_factory", "name": "Test Factory", "kind": "core", "category": "factory", "width": 3, "height": 3, "power": 0, "hp": 100, "cost": {} }""";
+
+    /// <summary>
+    /// The real content with buildings.json edited by <paramref name="editBuildings"/>, which must change it; without
+    /// power draws if not <paramref name="power"/>.
+    /// </summary>
+    public static ContentDb Load(Func<string, string> editBuildings, bool power = true)
+    {
+        string buildings = Read("buildings.json"), edited = editBuildings(buildings);
+        if (edited == buildings)
+            throw new InvalidOperationException("the edit changed nothing; buildings.json has moved on");
+        return Build(power, [], edited);
+    }
 }

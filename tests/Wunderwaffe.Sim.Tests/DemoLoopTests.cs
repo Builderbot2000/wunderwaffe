@@ -57,27 +57,48 @@ public class DemoLoopTests(ITestOutputHelper output)
         Place(home, "drill", 46, 51);
         Place(home, "smelter", 46, 49, recipe: "smelt_copper");
         sim.Step();
-        Assert.Equal(8, home.Grid.BuildingCount);
+        Assert.Equal(8 + 3, home.Grid.BuildingCount); // and the starting scout
 
-        // Goals 3-4: claim the coal tile and ship coal home through a port pair in lane 47.
-        Do(new ClaimTileCommand(Me, coal.Id));
+        // Goal 3: lift the starting scout off (unit core at (47, 38), above the core).
+        Assert.Equal("unit_core", home.Grid.BuildingAt(47, 38)?.DefId);
+        Do(new ActivateUnitCommand(Me, home.Id, 47, 38));
         sim.Step();
-        Assert.Equal(Me, coal.Owner);
+        var scout = Assert.Single(sim.Units);
+
+        // Goal 4: fly it into the coal tile's victory circle, land, and hold the circle until the tile is ours.
+        Do(new MoveUnitsCommand(Me, [scout.Id], coal.Id, coal.CircleX, coal.CircleY));
+        sim.Step();
+        Assert.True(RunUntil(() => !scout.Moving, 120), "the scout never arrived");
+        Assert.Equal(coal.Id, scout.TileId);
+        Do(new DeployUnitCommand(Me, scout.Id));
+        sim.Step();
+        Assert.Empty(sim.Units);
+        Assert.Equal(3, coal.Grid.BuildingCount);
+        Assert.True(RunUntil(() => coal.Owner == Me, Balance.CaptureSeconds + 1), "the coal tile was never claimed");
+
+        // Goal 5: ship coal home through a port pair in lane 47. The coal tile has no stock, so home pays.
         Place(coal, "drill", 1, 46);
         Place(coal, "export_port", 0, 47, West);
-        // The coal drill is far from the new tile's core: wire it in along row 46 (FB-005).
-        var coalCore = coal.Grid.Buildings.Single(b => b.DefId == Simulation.CoreBuildingId);
-        Assert.InRange(coalCore.Y, 44, 46);
-        for (int x = 3; x < coalCore.X; x++)
-            Place(coal, "wire", x, 46);
+        // The claimed tile has no core: the landed scout's unit core powers it (FB-005). Wire the coal drill to the
+        // cell west of it, along row 46 and then along that column (the scout landed upright, clear of it).
+        var unitCore = coal.Grid.Buildings.Single(b => b.DefId == "unit_core");
+        var wires = new List<(int X, int Y)>();
+        int wx = unitCore.X - 1;
+        for (int x = 3; x <= wx; x++)
+            wires.Add((x, 46));
+        for (int y = 46; y != unitCore.Y; y += Math.Sign(unitCore.Y - 46))
+            wires.Add((wx, y + Math.Sign(unitCore.Y - 46)));
+        foreach (var (x, y) in wires)
+            Place(coal, "wire", x, y);
         Place(home, "import_port", 95, 47, East);
         // A belt from beside the future steel mill back to the core carries steel (and some copper ore) home.
         for (int x = 49; x <= 91; x++)
             Place(home, "conveyor", x, 48, West);
         sim.Step();
-        Assert.Equal(3 + coalCore.X - 3, coal.Grid.BuildingCount);
+        Assert.Equal(5 + wires.Count, coal.Grid.BuildingCount);
+        Assert.Same(coal.Grid.Power.NetworkOf(unitCore), coal.Grid.Power.NetworkOf(coal.Grid.BuildingAt(1, 46)!));
 
-        // Goal 5: the steel mill, once affordable; it needs plates from its own smelter and coal from the port. It
+        // Goal 6: the steel mill, once affordable; it needs plates from its own smelter and coal from the port. It
         // draws more than a core gives and stands far from it, so a fuel generator on top of it powers the corner:
         // copper drill -> fuel press -> generator, all touching (FB-005). A wire along row 47 from the core's east
         // drill to the mill lets core power start the fuel line, which then carries the mill.
@@ -98,13 +119,18 @@ public class DemoLoopTests(ITestOutputHelper output)
         Assert.Equal("steel_mill", home.Grid.BuildingAt(92, 46)?.DefId);
         Assert.Equal("fuel_press", home.Grid.BuildingAt(94, 44)?.DefId);
 
-        // Goal 6: a unit core on frame, lifted off once the steel goal is met and the core is affordable.
+        // Goal 7: a unit core on frame, lifted off once the steel goal is met and the core is affordable.
         var unitCost = sim.Content.Buildings["unit_core"].Cost;
         Assert.True(RunUntil(() => me().ProducedOf("steel") >= 20 && home.Inventory.Has(unitCost), 900),
             $"unit core not reached: mill {home.Grid.BuildingAt(92, 46)!.Machine!.Status} {home.Grid.BuildingAt(92, 46)!.Machine!.MissingInput}, gen {home.Grid.BuildingAt(92, 44)!.Machine!.Status}, press {home.Grid.BuildingAt(94, 44)!.Machine!.Status} {home.Grid.BuildingAt(94, 44)!.Machine!.PowerPermille}, nets {string.Join(";", home.Grid.Power.Networks.Select(n => $"{n.Members.Count}:{n.Supply}/{n.Demand}"))}; {me().ProducedOf("steel")} steel, shipped {me().Shipped}, inventory {Inv(home)}");
         for (int x = 60; x <= 62; x++)
             Do(new PlaceFrameCommand(Me, home.Id, x, 40));
         Place(home, "unit_core", 61, 40);
+        sim.Step();
+        // Lift-off needs a way to move (UD-003): one thruster.
+        var thrusterCost = sim.Content.Buildings["thruster"].Cost;
+        Assert.True(RunUntil(() => home.Inventory.Has(thrusterCost), 900), $"thruster not reached: inventory {Inv(home)}");
+        Place(home, "thruster", 62, 40);
         sim.Step();
         Do(new ActivateUnitCommand(Me, home.Id, 61, 40));
         sim.Step();
