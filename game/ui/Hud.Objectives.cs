@@ -1,5 +1,4 @@
 using Godot;
-using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game.Screens;
 
@@ -8,26 +7,21 @@ public partial class Hud
 {
     void RefreshGoal()
     {
-        var goals = Content.Goals;
-        var goal = Progression.CurrentGoal(Sim, Me);
-        if (goal == null)
+        if (Query.Goal() is not { } goal)
         {
             _goalStep.Text = "OBJECTIVES COMPLETE";
             _goalName.Text = "Demo complete";
             _goalText.Text = "Every objective is done. Keep expanding, or save from the menu.";
             _goalBar.Value = _goalBar.MaxValue;
             _goalCount.Text = "";
+            return;
         }
-        else
-        {
-            long have = System.Math.Min(Progression.Progress(Sim, Me, goal.Condition), goal.Condition.Amount);
-            _goalStep.Text = $"OBJECTIVE {(MyState?.GoalsDone ?? 0) + 1} OF {goals.Count}";
-            _goalName.Text = goal.Name;
-            _goalText.Text = goal.Description;
-            _goalBar.MaxValue = goal.Condition.Amount;
-            _goalBar.Value = have;
-            _goalCount.Text = $"{have} / {goal.Condition.Amount} {GameText.ConditionUnit(Content, goal.Condition)}";
-        }
+        _goalStep.Text = $"OBJECTIVE {goal.Index + 1} OF {goal.Count}";
+        _goalName.Text = goal.Name;
+        _goalText.Text = goal.Description;
+        _goalBar.MaxValue = goal.Amount;
+        _goalBar.Value = goal.Progress;
+        _goalCount.Text = $"{goal.Progress} / {goal.Amount} {GameText.ConditionUnit(Content, Content.Goals[goal.Index].Condition)}";
     }
 
     /// <summary>Toasts for goals completed since the last frame; the demo-complete panel after the last goal.</summary>
