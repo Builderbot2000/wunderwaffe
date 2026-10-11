@@ -151,8 +151,20 @@ public sealed class ContentDb
             if (b.Hp <= 0)
                 errors.Add($"building '{b.Id}': hp must be > 0");
             ValidateCombat(b, errors);
+            if (b.Kind == BuildingKind.Platform && (!b.OnWater || b.Width != 1 || b.Height != 1))
+                errors.Add($"building '{b.Id}': a platform must be 1x1 and onWater");
+            if (b.Kind == BuildingKind.UnitFactory && (b.Radius <= 0 || b.BlockCap <= 0))
+                errors.Add($"building '{b.Id}': a unit factory needs radius and blockCap > 0");
+            foreach (var (id, n) in b.Upkeep ?? [])
+            {
+                if (!Items.ContainsKey(id) || n <= 0)
+                    errors.Add($"building '{b.Id}': upkeep '{id}' must be a known item and > 0");
+            }
+            if ((b.Kind == BuildingKind.Locomotor) != (b.Locomotion != null))
+                errors.Add($"building '{b.Id}': a locomotor needs a locomotion class, and only locomotors have one");
         }
-
+        if (Buildings.Values.Count(b => b.Kind == BuildingKind.Platform) > 1)
+            errors.Add("buildings: at most one platform");
         foreach (var g in Goals)
             ValidateCondition(g.Condition, $"goal '{g.Id}'", errors);
 

@@ -69,6 +69,8 @@ public partial class Hud : Control
         BuildRight();
         BuildBottom();
         BuildOverlays();
+        BuildBlueprints();
+        UnitTool.Notice += text => Toast(text, Ui.Warn);
 
         _seenGoals = MyState?.GoalsDone ?? 0;
         _host.WatchView(this, OnViewChanged);
@@ -120,7 +122,7 @@ public partial class Hud : Control
         _sideInfo = Ui.Column(4);
         side.AddChild(_sideInfo);
         var buttons = Ui.Row();
-        _claim = Ui.Button("Claim (C)", ClaimSelected);
+        _claim = Ui.Button("Send units (C)", SendToCircle);
         _enter = Ui.Button("Open tile (Enter)", () => _host.EnterTile(SelectedWorldTile().Id));
         buttons.AddChild(_claim);
         buttons.AddChild(_enter);
@@ -186,6 +188,7 @@ public partial class Hud : Control
         right.AddChild(_hints);
         var buttons = Ui.Row(6);
         buttons.Alignment = BoxContainer.AlignmentMode.End;
+        buttons.AddChild(Ui.Button("Blueprints  B", ToggleLibrary));
         buttons.AddChild(Ui.Button("Help  F1", () => Toggle(_help)));
         buttons.AddChild(Ui.Button("Menu  Esc", PauseMenu.Open));
         right.AddChild(buttons);
@@ -254,6 +257,10 @@ public partial class Hud : Control
         "    Lay frame (0) under a unit core and thrusters, hover the core with no building picked and press G",
         "    Left-click / drag selects units · right-click moves them · past the border goes to the next tile",
         "    G with units selected lands them",
+        "    K over a unit core records its design · B opens the blueprint library · R turns and F mirrors a picked blueprint",
+        "    Click a unit factory to select it, then pick a blueprint for it to build within its radius",
+        "    H hold · P then right-click patrols · X retreats · Q makes a squad · T formation · V stance · E escorts the unit under the cursor",
+        "    Ctrl+1-9 stores a control group, Alt+1-9 recalls it · Y over a unit core, then right-click: its rally point",
         "",
         "Camera: WASD or arrows pan · wheel zooms · middle-drag pans",
         "Debug: F2 performance · F3 stress test · F4 add 1000 of each item",
@@ -269,6 +276,10 @@ public partial class Hud : Control
             _stats.Visible = _showStats = !_showStats;
         else if (e.IsActionPressed(InputActions.Cancel) && _help.Visible)
             _help.Visible = false;
+        else if (e.IsActionPressed(InputActions.BlueprintLibrary) && _host.View == ViewMode.Tile)
+            ToggleLibrary();
+        else if (e.IsActionPressed(InputActions.Cancel) && _library.Visible)
+            _library.Visible = false;
         else
             return;
         GetViewport().SetInputAsHandled();
@@ -297,6 +308,7 @@ public partial class Hud : Control
     void RefreshSlow()
     {
         RefreshGoal();
+        RefreshBlueprints();
         if (_host.View == ViewMode.Tile)
         {
             _title.Text = _host.ViewedTile.Name;

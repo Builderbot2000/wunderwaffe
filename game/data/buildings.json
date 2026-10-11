@@ -15,5 +15,10 @@
   { "id": "shield_generator", "name": "Shield Generator", "kind": "shield", "width": 2, "height": 2, "power": 40, "hp": 200, "cost": { "copper_plate": 20, "steel": 10 }, "shield": { "radius": 6, "capacity": 400, "regen": 40 } },
   { "id": "repair_bay", "name": "Repair Bay", "kind": "repair", "width": 2, "height": 2, "power": 10, "hp": 200, "cost": { "iron_plate": 20, "copper_plate": 10 }, "repair": { "radius": 8, "rate": 30, "cost": { "iron_plate": 1 }, "per": 50 } },
   { "id": "supply_depot", "name": "Supply Depot", "kind": "storage", "width": 2, "height": 2, "power": 0, "hp": 300, "cost": { "iron_plate": 20 }, "supplyRadius": 12, "storage": 60 },
-  { "id": "ammo_rack", "name": "Ammo Rack", "kind": "storage", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": { "iron_plate": 5 }, "storage": 40 }
+  { "id": "ammo_rack", "name": "Ammo Rack", "kind": "storage", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": { "iron_plate": 5 }, "storage": 40 },
+  { "id": "unit_factory", "name": "Unit Factory", "kind": "unit_factory", "category": "factory", "radius": 6, "blockCap": 16, "width": 3, "height": 3, "power": 10, "hp": 800, "cost": { "iron_plate": 30, "copper_plate": 20, "steel": 10 } },
+  { "id": "wheels", "name": "Wheels", "kind": "locomotor", "locomotion": "ground", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": { "iron_plate": 5 } },
+  { "id": "hull", "name": "Hull", "kind": "locomotor", "locomotion": "naval", "width": 1, "height": 1, "power": 0, "hp": 150, "cost": { "iron_plate": 8 } },
+  { "id": "rotor", "name": "Rotor", "kind": "locomotor", "locomotion": "air", "width": 1, "height": 1, "power": 0, "hp": 60, "cost": { "steel": 5, "copper_plate": 5 } },
+  { "id": "platform", "name": "Floating Platform", "kind": "platform", "onWater": true, "width": 1, "height": 1, "power": 0, "hp": 40, "cost": { "iron_ore": 2 } }
 ]

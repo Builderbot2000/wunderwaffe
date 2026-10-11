@@ -9,8 +9,8 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   chain (`goals.json`, `UnlockCondition` types `produce`/`claim`/`ship`/`launch`, counters on `PlayerState`).
 - **Building owner.** `PlacedBuilding.Owner` is the player who placed it (`PlaceBuildingCommand.Player`), the tile's
   owner for a tile core (`Simulation.PlaceCore`), or the unit's owner for blocks put back by landing
-  (`UnitAssembly.Deploy`). It need not equal `TileState.Owner`; placement rules still require owning the tile (silo A
-  changes that). Frame cells have no owner: they belong to whoever owns the tile.
+  (`UnitAssembly.Deploy`). It need not equal `TileState.Owner`; placement needs presence, not ownership (see Territory rules
+  below). Frame cells have no owner: they belong to whoever owns the tile.
 - **Hit points.** `BuildingDef.Hp` (`hp` in `buildings.json`, validated > 0) is one block's full HP.
   `PlacedBuilding.Hp` and `UnitBlock.Hp` are the current value (both `internal set`), carried across lift-off
   (`UnitAssembly.Activate`) and landing (`UnitAssembly.Deploy`), hashed in `StateHash`. Nothing deals damage yet (F).
@@ -29,6 +29,18 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   `CheckDeploy`).
 - A dead unit block (Hp 0) stays in `Unit.Blocks`; anything that reads block function must skip `Hp <= 0`, and
   `Unit.RecomputeStats` rebuilds engines/cargo/radius after a block dies or is rebuilt.
+## Territory rules (silo A)
+
+- **Presence, not ownership, gates acting on a tile** (WM-015): `Territory.HasPresence(sim, player, tile)` (owns it, or
+  has a building or unit there). Nobody builds or lands with a cell in an enemy-owned circle while a building not of
+  theirs stands there (`Territory.EnemyCircleBlocks`). New placement-like checks should use these, not `tile.Owner`.
+- **Who pays:** `Territory.Payer(sim, tile, player, cost)`: the tile if owned and affordable, else the first owned
+  neighbour that can. Nobody spends a stock that isn't theirs.
+- **Claims** have no command: `Expansion.Step` (phase 2) runs per-tile circle timers (`TileState.ClaimTicks`) and
+  `Expansion.Claim` destroys rivals' buildings in the circle through `Territory.DestroyBuilding`.
+- **Expansion path:** each start has a landed scout (thruster, unit core, thruster on frame); lift it off, move it to
+  `(tile.CircleX, tile.CircleY)`, land it, wait the capture time.
+- **Contested:** `Territory.IsContested` / `ContestedTiles`, computed live from unit positions.
 
 ## Tick order inside `Simulation.Step`
 
@@ -39,13 +51,18 @@ file. Don't add empty stubs ahead of time.
 | # | Phase | Owner | Call today / where it goes |
 |---|---|---|---|
 | 1 | Commands | shared | exists: the `_pending` loop (`LoggedCommand` into `_log`, then `Command.Apply`) |
-| 2 | Territory / claim timers | A | after the command loop, before the tile loop |
+| 2 | Territory / claim timers | A | exists: `Expansion.Step(this);` |
 | 3 | Tile entities, incl. power and boosters | B | exists: `foreach (var tile in _tiles) TileEntities.Step(this, tile);` (power/boosters go inside `TileEntities.Step` or right beside it) |
 | 4 | Combat (weapons, damage, wrecks) | F | exists: `Combat.Step(this);` |
 | 5 | Unit physics and steering | E | exists: `UnitPhysics.Step(this);` |
 | 6 | Rate mode / abstract travel | C | after `UnitPhysics.Step`, before `Progression.Step` |
 | 7 | Goals / victory | G | exists: `Progression.Step(this);` (victory checks go right after it) |
 | 8 | `Tick++` | shared | exists: last line |
+
+D's calls: `UnitFactory.Step(this)` right after the tile loop (end of phase 3: factories build and lift off), and
+`UnitUpkeep.Step(this)` right before `UnitPhysics.Step` (after combat). Every lift-off, by hand or from a factory, goes
+through `UnitAssembly.Launch` and ends in its `Built(sim, unit, tile, source)` hook: that is where rally/auto-squad
+(E, UC-006) and the unit-completed alert (G) belong.
 
 C owns the scheduling in `Simulation.Step` (for example rate-mode tiles skipping phase 3); other silos only insert
 their one call.

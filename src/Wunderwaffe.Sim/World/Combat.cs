@@ -181,16 +181,18 @@ public static class Combat
     }
 
     /// <summary>
-    /// Deconstructs the wreck on a cell (CB-006), like removing a building: the tile's owner gets
-    /// <see cref="Balance.WreckRefundPercent"/> of its cost back.
+    /// Deconstructs the wreck on a cell (CB-006), like removing a building: anyone with presence on the tile may, and
+    /// <see cref="Balance.WreckRefundPercent"/> of its cost goes where <see cref="Territory.RefundTo"/> says, or is lost.
     /// </summary>
     internal static bool ClearWreck(Simulation sim, TileState tile, int player, int x, int y)
     {
-        if (tile.Owner != player || tile.Grid.WreckAt(x, y) is not { } w)
+        if (!Territory.HasPresence(sim, player, tile) || tile.Grid.WreckAt(x, y) is not { } w)
             return false;
         tile.Grid.RemoveWreck(w);
+        if (Territory.RefundTo(sim, tile, player) is not { } to)
+            return true;
         foreach (var (id, n) in sim.Content.Buildings[w.DefId].Cost)
-            tile.Inventory.Add(id, (long)n * Balance.WreckRefundPercent / 100);
+            to.Inventory.Add(id, (long)n * Balance.WreckRefundPercent / 100);
         return true;
     }
 

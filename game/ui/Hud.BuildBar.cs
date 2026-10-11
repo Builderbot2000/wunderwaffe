@@ -56,6 +56,8 @@ public partial class Hud
             b.TooltipText = ToolTooltip(tool);
         }
 
+        if (ShowBlueprintStatus())
+            return;
         if (BuildTool.Selected is not { } picked)
         {
             _placePanel.Visible = false;
@@ -106,10 +108,12 @@ public partial class Hud
             case PlaceResult.BadTerrain:
                 var cell = BuildTool.HoveredCell();
                 return $"can't build on {Content.TerrainList[tile.Grid.TerrainAt(cell.X, cell.Y)].Name.ToLowerInvariant()}";
-            case PlaceResult.NotOwner:
-                return "not your tile";
             case PlaceResult.Wreck:
                 return "a wreck is in the way: right-click it with a building picked to salvage it";
+            case PlaceResult.NoPresence:
+                return "land a unit here first: you need a building or unit on a tile to build on it";
+            case PlaceResult.EnemyCircle:
+                return "an enemy building holds this victory circle";
             default:
                 return result.ToString();
         }

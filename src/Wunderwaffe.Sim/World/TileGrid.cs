@@ -41,6 +41,8 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     public CombatState? Combat { get; } =
         def.Kind is BuildingKind.Weapon or BuildingKind.Shield or BuildingKind.Repair
             ? new CombatState { Charge = def.Shield?.Capacity ?? 0, AmmoItem = def.Weapon?.Ammo } : null;
+
+    public FactoryState? Factory { get; } = def.Kind == BuildingKind.UnitFactory ? new FactoryState() : null;
 }
 
 /// <summary>
@@ -68,7 +70,9 @@ public sealed class TileGrid
     readonly List<PlacedBuilding> _importPorts = [];
     readonly List<PlacedBuilding> _combat = [];
     readonly List<PlacedBuilding> _suppliers = [];
+    readonly List<PlacedBuilding> _factories = [];
     readonly bool[] _frames;
+    readonly bool[] _platforms;
 
     /// <summary>A rectangular tile of buildable ground with no port zones.</summary>
     public TileGrid(int width, int height)
@@ -98,7 +102,11 @@ public sealed class TileGrid
         _cells = new int[width * height];
         _deposits = new string?[width * height];
         _frames = new bool[width * height];
+        _platforms = new bool[width * height];
     }
+
+    /// <summary>A copy of the ground alone (shape, buildability, terrain), with nothing on it: for trying out deposits.</summary>
+    internal TileGrid Blank() => new(Width, Height, _mask, _buildable, _terrain);
 
     static T[] Filled<T>(int n, T value)
     {
@@ -133,6 +141,9 @@ public sealed class TileGrid
     /// <summary>Buildings with a resource radius (FB-018), such as the core and storage, in id order.</summary>
     public IReadOnlyList<PlacedBuilding> Suppliers => _suppliers;
 
+    /// <summary>Unit factories (UD-006), in id order.</summary>
+    public IReadOnlyList<PlacedBuilding> Factories => _factories;
+
     /// <summary>Cells carrying a unit frame (the floor a unit is built on).</summary>
     public int FrameCount { get; private set; }
 
@@ -157,8 +168,8 @@ public sealed class TileGrid
     /// <summary>A cell of this tile.</summary>
     public bool InBounds(int x, int y) => InRect(x, y) && _mask[y * Width + x];
 
-    /// <summary>A cell of this tile whose terrain takes buildings (FB-002).</summary>
-    public bool Buildable(int x, int y) => InBounds(x, y) && _buildable[y * Width + x];
+    /// <summary>A cell of this tile whose terrain, or platform (FB-017), takes buildings (FB-002).</summary>
+    public bool Buildable(int x, int y) => InBounds(x, y) && (_buildable[y * Width + x] || _platforms[y * Width + x]);
 
     /// <summary>Terrain index (into <c>ContentDb.TerrainList</c>) of any cell of the box, or 0 outside it.</summary>
     public int TerrainAt(int x, int y) => InRect(x, y) ? _terrain[y * Width + x] : 0;
@@ -183,6 +194,20 @@ public sealed class TileGrid
             return;
         _frames[y * Width + x] = on;
         FrameCount += on ? 1 : -1;
+        Revision++;
+    }
+
+    /// <summary>Cells carrying a floating platform (FB-017), which makes water buildable.</summary>
+    public int PlatformCount { get; private set; }
+
+    public bool HasPlatform(int x, int y) => InRect(x, y) && _platforms[y * Width + x];
+
+    internal void SetPlatform(int x, int y, bool on)
+    {
+        if (_platforms[y * Width + x] == on)
+            return;
+        _platforms[y * Width + x] = on;
+        PlatformCount += on ? 1 : -1;
         Revision++;
     }
 
@@ -228,14 +253,14 @@ public sealed class TileGrid
         return true;
     }
 
-    /// <summary>Every cell of the footprint is buildable ground. Assumes it is in bounds.</summary>
+    /// <summary>Every cell of the footprint is buildable ground or platform. Assumes it is in bounds.</summary>
     public bool Buildable(int x, int y, int w, int h)
     {
         for (int cy = y; cy < y + h; cy++)
         {
             for (int cx = x; cx < x + w; cx++)
             {
-                if (!_buildable[cy * Width + cx])
+                if (!_buildable[cy * Width + cx] && !_platforms[cy * Width + cx])
                     return false;
             }
         }
@@ -286,6 +311,7 @@ public sealed class TileGrid
         BuildingKind.ExportPort => _exportPorts,
         BuildingKind.ImportPort => _importPorts,
         BuildingKind.Weapon or BuildingKind.Shield or BuildingKind.Repair => _combat,
+        BuildingKind.UnitFactory => _factories,
         _ => null,
     };
 

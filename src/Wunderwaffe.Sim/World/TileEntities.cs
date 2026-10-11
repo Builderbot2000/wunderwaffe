@@ -195,6 +195,9 @@ internal static class TileEntities
                 target.Combat.Ammo++;
                 return true;
 
+            case BuildingKind.UnitFactory:
+                return UnitFactory.TryInsert(target, item);
+
             default:
                 return false;
         }
@@ -291,5 +294,7 @@ internal static class TileEntities
         }
         if (b.Combat is { Ammo: > 0, AmmoItem: { } ammo } c)
             inv.Add(ammo, c.Ammo);
+        if (b.Factory is { } factory)
+            UnitFactory.Drain(tile, factory);
     }
 }

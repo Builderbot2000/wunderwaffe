@@ -30,6 +30,7 @@ public partial class TileView : Node2D
     MultiMeshInstance2D _ground = null!;
     MultiMeshInstance2D _deposits = null!;
     MultiMeshInstance2D _frames = null!;
+    MultiMeshInstance2D _platforms = null!;
     MultiMeshInstance2D _buildings = null!;
     Node2D _depositIcons = null!;
     Node2D _buildingSprites = null!;
@@ -56,6 +57,7 @@ public partial class TileView : Node2D
         _ground.SelfModulate = Colors.White with { A = GroundDetail };
         _deposits = AddLayer(this, "Deposits", null);
         _depositIcons = AddGroup("DepositIcons");
+        _platforms = AddLayer(this, "Platforms", null);
         _frames = AddLayer(this, "Frames", Sprites.Get(Sprites.Frame));
         _buildings = AddLayer(this, "Buildings", null);
         _buildingSprites = AddGroup("BuildingSprites");
@@ -81,6 +83,7 @@ public partial class TileView : Node2D
             _drawnTileId = tile.Id;
             DrawGround(grid);
             DrawDeposits(grid);
+            DrawPlatforms(grid);
             DrawFrames(grid);
             DrawBuildings(grid);
         }
@@ -220,6 +223,30 @@ public partial class TileView : Node2D
         foreach (var (zone, lines) in TileShapes.ZoneOutlines(tile))
             _outline.DrawMultiline(TileShapes.ToPixels(lines, px), Palette.Zone(zone) with { A = 0.45f }, 1);
         _outline.DrawMultiline(TileShapes.ToPixels(TileShapes.Outline(tile), px), Palette.TileBorder, 2);
+        // The victory circle (WM-014): a building with any cell in it counts toward claiming the tile.
+        var centre = new Vector2(tile.CircleX + 0.5f, tile.CircleY + 0.5f) * px;
+        _outline.DrawArc(centre, (Sim.Balance.CircleRadius + 0.5f) * px, 0, Mathf.Tau, 96, Palette.Circle, 3);
+    }
+
+    /// <summary>Floating platforms (FB-017): a deck over the water that buildings stand on.</summary>
+    void DrawPlatforms(TileGrid grid)
+    {
+        var cells = new List<(int X, int Y)>();
+        for (int y = 0; grid.PlatformCount > 0 && y < grid.Height; y++)
+        {
+            for (int x = 0; x < grid.Width; x++)
+            {
+                if (grid.HasPlatform(x, y))
+                    cells.Add((x, y));
+            }
+        }
+        var mm = _platforms.Multimesh;
+        mm.InstanceCount = cells.Count;
+        for (int i = 0; i < cells.Count; i++)
+        {
+            mm.SetInstanceTransform2D(i, Rect(cells[i].X, cells[i].Y, 1, 1, 0.03f, 0));
+            mm.SetInstanceColor(i, Palette.Platform);
+        }
     }
 
     void DrawGround(TileGrid grid)

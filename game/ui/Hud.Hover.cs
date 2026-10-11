@@ -73,7 +73,15 @@ public partial class Hud
                 break;
             case BuildingKind.UnitCore:
             case BuildingKind.Thruster:
+            case BuildingKind.Locomotor:
                 Line("A unit part. Lay frame under it, then hover the unit core with no building picked and press G to lift off.");
+                if (b.Kind == BuildingKind.UnitCore)
+                    Line("K records the design on its frame to the blueprint library.");
+                break;
+            case BuildingKind.UnitFactory when b.Factory is { } f:
+                Line($"Builds a library blueprint within {UnitFactory.Radius(Sim, tile, b)} cells, up to {UnitFactory.BlockCap(Sim, tile, b)} blocks, " +
+                     "from items belts bring it. Click to select it.");
+                Line($"{f.Status} · {f.Built} built", f.Status is FactoryStatus.Building ? Ui.Good : Ui.Muted);
                 break;
             case BuildingKind.Weapon or BuildingKind.Wall or BuildingKind.Shield or BuildingKind.Repair or BuildingKind.Storage:
                 DescribeCombat(tile, b, def, Line);
@@ -149,7 +157,7 @@ public partial class Hud
         if (Sim.TryGetTile(PortRules.PartnerOf(tile.Grid, port)) is not { } n)
             return "Not in an I/O zone: nowhere to send items.";
         if (n.Owner != tile.Owner)
-            return $"{n.Name} isn't yours. Claim it to send items there.";
+            return $"{n.Name} isn't yours. Claim its victory circle to send items there.";
         if (!n.Grid.ImportPorts.Any(p => PortRules.PartnerOf(n.Grid, p) == tile.Id))
             return $"No import port in {n.Name}'s zone facing this tile. Items wait here until there is.";
         return null;

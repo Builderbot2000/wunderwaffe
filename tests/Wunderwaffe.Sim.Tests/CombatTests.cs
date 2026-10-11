@@ -312,11 +312,12 @@ public class CombatTests
     public void AUnitWithStorageSuppliesItsFriends()
     {
         var (sim, mine, _) = Arena();
-        // A supply depot riding on a unit: core, depot (2x2) on frame.
+        // A supply depot riding on a unit: core, thruster (UD-003 needs locomotion), depot (2x2) on frame.
         for (int y = 20; y < 22; y++)
             for (int x = 20; x < 23; x++)
                 sim.Enqueue(new PlaceFrameCommand(Me, mine.Id, x, y));
         Put(sim, mine, Me, "unit_core", 20, 20);
+        Put(sim, mine, Me, "thruster", 20, 21);
         Put(sim, mine, Me, "supply_depot", 21, 20);
         sim.Step();
         sim.Enqueue(new ActivateUnitCommand(Me, mine.Id, 20, 20));

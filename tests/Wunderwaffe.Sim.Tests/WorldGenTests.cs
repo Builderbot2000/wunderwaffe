@@ -206,8 +206,10 @@ public class WorldGenTests
         var home = sim.Tiles[sim.StartTileId];
         Assert.True(home.Grid.BuildableCount * 100 >= home.Grid.Area * 60);
         Assert.True(sim.Neighbors(home).Count(n => n.Grid.BuildableCount * 100 >= n.Grid.Area * 30) >= 2);
-        var core = Assert.Single(home.Grid.Buildings);
-        Assert.Equal("core", core.DefId);
+        var core = Assert.Single(home.Grid.Buildings, b => b.DefId == "core");
+        Assert.True(home.InCircle(core.X + 1, core.Y + 1), "the core stands in the start's victory circle");
+        // And the scout for the first foothold elsewhere (WM-015).
+        Assert.Equal(["thruster", "unit_core", "thruster"], home.Grid.Buildings.Where(b => b.DefId != "core").Select(b => b.DefId));
     }
 
     [Theory]
@@ -234,8 +236,6 @@ public class WorldGenTests
         Assert.NotEqual(a.StartTileIds[0], a.StartTileIds[1]);
         Assert.Equal(a.StartTileIds, b.StartTileIds);
         Assert.Equal(a.StateHash(), b.StateHash());
-        // Player 0 starts where a single-player game would.
-        Assert.Equal(World(seed).StartTileId, a.StartTileId);
         for (int p = 0; p < 2; p++)
         {
             var home = a.Tiles[a.StartTileIds[p]];

@@ -11,14 +11,13 @@ public class SaveTests(ITestOutputHelper output)
     const int Me = 0;
 
     /// <summary>
-    /// A small session through every command kind: a mining line, a claim, a unit lifted off and flown, all spread
+    /// A small session through every command kind: a mining line, a destroyed belt, a unit lifted off and flown, all spread
     /// over a few in-game minutes.
     /// </summary>
     static Simulation Session()
     {
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         var home = sim.Tiles[sim.StartTileId];
-        var east = sim.Neighbors(home).First(n => n.Grid.BuildableCount * 2 > n.Grid.Area);
         // Home's shape and terrain depend on the seed, so build on the first open ground: belts on its top row, the
         // unit three rows down.
         var (x0, y0) = Harness.Open(home, 12, 6);
@@ -34,18 +33,28 @@ public class SaveTests(ITestOutputHelper output)
         At(0, new DebugGrantCommand(Me, home.Id, "copper_ore", 500), new DebugGrantCommand(Me, home.Id, "steel", 50),
             new DebugGrantCommand(Me, home.Id, "iron_plate", 50), new DebugGrantCommand(Me, home.Id, "copper_plate", 50));
         At(1, Enumerable.Range(0, 10).Select(i => (Command)new PlaceBuildingCommand(Me, home.Id, "conveyor", x0 + i, y0)).ToArray());
-        At(2, new RemoveBuildingCommand(Me, home.Id, x0 + 5, y0), new ClaimTileCommand(Me, east.Id));
+        At(2, new RemoveBuildingCommand(Me, home.Id, x0 + 5, y0), new DebugDestroyCommand(Me, home.Id, x0 + 6, y0));
         At(3, new PlaceFrameCommand(Me, home.Id, ux, uy), new PlaceFrameCommand(Me, home.Id, ux + 1, uy), new PlaceFrameCommand(Me, home.Id, ux + 2, uy),
             new PlaceFrameCommand(Me, home.Id, ux + 3, uy), new RemoveFrameCommand(Me, home.Id, ux + 3, uy));
         At(4, new PlaceBuildingCommand(Me, home.Id, "thruster", ux, uy), new PlaceBuildingCommand(Me, home.Id, "unit_core", ux + 1, uy),
             new PlaceBuildingCommand(Me, home.Id, "thruster", ux + 2, uy));
         At(5, new ActivateUnitCommand(Me, home.Id, ux + 1, uy));
         At(6, new MoveUnitsCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY));
+        At(7, new SetRallyCommand(Me, home.Id, x0, y0, home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY, 0),
+            new CreateSquadCommand(Me, "Alpha", [1]), new RenameSquadCommand(Me, 1, "Bravo"),
+            new SetFormationCommand(Me, 1, Formation.Wedge), new SetFormationCommand(Me, 1, Formation.Custom, [0, 0]),
+            new SetSquadStanceCommand(Me, 1, Stance.Defensive), new SetStanceCommand(Me, [1], Stance.Aggressive),
+            new AssignSquadCommand(Me, 0, [1]), new DisbandSquadCommand(Me, 1));
+        At(8, new PatrolUnitsCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY),
+            new HoldUnitsCommand(Me, [1]), new RetreatUnitsCommand(Me, [1]));
         // Combat orders with nothing hostile around: the attacks are no-ops, the attack-move flies to the same point.
-        At(7, new AttackMoveCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY),
+        At(9, new AttackMoveCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY),
             new AttackCommand(Me, [1], 99), new AttackBuildingCommand(Me, [1], home.Id, x0, y0),
-            new DebugDamageCommand(Me, home.Id, x0 + 9, y0, 1000));
+            new DebugDamageCommand(Me, home.Id, x0 + 9, y0, 10));
         At(20, new DeployUnitCommand(Me, 1));
+        var belts = new Blueprint([new BlueprintBlock("conveyor", 0, 0, 0), new BlueprintBlock("conveyor", 1, 0, 0)], []);
+        At(22, new PlaceBlueprintCommand(Me, home.Id, belts, x0, y0 + 5, 2, Flip: true),
+            new SetFactoryBlueprintCommand(Me, home.Id, x0, y0 + 5, belts, x0, y0 + 1));
         At(30);
         return sim;
     }
@@ -56,7 +65,8 @@ public class SaveTests(ITestOutputHelper output)
         // NF-002: load restores identical state.
         var sim = Session();
         Assert.Equal(1, sim.PlayerOrNull(Me)!.Launched);
-        Assert.Equal(2, sim.Tiles.Count(t => t.Owner == Me));
+        // 10 belts, one removed, one destroyed, two from the blueprint.
+        Assert.Equal(10, sim.Tiles[sim.StartTileId].Grid.Buildings.Count(b => b.DefId == "conveyor"));
         string json = SaveFile.From(sim, "test").ToJson();
 
         var loaded = Replay.Load(TestContent.Load(), SaveFile.FromJson(json));

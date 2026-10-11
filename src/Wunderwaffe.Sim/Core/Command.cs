@@ -10,7 +10,6 @@ namespace Wunderwaffe.Sim.Core;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(PlaceBuildingCommand), "place")]
 [JsonDerivedType(typeof(RemoveBuildingCommand), "remove")]
-[JsonDerivedType(typeof(ClaimTileCommand), "claim")]
 [JsonDerivedType(typeof(PlaceFrameCommand), "place_frame")]
 [JsonDerivedType(typeof(RemoveFrameCommand), "remove_frame")]
 [JsonDerivedType(typeof(ActivateUnitCommand), "activate_unit")]
@@ -21,6 +20,20 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(AttackBuildingCommand), "attack_building")]
 [JsonDerivedType(typeof(AttackMoveCommand), "attack_move")]
 [JsonDerivedType(typeof(DebugDamageCommand), "debug_damage")]
+[JsonDerivedType(typeof(DebugDestroyCommand), "debug_destroy")]
+[JsonDerivedType(typeof(PlaceBlueprintCommand), "place_blueprint")]
+[JsonDerivedType(typeof(SetFactoryBlueprintCommand), "set_factory_blueprint")]
+[JsonDerivedType(typeof(HoldUnitsCommand), "hold_units")]
+[JsonDerivedType(typeof(PatrolUnitsCommand), "patrol_units")]
+[JsonDerivedType(typeof(RetreatUnitsCommand), "retreat_units")]
+[JsonDerivedType(typeof(SetStanceCommand), "set_stance")]
+[JsonDerivedType(typeof(CreateSquadCommand), "create_squad")]
+[JsonDerivedType(typeof(DisbandSquadCommand), "disband_squad")]
+[JsonDerivedType(typeof(AssignSquadCommand), "assign_squad")]
+[JsonDerivedType(typeof(RenameSquadCommand), "rename_squad")]
+[JsonDerivedType(typeof(SetFormationCommand), "set_formation")]
+[JsonDerivedType(typeof(SetSquadStanceCommand), "set_squad_stance")]
+[JsonDerivedType(typeof(SetRallyCommand), "set_rally")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -54,19 +67,13 @@ public sealed record RemoveBuildingCommand(int Player, int TileId, int X, int Y)
     }
 }
 
-/// <summary>Claims an unclaimed tile next to one the player owns (WM-006).</summary>
-public sealed record ClaimTileCommand(int Player, int TileId) : Command(Player)
-{
-    internal override void Apply(Simulation sim) => sim.TryClaim(Player, TileId);
-}
-
-/// <summary>Lays a unit frame on a cell, paying <see cref="Balance.FrameCost"/>. Frames go under buildings too.</summary>
+/// <summary>Lays a unit frame on a cell, paying <see cref="Balance.FrameCost"/> via <see cref="Territory.Payer"/>. Frames go under buildings too.</summary>
 public sealed record PlaceFrameCommand(int Player, int TileId, int X, int Y) : Command(Player)
 {
     internal override void Apply(Simulation sim)
     {
         if (sim.TryGetTile(TileId) is { } tile)
-            UnitAssembly.PlaceFrame(tile, Player, X, Y);
+            UnitAssembly.PlaceFrame(sim, tile, Player, X, Y);
     }
 }
 
@@ -76,7 +83,7 @@ public sealed record RemoveFrameCommand(int Player, int TileId, int X, int Y) : 
     internal override void Apply(Simulation sim)
     {
         if (sim.TryGetTile(TileId) is { } tile)
-            UnitAssembly.RemoveFrame(tile, Player, X, Y);
+            UnitAssembly.RemoveFrame(sim, tile, Player, X, Y);
     }
 }
 
@@ -163,4 +170,119 @@ public sealed record DebugDamageCommand(int Player, int TileId, int X, int Y, in
         if (sim.TryGetTile(TileId) is { } tile && tile.Grid.BuildingAt(X, Y) is { } b && Amount > 0)
             Combat.DamageBuilding(sim, tile, b, Amount, "debug");
     }
+}
+/// <summary>
+/// Debug only: destroys the building covering cell (X, Y), whoever owns it, as combat will (WM-016: losing a last core
+/// eliminates its owner). Must be disabled in multiplayer.
+/// </summary>
+public sealed record DebugDestroyCommand(int Player, int TileId, int X, int Y) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile && tile.Grid.BuildingAt(X, Y) is { } b)
+            Territory.DestroyBuilding(sim, tile, b);
+    }
+}
+
+/// <summary>
+/// Places a whole blueprint in one action with its top-left at (X, Y), mirrored if <paramref name="Flip"/> and then
+/// turned <paramref name="Rotation"/> quarter turns, paying the total cost (FB-009). Nothing is placed unless every
+/// block fits and the total is affordable; see <see cref="Blueprints.Check"/>.
+/// </summary>
+public sealed record PlaceBlueprintCommand(int Player, int TileId, Blueprint Blueprint, int X, int Y, int Rotation = 0, bool Flip = false)
+    : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile)
+            Blueprints.Place(sim, tile, Player, Blueprint, X, Y, Rotation, Flip);
+    }
+}
+
+/// <summary>
+/// Projects a blueprint from a unit factory (UD-006): the factory covering cell (X, Y) builds it with its top-left at
+/// (OX, OY), turned and flipped as for <see cref="PlaceBlueprintCommand"/>, over and over. A null blueprint stops it.
+/// See <see cref="UnitFactory.CheckProject"/>.
+/// </summary>
+public sealed record SetFactoryBlueprintCommand(
+    int Player, int TileId, int X, int Y, Blueprint? Blueprint, int OX = 0, int OY = 0, int Rotation = 0, bool Flip = false)
+    : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile)
+            UnitFactory.Project(sim, tile, Player, X, Y, Blueprint, OX, OY, Rotation, Flip);
+    }
+}
+
+/// <summary>Units stop where they are and stay (UC-001). They still fire, but don't chase.</summary>
+public sealed record HoldUnitsCommand(int Player, int[] UnitIds) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.Issue(sim, Player, UnitIds, OrderKind.Hold, -1, 0, 0);
+}
+
+/// <summary>Units go back and forth between where they are and a cell (UC-001), in formation.</summary>
+public sealed record PatrolUnitsCommand(int Player, int[] UnitIds, int TileId, int X, int Y) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.Issue(sim, Player, UnitIds, OrderKind.Patrol, TileId, X, Y);
+}
+
+/// <summary>Units fall back to the nearest tile their owner holds, without fighting (UC-001).</summary>
+public sealed record RetreatUnitsCommand(int Player, int[] UnitIds) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.Issue(sim, Player, UnitIds, OrderKind.Retreat, -1, 0, 0);
+}
+
+/// <summary>Sets units' stance (UC-004); an escort follows unit <paramref name="EscortId"/>.</summary>
+public sealed record SetStanceCommand(int Player, int[] UnitIds, Stance Stance, int EscortId = -1) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.SetStance(sim, Player, UnitIds, Stance, EscortId);
+}
+
+/// <summary>Makes a named squad of units, taking them out of any other (UC-002).</summary>
+public sealed record CreateSquadCommand(int Player, string Name, int[] UnitIds) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.CreateSquad(sim, Player, Name, UnitIds);
+}
+
+/// <summary>Breaks a squad up; its units carry on alone.</summary>
+public sealed record DisbandSquadCommand(int Player, int SquadId) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.DisbandSquad(sim, Player, SquadId);
+}
+
+/// <summary>Moves units into a squad, or out of their squads when <paramref name="SquadId"/> is 0.</summary>
+public sealed record AssignSquadCommand(int Player, int SquadId, int[] UnitIds) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.AssignSquad(sim, Player, SquadId, UnitIds);
+}
+
+public sealed record RenameSquadCommand(int Player, int SquadId, string Name) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.RenameSquad(sim, Player, SquadId, Name);
+}
+
+/// <summary>
+/// Sets a squad's formation (UC-003); a moving squad re-forms on the way. <paramref name="Custom"/> is custom slots as
+/// flattened (forward, right) cell pairs.
+/// </summary>
+public sealed record SetFormationCommand(int Player, int SquadId, Formation Formation, int[]? Custom = null) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.SetFormation(sim, Player, SquadId, Formation, Custom);
+}
+
+/// <summary>Sets the stance of a squad and every member (UC-004). Escort is per unit, through <see cref="SetStanceCommand"/>.</summary>
+public sealed record SetSquadStanceCommand(int Player, int SquadId, Stance Stance) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.SetSquadStance(sim, Player, SquadId, Stance);
+}
+
+/// <summary>
+/// Sets where the factory building at (X, Y) sends its new units (UC-006): a rally cell (<paramref name="RallyTileId"/>
+/// -1 for none) and a squad they join (0 for none).
+/// </summary>
+public sealed record SetRallyCommand(int Player, int TileId, int X, int Y, int RallyTileId, int RallyX, int RallyY, int SquadId)
+    : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.SetRally(sim, Player, TileId, X, Y, RallyTileId, RallyX, RallyY, SquadId);
 }

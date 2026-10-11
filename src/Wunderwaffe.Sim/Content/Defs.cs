@@ -61,6 +61,17 @@ public enum BuildingKind
     /// unit it adds <see cref="BuildingDef.Storage"/> to the unit's cargo.
     /// </summary>
     Storage,
+
+    /// <summary>
+    /// A floor laid on water (FB-017): not a building on the tile but a layer under its cells, like frame, that makes
+    /// them buildable ground. Ownerless; removed (and refunded) from an empty cell.
+    /// </summary>
+    Platform,
+    /// <summary>Builds a library blueprint block by block within its radius, fed by belts, and lifts units off (UD-006).</summary>
+    UnitFactory,
+
+    /// <summary>Wheels, a hull or a rotor: gives a unit its <see cref="BuildingDef.Locomotion"/> class (UD-004). Inert on a tile.</summary>
+    Locomotor,
 }
 
 public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower);
@@ -76,6 +87,11 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// <param name="Repair">Repair blocks only.</param>
 /// <param name="SupplyRadius">Resource radius in cells (FB-018): cores and storage share stock with friendlies this close.</param>
 /// <param name="Storage">Items a storage block adds to a unit's cargo.</param>
+/// <param name="OnWater">May stand on water terrain (<c>water</c> in terrain.json) as well as buildable ground (FB-017).</param>
+/// <param name="Radius">Unit factories only: how far, in cells, from the factory's footprint it may build (UD-006).</param>
+/// <param name="BlockCap">Unit factories only: the most frame cells a unit it builds may have (UD-006, WW-002).</param>
+/// <param name="Upkeep">Items a minute this block costs while it rides on a unit (UD-013); null for none.</param>
+/// <param name="Locomotion">Locomotors only: the class this block gives a unit (see <c>World.Locomotion</c>).</param>
 public sealed record BuildingDef(
     string Id,
     string Name,
@@ -92,7 +108,12 @@ public sealed record BuildingDef(
     ShieldDef? Shield = null,
     RepairDef? Repair = null,
     int SupplyRadius = 0,
-    int Storage = 0)
+    int Storage = 0,
+    bool OnWater = false,
+    int Radius = 0,
+    int BlockCap = 0,
+    Dictionary<string, int>? Upkeep = null,
+    [property: JsonConverter(typeof(SnakeCaseEnumConverter))] World.LocomotionClass? Locomotion = null)
 {
     /// <summary>Width and height after <paramref name="rotation"/> quarter turns: odd turns swap them.</summary>
     public (int W, int H) Footprint(int rotation) => (rotation & 1) == 0 ? (Width, Height) : (Height, Width);
@@ -158,6 +179,8 @@ public sealed record GoalDef(string Id, string Name, string Description, UnlockC
 /// <param name="Water">Counts as water for coasts, moisture and a tile's land share.</param>
 /// <param name="River">Used for river cells instead of the bands. At most one terrain should set it.</param>
 /// <param name="Deposits">Relative chance, per minable item, that a deposit patch of it is centred on this terrain.</param>
+/// <param name="Ground">Whether ground units can cross it (UD-004). Default: anything but water.</param>
+/// <param name="Naval">Whether naval units can cross it (UD-004). Default: water only.</param>
 public sealed record TerrainDef(
     string Id,
     string Name,
@@ -167,8 +190,16 @@ public sealed record TerrainDef(
     bool River = false,
     int[]? Elevation = null,
     int[]? Moisture = null,
-    Dictionary<string, int>? Deposits = null)
+    Dictionary<string, int>? Deposits = null,
+    bool? Ground = null,
+    bool? Naval = null)
 {
+    /// <summary>Ground units cross it: <see cref="Ground"/>, defaulting to anything but water.</summary>
+    public bool GroundPassable => Ground ?? !Water;
+
+    /// <summary>Naval units cross it: <see cref="Naval"/>, defaulting to water.</summary>
+    public bool NavalPassable => Naval ?? Water;
+
     public bool Contains(int elevation, int moisture) =>
         !River && InBand(Elevation, elevation) && InBand(Moisture, moisture);
 
