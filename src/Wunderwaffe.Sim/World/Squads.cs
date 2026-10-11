@@ -109,4 +109,28 @@ public sealed class Squads
     internal void ClearRally(int tileId, int buildingId) => _rallies.Remove((tileId, buildingId));
 
     public static bool ValidName(string? name) => !string.IsNullOrWhiteSpace(name) && name.Length <= MaxNameLength;
+
+    /// <summary>A deep copy, for state snapshots (NF-008).</summary>
+    internal Squads Clone()
+    {
+        var copy = new Squads();
+        copy.RestoreFrom(this);
+        return copy;
+    }
+
+    /// <summary>Makes this an exact copy of <paramref name="other"/>, for loading state snapshots (NF-008).</summary>
+    internal void RestoreFrom(Squads other)
+    {
+        _squads.Clear();
+        foreach (var s in other._squads.Values)
+        {
+            var c = new Squad(s.Id, s.Owner, s.Name) { Formation = s.Formation, Custom = s.Custom, Stance = s.Stance, Order = s.Order, TargetId = s.TargetId };
+            c.MemberList.AddRange(s.MemberList);
+            _squads.Add(c.Id, c);
+        }
+        _rallies.Clear();
+        foreach (var (k, r) in other._rallies)
+            _rallies.Add(k, r);
+        _nextId = other._nextId;
+    }
 }

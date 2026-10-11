@@ -72,6 +72,7 @@ public partial class Hud
                 break;
             case BuildingKind.UnitCore:
             case BuildingKind.Thruster:
+            case BuildingKind.Locomotor:
                 Line("A unit part. Lay frame under it, then hover the unit core with no building picked and press G to lift off.");
                 break;
             case BuildingKind.Machine when b.Machine is { Recipe: { } recipe } m:

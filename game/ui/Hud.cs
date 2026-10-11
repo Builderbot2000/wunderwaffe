@@ -254,6 +254,8 @@ public partial class Hud : Control
         "    Lay frame (0) under a unit core and thrusters, hover the core with no building picked and press G",
         "    Left-click / drag selects units · right-click moves them · past the border goes to the next tile",
         "    G with units selected lands them",
+        "    H hold · P then right-click patrols · X retreats · Q makes a squad · F formation · V stance · E escorts the unit under the cursor",
+        "    Ctrl+1-9 stores a control group, Alt+1-9 recalls it · Y over a unit core, then right-click: its rally point",
         "",
         "Camera: WASD or arrows pan · wheel zooms · middle-drag pans",
         "Debug: F2 performance · F3 stress test · F4 add 1000 of each item",

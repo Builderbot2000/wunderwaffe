@@ -10,7 +10,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `Simulation.World.cs` | Partial: world building. `GenerateWorld` (runs Gen phases, `ChooseStarts` = placeholder farthest-point spread per player, regional deposits RS-003), `AddTile`/`AddStartingTile` (hand-built square tiles for tests), `SettleStartingTile`, `CreateTile`, `RebuildTopology` (adjacency + zones), `CoreSpot`/`PlaceCore`. `DefaultTileSize`=96. |
 | `Balance.cs` | Code-side tuning: `StartingItems`, `ClaimCost`, `ClaimedTileItems`, `FrameCost`, `RefundPercent`, `RegionalChancePercent`, land-share thresholds. |
 | `GameSetup.cs` | Record (Width, Height, Seed, Players=1) in nominal tiles; `Default`, `ParseSeed` (text → FNV hash). |
-| `Content/Defs.cs` | JSON records: `ItemDef`, `RecipeDef` (empty inputs = extraction), `BuildingDef` (`Hp` per block, +`Footprint(rotation)`), `BuildingKind` enum, `UnlockCondition` (goal conditions: `produce`/`claim`/`ship`/`launch`), `GoalDef`, `TerrainDef` (bands, deposit weights). |
+| `Content/Defs.cs` | JSON records: `ItemDef`, `RecipeDef` (empty inputs = extraction), `BuildingDef` (`Hp` per block, +`Footprint(rotation)`), `BuildingKind` enum, `UnlockCondition` (goal conditions: `produce`/`claim`/`ship`/`launch`), `GoalDef`, `TerrainDef` (bands, deposit weights, `Ground`/`Naval` passability), `BuildingDef.Locomotion` (locomotor blocks). |
 | `Content/ContentDb.cs` | Loads + validates all JSON (`FromJson`, throws `ContentException` with every error). Lookups: `Items`, `Recipes`, `Buildings`, `BuildingList` (menu order), `Goals`, `TerrainList`, `RecipesByBuilding`, `DefaultTerrain`, `RiverTerrain`, `Classify(elev, moist)`. |
 | `Core/Command.cs` | Every player action as a JSON-polymorphic record with `Apply(sim)`: place/remove building, claim, place/remove frame, activate/deploy/move units, debug grant. No tech tree, so no unlock command. `LoggedCommand`. |
 | `Core/SaveFile.cs` | `SaveFile` (setup + log + hash, `CurrentVersion`), `Replay` (sliced re-simulation, `Matches`), `SaveException`. |
@@ -30,17 +30,20 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/WorldMap.cs` | Global grid: terrain, elevation, tile id per cell; adjacency (`MinBorderCells`=3), `BorderCells(from,to)`, `Grow` for hand-built worlds. |
 | `World/TileGenerator.cs` | Deposit patches on a tile, weighted by terrain (`GenerateDeposits`, `exclude` for regional items). |
 | `World/Direction.cs` | N/E/S/W, `Dx`/`Dy`, `FromRotation` (0=east, clockwise), `Opposite`. |
-| `World/Units.cs` | `Unit` rigid body (mass, inertia, radius, thrusters, max speed computed in ctor), order/path state; `UnitBlock` (carries the building's `Hp`), `UnitCell`, `Thruster`. |
+| `World/Units.cs` | `Unit` rigid body (mass, inertia, radius, thrusters, max speed, `Locomotion` computed in ctor), route/path state, `Order`, `Stance`, anchor, escort, `SquadId`; `Stance` enum, `UnitBlock` (carries the building's `Hp`), `UnitCell`, `Thruster`. |
 | `World/UnitAssembly.cs` | Frames (`CheckFrame`, place/remove), lift-off (`CheckActivate` flood-fills frame from a unit core → `Activate` spawns unit), landing (`CheckDeploy` → `Deploy`). Result enums. `MaxCells`=64. |
-| `World/UnitSim.cs` | Move orders: `Order` (formation, `MoveResult`), `FindRoute` (BFS over tiles). |
-| `World/UnitPhysics.cs` | Per-tick flight controller, border portals, path following, tile tracking, collisions with buildings and units. |
-| `World/UnitPath.cs` | A* over current + next tile with clearance, line-of-sight straightening. |
+| `World/UnitSim.cs` | Orders (`OrderKind`, `UnitOrder`, `Issue`/`Order`, hold/patrol/retreat, `Arrived`), formation `Slots`, stances (`Step`, `MayChase`/`Chase`/`Halt`/`Resume`/`CanFire`, `LeashCells`), squad ops + checks, rally (`CheckRally`, `OnUnitBuilt`), `AbstractWaypoints`/`CruiseSpeed` (UC-009). |
+| `World/UnitPhysics.cs` | Per-tick flight controller (starts with `UnitSim.Step`), border portals (by route region), path following, tile tracking, collisions with buildings, impassable terrain and units. |
+| `World/UnitPath.cs` | A* over current + next tile with clearance, terrain by locomotion (`UnitNav` regions), line-of-sight straightening; a blocked start heads for the nearest free cell. |
 | `World/Trig.cs` | Integer CORDIC sin/cos/atan2; angles in 1/65536 turns, `One`=4096. |
 | `World/Gen/TerrainGen.cs` | Phase 1: elevation (warped noise, rank-normalised), drainage → lakes/rivers, moisture, classification. `SeaLevel`=400. |
 | `World/Gen/Partition.cs` | Phase 2: seeds by dart throwing, Dijkstra growth along terrain costs, merge tiny regions, renumber by position. |
 | `World/Gen/Zones.cs` | Phase 3: per-tile I/O zones by multi-source BFS from borders. |
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
+| `World/Locomotion.cs` | UD-004: `LocomotionClass` (ground/naval/air), `Locomotion.Check`/`Of` (class from block ids; rotor > hull > wheels/thrusters; hull+wheels conflict), `CanCross` (terrain). |
+| `World/UnitNav.cs` | Terrain regions per (class, clearance), cached per sim, not hashed: `Regions`, `FindRoute` (region BFS → tiles + regions, goal snapping), `Portal` (border cell), `Plan` → `TravelPlan` (route + ETA for abstract travel). |
+| `World/Squads.cs` | `Squad` (name, members in slot order, `Formation`, custom slots, stance, order, `TargetId` for combat), `Rally`, `Squads` registry on `Simulation.Squads` (hashed; `Clone`/`RestoreFrom` for snapshots). |
 
 ## game/ (Godot project; namespaces `Wunderwaffe.Game[.Input/.Render/.Screens/.Debug]`)
 
@@ -52,7 +55,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `autoload/SimHost.cs` | `SimHost.Instance`. Owns `Content`, `Sim`, tick loop (`_Process`, max 8 ticks/frame), `ViewMode` (Tile/World) + `ViewedTile`, `Selected` units, `WatchView`/`ShowOnlyIn` helpers, new/save/load (`BeginLoad` replays over frames), quit, CLI flags (`--tour`, `--stress`, `--drive`), F3/F4/Tab. |
 | `input/InputActions.cs` | Action names + default key bindings (registered in code). |
 | `input/BuildTool.cs` | Build palette (`Tools`, one per building or per recipe for multi-recipe crafters, + frame), selection, `BuildRotation`, placement/removal on mouse, ghost and port-zone drawing, `Preview`, `HoveredZone`, `PickedIsPort`, `HoveredCell`. |
-| `input/UnitTool.cs` | Unit selection (click/box, Shift adds), move orders (tile and world map), G = lift off / land, `Status` text. Active when no building is picked. |
+| `input/UnitTool.cs` | Unit selection (click/box, Shift adds), move/patrol orders (tile and world map), H hold, X retreat, Q squad, F formation, V stance, E escort, Y rally, Ctrl/Alt+1-9 control groups (UI-only), G = lift off / land, `Status` text. Active when no building is picked. |
 | `input/CameraController.cs` | Pan/zoom; keeps separate camera per view; fits the world map. |
 | `render/Palette.cs` | `CellPx`=16, placeholder colours (spread by id), terrain colours, `Zone`, `Owner`. |
 | `render/Sprites.cs` | `res://assets/sprites/{id}.png` lookup with cache; null if missing (callers fall back to colours). |
@@ -98,6 +101,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `SimulationTests.cs` | Determinism, starting tile. |
 | `StressTests.cs` | NF-001 tick budget with thousands of buildings. |
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats: content changes that break the loop fail here. |
+| `MovementTests.cs` | Locomotion classes, terrain-aware routes on a generated world, hold/patrol/retreat, squads, formations, stances, rally, travel plan ETA. |
 
 ## Other
 

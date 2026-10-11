@@ -23,6 +23,20 @@ public static class InputActions
     public const string WorldEnter = "world_enter";
     public const string WorldClaim = "world_claim";
     public const string UnitToggle = "unit_toggle";
+    public const string UnitHold = "unit_hold";
+    /// <summary>Arms a patrol: the next right-click patrols there.</summary>
+    public const string UnitPatrol = "unit_patrol";
+    public const string UnitRetreat = "unit_retreat";
+    /// <summary>Makes the selection a new squad.</summary>
+    public const string UnitSquad = "unit_squad";
+    /// <summary>Cycles the selected squad's formation.</summary>
+    public const string UnitFormation = "unit_formation";
+    /// <summary>Cycles the selection's stance: aggressive, defensive, hold fire.</summary>
+    public const string UnitStance = "unit_stance";
+    /// <summary>The selection escorts the unit under the cursor.</summary>
+    public const string UnitEscort = "unit_escort";
+    /// <summary>Over a unit core or factory: arms its rally point, set by the next right-click.</summary>
+    public const string UnitRally = "unit_rally";
     public const int Slots = 10;
 
     /// <summary>Slots 1-9 are the number keys; the tenth is 0.</summary>
@@ -44,6 +58,14 @@ public static class InputActions
         Add(WorldEnter, Key.Enter, Key.KpEnter);
         Add(WorldClaim, Key.C);
         Add(UnitToggle, Key.G);
+        Add(UnitHold, Key.H);
+        Add(UnitPatrol, Key.P);
+        Add(UnitRetreat, Key.X);
+        Add(UnitSquad, Key.Q);
+        Add(UnitFormation, Key.F);
+        Add(UnitStance, Key.V);
+        Add(UnitEscort, Key.E);
+        Add(UnitRally, Key.Y);
         for (int i = 0; i < Slots; i++)
             Add(Slot(i), i == 9 ? Key.Key0 : Key.Key1 + i);
     }
