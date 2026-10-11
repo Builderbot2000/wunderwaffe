@@ -149,6 +149,11 @@ public static class RateModel
                 _out[i] = [.. targets];
             }
 
+            // Drop links nothing can cross (a belt facing back into its source, a drill next to a drill), so they don't
+            // make false loops in the order.
+            for (int i = 0; i < n; i++)
+                _out[i] = _out[i].Where(e => _kind[e.Target] is NodeKind.Core or NodeKind.Export or NodeKind.Crafter
+                    || (_kind[e.Target] == NodeKind.Conveyor && _ahead[e.Target] != i)).ToArray();
             (_order, _cyclic) = TopologicalOrder(n);
             _cap = new long[n * _k];
             _inflow = new long[n * _k];
