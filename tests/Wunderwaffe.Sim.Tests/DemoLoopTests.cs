@@ -56,12 +56,26 @@ public class DemoLoopTests(ITestOutputHelper output)
         Place(home, "drill", 46, 51);
         Place(home, "smelter", 46, 49, recipe: "smelt_copper");
         sim.Step();
-        Assert.Equal(8, home.Grid.BuildingCount);
+        Assert.Equal(8 + 3, home.Grid.BuildingCount); // and the starting scout
 
-        // Goals 3-4: claim the coal tile and ship coal home through a port pair in lane 47.
-        Do(new ClaimTileCommand(Me, coal.Id));
+        // Goal 3: lift the starting scout off (unit core at (47, 38), above the core).
+        Assert.Equal("unit_core", home.Grid.BuildingAt(47, 38)?.DefId);
+        Do(new ActivateUnitCommand(Me, home.Id, 47, 38));
         sim.Step();
-        Assert.Equal(Me, coal.Owner);
+        var scout = Assert.Single(sim.Units);
+
+        // Goal 4: fly it into the coal tile's victory circle, land, and hold the circle until the tile is ours.
+        Do(new MoveUnitsCommand(Me, [scout.Id], coal.Id, coal.CircleX, coal.CircleY));
+        sim.Step();
+        Assert.True(RunUntil(() => !scout.Moving, 120), "the scout never arrived");
+        Assert.Equal(coal.Id, scout.TileId);
+        Do(new DeployUnitCommand(Me, scout.Id));
+        sim.Step();
+        Assert.Empty(sim.Units);
+        Assert.Equal(3, coal.Grid.BuildingCount);
+        Assert.True(RunUntil(() => coal.Owner == Me, Balance.CaptureSeconds + 1), "the coal tile was never claimed");
+
+        // Goal 5: ship coal home through a port pair in lane 47. The coal tile has no stock, so home pays.
         Place(coal, "drill", 1, 46);
         Place(coal, "export_port", 0, 47, West);
         Place(home, "import_port", 95, 47, East);
@@ -69,9 +83,9 @@ public class DemoLoopTests(ITestOutputHelper output)
         for (int x = 49; x <= 91; x++)
             Place(home, "conveyor", x, 48, West);
         sim.Step();
-        Assert.Equal(3, coal.Grid.BuildingCount);
+        Assert.Equal(5, coal.Grid.BuildingCount);
 
-        // Goal 5: the steel mill, once affordable; it needs plates from its own smelter and coal from the port.
+        // Goal 6: the steel mill, once affordable; it needs plates from its own smelter and coal from the port.
         Assert.True(RunUntil(() => home.Inventory.Has(sim.Content.Buildings["steel_mill"].Cost), 900),
             $"steel mill not reached: {me().ProducedOf("iron_plate")} plates, inventory {Inv(home)}");
         Place(home, "steel_mill", 92, 46);
@@ -80,7 +94,7 @@ public class DemoLoopTests(ITestOutputHelper output)
         sim.Step();
         Assert.Equal("steel_mill", home.Grid.BuildingAt(92, 46)?.DefId);
 
-        // Goal 6: a unit core on frame, lifted off once the steel goal is met and the core is affordable.
+        // Goal 7: a unit core on frame, lifted off once the steel goal is met and the core is affordable.
         var unitCost = sim.Content.Buildings["unit_core"].Cost;
         Assert.True(RunUntil(() => me().ProducedOf("steel") >= 20 && home.Inventory.Has(unitCost), 900),
             $"unit core not reached: {me().ProducedOf("steel")} steel, shipped {me().Shipped}, inventory {Inv(home)}");

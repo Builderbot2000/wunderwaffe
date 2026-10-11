@@ -37,6 +37,9 @@ public enum DeployResult
 
     /// <summary>Some cells it would land on are off the tile, unbuildable, built on, or already framed.</summary>
     Blocked,
+
+    /// <summary>It would land in an enemy-owned victory circle while a building not of the player's stands in it (WM-015).</summary>
+    EnemyCircle,
 }
 
 /// <summary>
@@ -188,7 +191,8 @@ public static class UnitAssembly
         if (sim.UnitById(unitId) is not { } unit)
             return DeployResult.NoSuchUnit;
         var tile = sim.Tiles[unit.TileId];
-        if (unit.Owner != player || tile.Owner != player)
+        // The unit is itself presence on the tile (WM-015), so landing needs no claim (UD-011).
+        if (unit.Owner != player)
             return DeployResult.NotOwner;
 
         int q = ((unit.Angle + Trig.Quarter / 2) / Trig.Quarter) & 3;
@@ -214,6 +218,11 @@ public static class UnitAssembly
             var (ax, ay) = Turn(b.GX - unit.CoreGX, b.GY - unit.CoreGY, q);
             var (bx, by) = Turn(b.GX + b.Width - 1 - unit.CoreGX, b.GY + b.Height - 1 - unit.CoreGY, q);
             blocks.Add((b, coreX + Math.Min(ax, bx), coreY + Math.Min(ay, by), Math.Abs(ax - bx) + 1, Math.Abs(ay - by) + 1, (b.Rotation + q) & 3));
+        }
+        foreach (var (_, x, y, w, h, _) in blocks)
+        {
+            if (Territory.EnemyCircleBlocks(tile, player, x, y, w, h))
+                return DeployResult.EnemyCircle;
         }
         plan = new DeployPlan(q, cells, blocks);
         return DeployResult.Ok;

@@ -87,6 +87,22 @@ internal sealed class StateHash
             Mix(b.Hp);
             MixEntity(b);
         }
+        Mix(t.CircleX);
+        Mix(t.CircleY);
+        foreach (var (p, ticks) in t.ClaimTicks)
+        {
+            Mix(p);
+            Mix(ticks);
+        }
+        Mix(g.PlatformCount);
+        for (int y = 0; g.PlatformCount > 0 && y < g.Height; y++)
+        {
+            for (int x = 0; x < g.Width; x++)
+            {
+                if (g.HasPlatform(x, y))
+                    Mix(y * g.Width + x);
+            }
+        }
     }
 
     void MixEntity(PlacedBuilding b)

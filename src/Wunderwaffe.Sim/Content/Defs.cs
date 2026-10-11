@@ -40,6 +40,12 @@ public enum BuildingKind
 
     /// <summary>Pushes a unit the way it faces while the unit is active. Inert on a tile.</summary>
     Thruster,
+
+    /// <summary>
+    /// A floor laid on water (FB-017): not a building on the tile but a layer under its cells, like frame, that makes
+    /// them buildable ground. Ownerless; removed (and refunded) from an empty cell.
+    /// </summary>
+    Platform,
 }
 
 public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower);
@@ -47,6 +53,7 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// <param name="Hp">Hit points of one placed block (one building, wherever it stands: tile or unit). Must be &gt; 0.</param>
 /// <param name="Speed">Conveyors only: how far an item moves along a cell each tick, out of <c>BeltState.CellLength</c>.</param>
 /// <param name="Thrust">Thrusters only: force on the unit while it is active.</param>
+/// <param name="OnWater">May stand on water terrain (<c>water</c> in terrain.json) as well as buildable ground (FB-017).</param>
 public sealed record BuildingDef(
     string Id,
     string Name,
@@ -57,7 +64,8 @@ public sealed record BuildingDef(
     int Hp,
     [property: JsonConverter(typeof(SnakeCaseEnumConverter))] BuildingKind Kind = BuildingKind.Machine,
     int Speed = 0,
-    int Thrust = 0)
+    int Thrust = 0,
+    bool OnWater = false)
 {
     /// <summary>Width and height after <paramref name="rotation"/> quarter turns: odd turns swap them.</summary>
     public (int W, int H) Footprint(int rotation) => (rotation & 1) == 0 ? (Width, Height) : (Height, Width);

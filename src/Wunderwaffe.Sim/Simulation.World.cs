@@ -45,11 +45,19 @@ public sealed partial class Simulation
             CreateTile(b.X0, b.Y0, b.X1 - b.X0 + 1, b.Y1 - b.Y0 + 1);
         RebuildTopology();
 
-        _startTileIds.AddRange(ChooseStarts(w, h, players));
+        _startTileIds.AddRange(ChooseStarts(w, h, players, seed));
         var missing = RegionalExclusions(_startTileIds.Select(id => _tiles[id]).ToList(), seed);
         foreach (var t in _tiles)
-            TileGenerator.GenerateDeposits(t.Grid, Content, new Rng(seed ^ (ulong)(t.Id + 1) * 0x9E3779B97F4A7C15UL), missing[t.Id]);
+            TileGenerator.GenerateDeposits(t.Grid, Content, DepositRng(seed, t.Id), missing[t.Id]);
+
+        // Victory circles go on the deposits (WM-014); tiles are independent, so in parallel.
+        var circles = new (int X, int Y)[_tiles.Count];
+        Parallel.For(0, _tiles.Count, i => circles[i] = Circles.Place(_tiles[i].Grid));
+        foreach (var t in _tiles)
+            (t.CircleX, t.CircleY) = circles[t.Id];
     }
+
+    static Rng DepositRng(ulong seed, int tileId) => new(seed ^ (ulong)(tileId + 1) * 0x9E3779B97F4A7C15UL);
 
     /// <summary>
     /// Per tile, the regional items it gets no deposits of (RS-003): all of them on the starts, and each one on
@@ -84,36 +92,83 @@ public sealed partial class Simulation
     static bool IsLand(TileState t, int percent) => t.Grid.BuildableCount * 100L >= (long)t.Grid.Area * percent;
 
     /// <summary>
-    /// Starting tiles for <paramref name="players"/> players. Good starts are land tiles with room for a core and at
-    /// least two land neighbours to expand into. Player 0 gets the good start nearest the middle of the world (failing
-    /// that, the tile with most buildable ground); each next player gets the start farthest, in tile-graph steps, from
-    /// those already picked (ties to the lowest id), taken from the good starts and then any tile with room for a core.
-    /// Placeholder spread until the fair-start algorithm (OQ-22).
+    /// Starting tiles for <paramref name="players"/> players (WM-005, OQ-22). Candidates are good starts (land with room
+    /// for a core and at least two land neighbours to expand into), or any tile with room for a core when there aren't
+    /// enough. Each of <see cref="Balance.StartAttempts"/> seeded attempts seeds one start (the first attempt: the
+    /// candidate nearest the middle of the world; the rest: a random one) and adds the rest by farthest-point sampling
+    /// over tile-graph steps (ties to the lowest id). The kept set has the most starts with a land neighbour to carry
+    /// their regional deposits (within <see cref="Balance.RegionalHops"/>), then the most even starting deposits, then
+    /// the widest spacing; earlier attempts win ties. One player just gets the middle start.
     /// </summary>
-    List<int> ChooseStarts(int w, int h, int players)
+    List<int> ChooseStarts(int w, int h, int players, ulong seed)
     {
         var fits = _tiles.Where(t => CoreSpot(t) != null).ToList();
         if (fits.Count < players)
             throw new InvalidOperationException($"only {fits.Count} tiles have room for a core, {players} players need one each");
         var good = fits.Where(t => IsLand(t, Balance.StartLandPercent) && Neighbors(t).Count(n => IsLand(n, Balance.LandPercent)) >= 2).ToList();
-        int first = good.Count == 0
+        var pool = good.Count >= players ? good : fits;
+        int middle = good.Count == 0
             ? fits.MaxBy(t => t.Grid.BuildableCount)!.Id
             : good
                 .OrderBy(t => (long)(t.CenterX - w / 2) * (t.CenterX - w / 2) + (long)(t.CenterY - h / 2) * (t.CenterY - h / 2))
                 .ThenBy(t => t.Id)
                 .First().Id;
-        var starts = new List<int> { first };
-        while (starts.Count < players)
+        if (players == 1)
+            return [middle];
+        if (!pool.Any(t => t.Id == middle))
+            middle = pool[0].Id;
+
+        var steps = new Dictionary<int, int[]>();
+        int[] From(int id) => steps.TryGetValue(id, out var s) ? s : steps[id] = TileSteps([id]);
+        var deposits = new Dictionary<int, SortedDictionary<string, int>>();
+        var regional = RegionalItems().ToHashSet();
+        var minable = Content.Recipes.Values.Where(r => r.Inputs.Count == 0).SelectMany(r => r.Outputs.Keys)
+            .Where(i => !regional.Contains(i)).Distinct().Order(StringComparer.Ordinal).ToList();
+        // A start gets every regional item excluded, so its deposits depend only on its id: lay them on a blank copy.
+        SortedDictionary<string, int> StartDeposits(TileState t)
         {
-            var steps = TileSteps(starts);
-            var pool = good.Any(t => !starts.Contains(t.Id)) ? good : fits;
-            starts.Add(pool
-                .Where(t => !starts.Contains(t.Id))
-                .OrderByDescending(t => steps[t.Id])
-                .ThenBy(t => t.Id)
-                .First().Id);
+            if (!deposits.TryGetValue(t.Id, out var d))
+            {
+                var grid = t.Grid.Blank();
+                TileGenerator.GenerateDeposits(grid, Content, DepositRng(seed, t.Id), regional);
+                d = deposits[t.Id] = grid.DepositCounts();
+            }
+            return d;
         }
-        return starts;
+
+        var rng = new Rng(seed ^ 0x5EED5EED5EEDUL);
+        List<int>? best = null;
+        (int Regional, long Even, int Spread) bestScore = default;
+        for (int a = 0; a < Balance.StartAttempts; a++)
+        {
+            var starts = new List<int> { a == 0 ? middle : pool[rng.Range(0, pool.Count)].Id };
+            while (starts.Count < players)
+            {
+                starts.Add(pool
+                    .Where(t => !starts.Contains(t.Id))
+                    .OrderByDescending(t => starts.Min(s => From(s)[t.Id]))
+                    .ThenBy(t => t.Id)
+                    .First().Id);
+            }
+
+            int regionalOk = starts.Count(s => Neighbors(_tiles[s]).Any(n => !starts.Contains(n.Id) && IsLand(n, Balance.LandPercent)));
+            long even = 0;
+            foreach (var item in minable)
+            {
+                var counts = starts.Select(s => StartDeposits(_tiles[s]).GetValueOrDefault(item)).ToList();
+                even += counts.Max() == 0 ? 1000 : counts.Min() * 1000L / counts.Max();
+            }
+            int spread = int.MaxValue;
+            for (int i = 0; i < starts.Count; i++)
+            {
+                for (int j = i + 1; j < starts.Count; j++)
+                    spread = Math.Min(spread, From(starts[i])[starts[j]]);
+            }
+            var score = (regionalOk, even, spread);
+            if (best == null || score.CompareTo(bestScore) > 0)
+                (best, bestScore) = (starts, score);
+        }
+        return best!;
     }
 
     /// <summary>Fewest border crossings from any of <paramref name="from"/> to each tile; int.MaxValue if unreachable.</summary>
@@ -181,15 +236,39 @@ public sealed partial class Simulation
         return tile;
     }
 
-    /// <summary>Makes an existing unowned tile a player's first tile: a core and starting items (WM-005).</summary>
+    /// <summary>
+    /// Makes an existing unowned tile a player's first tile (WM-005): a core in its victory circle, starting items, and a
+    /// landed scout (see <see cref="PlaceScout"/>) for the first foothold on another tile.
+    /// </summary>
     public void SettleStartingTile(TileState tile, int owner)
     {
         if (tile.Owner != TileState.Unowned)
             throw new InvalidOperationException($"tile {tile.Id} is already owned");
         tile.Owner = owner;
         Player(owner);
-        PlaceCore(tile);
+        if (PlaceCore(tile) is { } core)
+            PlaceScout(tile, owner, core.X, core.Y - ScoutGap);
         tile.Inventory.Add(Balance.StartingItems);
+    }
+
+    /// <summary>Rows between the core and the starting scout, searched outward from there.</summary>
+    const int ScoutGap = 8;
+
+    /// <summary>
+    /// A landed scout: a thruster, a unit core and a thruster in a row on frame, all pushing east. Building or landing
+    /// needs presence on a tile (WM-015), so expansion starts with this flying to a neighbour's victory circle and
+    /// landing there. Placed near (x, y) on free buildable ground, if there is room.
+    /// </summary>
+    void PlaceScout(TileState tile, int owner, int x, int y)
+    {
+        if (FreeSpot(tile, 3, 1, x, y) is not var (sx, sy))
+            return;
+        for (int i = 0; i < 3; i++)
+        {
+            tile.Grid.SetFrame(sx + i, sy, true);
+            var def = Content.Buildings[i == 1 ? "unit_core" : "thruster"];
+            tile.Grid.Add(def, owner, sx + i, sy, 1, 1, 0, null);
+        }
     }
 
     /// <summary>A tile for the cells of the map already marked with the next id, inside the given box.</summary>
@@ -225,6 +304,8 @@ public sealed partial class Simulation
             Biome = Content.TerrainList[Array.IndexOf(counts, counts.Max())].Id,
             Name = _names.Next(),
         };
+        // Hand-built tiles keep their circle in the middle; generation moves it onto the deposits (WM-014).
+        (tile.CircleX, tile.CircleY) = (tile.CenterX - ox, tile.CenterY - oy);
         _tiles.Add(tile);
         return tile;
     }
@@ -249,16 +330,24 @@ public sealed partial class Simulation
     BuildingDef CoreDef => Content.Buildings[CoreBuildingId];
 
     /// <summary>
-    /// Where a core fits nearest the tile's centre: on free buildable ground, searched in growing squares. Null if the
-    /// tile has no room, as an all-water tile might not.
+    /// Where a core fits nearest the tile's victory circle centre (WM-005: a start's core stands in its circle). Null if
+    /// the tile has no room, as an all-water tile might not.
     /// </summary>
     (int X, int Y)? CoreSpot(TileState tile)
     {
         var core = CoreDef;
-        var grid = tile.Grid;
-        if (grid.BuildableCount < core.Width * core.Height)
+        if (tile.Grid.BuildableCount < core.Width * core.Height)
             return null;
-        int sx = tile.CenterX - tile.OriginX - core.Width / 2, sy = tile.CenterY - tile.OriginY - core.Height / 2;
+        return FreeSpot(tile, core.Width, core.Height, tile.CircleX - core.Width / 2, tile.CircleY - core.Height / 2);
+    }
+
+    /// <summary>
+    /// The top-left of a free, unframed w x h block of buildable cells nearest (sx, sy), searched in growing squares;
+    /// null if none.
+    /// </summary>
+    static (int X, int Y)? FreeSpot(TileState tile, int w, int h, int sx, int sy)
+    {
+        var grid = tile.Grid;
         int reach = Math.Max(grid.Width, grid.Height);
         for (int r = 0; r <= reach; r++)
         {
@@ -266,8 +355,7 @@ public sealed partial class Simulation
             long bestD = long.MaxValue;
             void Try(int x, int y)
             {
-                if (!grid.InBounds(x, y, core.Width, core.Height) || !grid.Buildable(x, y, core.Width, core.Height)
-                    || !grid.IsFree(x, y, core.Width, core.Height))
+                if (!grid.InBounds(x, y, w, h) || !grid.Buildable(x, y, w, h) || !grid.IsFree(x, y, w, h) || Framed(grid, x, y, w, h))
                     return;
                 long d = (long)(x - sx) * (x - sx) + (long)(y - sy) * (y - sy);
                 if (d < bestD || (d == bestD && (y < best!.Value.Y || (y == best.Value.Y && x < best.Value.X))))
@@ -291,10 +379,20 @@ public sealed partial class Simulation
         return null;
     }
 
-    /// <summary>Puts a core on the tile, if there is room for one.</summary>
-    void PlaceCore(TileState tile)
+    static bool Framed(TileGrid grid, int x, int y, int w, int h)
     {
-        if (CoreSpot(tile) is { } spot)
-            tile.Grid.Add(CoreDef, tile.Owner, spot.X, spot.Y, CoreDef.Width, CoreDef.Height, 0, null);
+        for (int cy = y; cy < y + h; cy++)
+        {
+            for (int cx = x; cx < x + w; cx++)
+            {
+                if (grid.HasFrame(cx, cy))
+                    return true;
+            }
+        }
+        return false;
     }
+
+    /// <summary>Puts a core of the tile's owner on the tile, if there is room for one.</summary>
+    PlacedBuilding? PlaceCore(TileState tile) =>
+        CoreSpot(tile) is { } spot ? tile.Grid.Add(CoreDef, tile.Owner, spot.X, spot.Y, CoreDef.Width, CoreDef.Height, 0, null) : null;
 }

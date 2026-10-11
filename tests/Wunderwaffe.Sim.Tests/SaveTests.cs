@@ -11,14 +11,13 @@ public class SaveTests(ITestOutputHelper output)
     const int Me = 0;
 
     /// <summary>
-    /// A small session through every command kind: a mining line, a claim, a unit lifted off and flown, all spread
+    /// A small session through every command kind: a mining line, a destroyed belt, a unit lifted off and flown, all spread
     /// over a few in-game minutes.
     /// </summary>
     static Simulation Session()
     {
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         var home = sim.Tiles[sim.StartTileId];
-        var east = sim.Neighbors(home).First(n => n.Grid.BuildableCount * 2 > n.Grid.Area);
         // Home's shape and terrain depend on the seed, so build on the first open ground: belts on its top row, the
         // unit three rows down.
         var (x0, y0) = Harness.Open(home, 12, 6);
@@ -34,7 +33,7 @@ public class SaveTests(ITestOutputHelper output)
         At(0, new DebugGrantCommand(Me, home.Id, "copper_ore", 500), new DebugGrantCommand(Me, home.Id, "steel", 50),
             new DebugGrantCommand(Me, home.Id, "iron_plate", 50), new DebugGrantCommand(Me, home.Id, "copper_plate", 50));
         At(1, Enumerable.Range(0, 10).Select(i => (Command)new PlaceBuildingCommand(Me, home.Id, "conveyor", x0 + i, y0)).ToArray());
-        At(2, new RemoveBuildingCommand(Me, home.Id, x0 + 5, y0), new ClaimTileCommand(Me, east.Id));
+        At(2, new RemoveBuildingCommand(Me, home.Id, x0 + 5, y0), new DebugDestroyCommand(Me, home.Id, x0 + 6, y0));
         At(3, new PlaceFrameCommand(Me, home.Id, ux, uy), new PlaceFrameCommand(Me, home.Id, ux + 1, uy), new PlaceFrameCommand(Me, home.Id, ux + 2, uy),
             new PlaceFrameCommand(Me, home.Id, ux + 3, uy), new RemoveFrameCommand(Me, home.Id, ux + 3, uy));
         At(4, new PlaceBuildingCommand(Me, home.Id, "thruster", ux, uy), new PlaceBuildingCommand(Me, home.Id, "unit_core", ux + 1, uy),
@@ -52,7 +51,7 @@ public class SaveTests(ITestOutputHelper output)
         // NF-002: load restores identical state.
         var sim = Session();
         Assert.Equal(1, sim.PlayerOrNull(Me)!.Launched);
-        Assert.Equal(2, sim.Tiles.Count(t => t.Owner == Me));
+        Assert.Equal(8, sim.Tiles[sim.StartTileId].Grid.Buildings.Count(b => b.DefId == "conveyor"));
         string json = SaveFile.From(sim, "test").ToJson();
 
         var loaded = Replay.Load(TestContent.Load(), SaveFile.FromJson(json));

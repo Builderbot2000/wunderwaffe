@@ -10,13 +10,13 @@ namespace Wunderwaffe.Sim.Core;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(PlaceBuildingCommand), "place")]
 [JsonDerivedType(typeof(RemoveBuildingCommand), "remove")]
-[JsonDerivedType(typeof(ClaimTileCommand), "claim")]
 [JsonDerivedType(typeof(PlaceFrameCommand), "place_frame")]
 [JsonDerivedType(typeof(RemoveFrameCommand), "remove_frame")]
 [JsonDerivedType(typeof(ActivateUnitCommand), "activate_unit")]
 [JsonDerivedType(typeof(DeployUnitCommand), "deploy_unit")]
 [JsonDerivedType(typeof(MoveUnitsCommand), "move_units")]
 [JsonDerivedType(typeof(DebugGrantCommand), "debug_grant")]
+[JsonDerivedType(typeof(DebugDestroyCommand), "debug_destroy")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -48,12 +48,6 @@ public sealed record RemoveBuildingCommand(int Player, int TileId, int X, int Y)
         if (sim.TryGetTile(TileId) is { } tile)
             sim.TryRemove(tile, Player, X, Y);
     }
-}
-
-/// <summary>Claims an unclaimed tile next to one the player owns (WM-006).</summary>
-public sealed record ClaimTileCommand(int Player, int TileId) : Command(Player)
-{
-    internal override void Apply(Simulation sim) => sim.TryClaim(Player, TileId);
 }
 
 /// <summary>Lays a unit frame on a cell, paying <see cref="Balance.FrameCost"/>. Frames go under buildings too.</summary>
@@ -110,5 +104,18 @@ public sealed record DebugGrantCommand(int Player, int TileId, string ItemId, in
     {
         if (sim.TryGetTile(TileId) is { } tile && sim.Content.Items.ContainsKey(ItemId) && Amount > 0)
             tile.Inventory.Add(ItemId, Amount);
+    }
+}
+
+/// <summary>
+/// Debug only: destroys the building covering cell (X, Y), whoever owns it, as combat will (WM-016: losing a last core
+/// eliminates its owner). Must be disabled in multiplayer.
+/// </summary>
+public sealed record DebugDestroyCommand(int Player, int TileId, int X, int Y) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile && tile.Grid.BuildingAt(X, Y) is { } b)
+            Territory.DestroyBuilding(sim, tile, b);
     }
 }

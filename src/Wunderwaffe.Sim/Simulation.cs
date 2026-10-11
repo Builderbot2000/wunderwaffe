@@ -125,7 +125,7 @@ public sealed partial class Simulation(ContentDb content)
     /// <summary>Queues a command to apply at the start of the next <see cref="Step"/>.</summary>
     public void Enqueue(Command command) => _pending.Add(command);
 
-    /// <summary>One tick: queued commands, then each tile's entities, then units, then goals.</summary>
+    /// <summary>One tick: queued commands, claim timers, then each tile's entities, then units, then goals.</summary>
     public void Step()
     {
         foreach (var command in _pending)
@@ -135,6 +135,7 @@ public sealed partial class Simulation(ContentDb content)
         }
         _pending.Clear();
 
+        Expansion.Step(this);
         foreach (var tile in _tiles)
             TileEntities.Step(this, tile);
         UnitPhysics.Step(this);
@@ -148,43 +149,65 @@ public sealed partial class Simulation(ContentDb content)
 
     // ---- Command handlers. Each re-runs the same read-only check the UI previews with, then applies. ----
 
-    /// <summary>Claims an adjacent unclaimed tile, paying <see cref="Balance.ClaimCost"/> from a neighbouring tile (WM-006).</summary>
-    internal ClaimResult TryClaim(int player, int tileId)
-    {
-        var result = Expansion.Check(this, player, tileId, out var source);
-        if (result != ClaimResult.Ok)
-            return result;
-
-        var tile = _tiles[tileId];
-        source!.Inventory.TryTake(Balance.ClaimCost);
-        tile.Owner = player;
-        Player(player);
-        PlaceCore(tile);
-        tile.Inventory.Add(Balance.ClaimedTileItems);
-        return ClaimResult.Ok;
-    }
-
     internal PlaceResult TryPlace(TileState tile, int player, string buildingId, int x, int y, int rotation, string? recipeId)
     {
         var result = Placement.Check(this, tile, player, buildingId, x, y, rotation, recipeId, out var plan);
         if (result != PlaceResult.Ok)
             return result;
 
-        tile.Inventory.TryTake(plan.Def.Cost);
+        plan.Payer.Inventory.TryTake(plan.Def.Cost);
+        if (plan.Def.Kind == BuildingKind.Platform)
+        {
+            for (int cy = plan.Y; cy < plan.Y + plan.Height; cy++)
+            {
+                for (int cx = plan.X; cx < plan.X + plan.Width; cx++)
+                    tile.Grid.SetPlatform(cx, cy, true);
+            }
+            return PlaceResult.Ok;
+        }
         var recipe = plan.RecipeId == null ? null : Content.Recipes[plan.RecipeId];
         tile.Grid.Add(plan.Def, player, plan.X, plan.Y, plan.Width, plan.Height, plan.Rotation, recipe);
         return PlaceResult.Ok;
     }
 
+    /// <summary>
+    /// Removes a building of the player's and refunds it (FB-002), or, on a cell with nothing on it, a floating platform.
+    /// A player's last core stays (WM-016). Refunds go where <see cref="Territory.RefundTo"/> says, or are lost.
+    /// </summary>
     internal bool TryRemove(TileState tile, int player, int x, int y)
     {
-        if (tile.Owner != player || tile.Grid.BuildingAt(x, y) is not { } b || b.DefId == CoreBuildingId)
+        var grid = tile.Grid;
+        if (grid.BuildingAt(x, y) is not { } b)
+            return TryRemovePlatform(tile, player, x, y);
+        if (b.Owner != player || (b.Kind == BuildingKind.Core && CoreCount(player) <= 1))
             return false;
 
-        tile.Grid.Remove(b);
+        grid.Remove(b);
         TileEntities.Drain(tile, b);
-        foreach (var (id, n) in Content.Buildings[b.DefId].Cost)
-            tile.Inventory.Add(id, (long)n * Balance.RefundPercent / 100);
+        Refund(tile, player, Content.Buildings[b.DefId]);
         return true;
     }
+
+    bool TryRemovePlatform(TileState tile, int player, int x, int y)
+    {
+        var grid = tile.Grid;
+        if (!grid.HasPlatform(x, y) || grid.HasFrame(x, y) || !Territory.HasPresence(this, player, tile))
+            return false;
+        grid.SetPlatform(x, y, false);
+        if (Content.BuildingList.FirstOrDefault(d => d.Kind == BuildingKind.Platform) is { } def)
+            Refund(tile, player, def);
+        return true;
+    }
+
+    void Refund(TileState tile, int player, BuildingDef def)
+    {
+        if (Territory.RefundTo(this, tile, player) is not { } to)
+            return;
+        foreach (var (id, n) in def.Cost)
+            to.Inventory.Add(id, (long)n * Balance.RefundPercent / 100);
+    }
+
+    /// <summary>Cores <paramref name="player"/> has standing, on any tile (WM-016).</summary>
+    public int CoreCount(int player) =>
+        _tiles.Sum(t => t.Grid.Buildings.Count(b => b.Kind == BuildingKind.Core && b.Owner == player));
 }

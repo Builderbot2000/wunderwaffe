@@ -55,7 +55,7 @@ public class PlacementTests
         Assert.Equal(sim.Content.Buildings["conveyor"].Hp, belt.Hp);
 
         var start = new Simulation(TestContent.Load()).AddStartingTile(0, 0, 1, seed: 1);
-        Assert.Equal(1, start.Grid.Buildings.Single().Owner);
+        Assert.All(start.Grid.Buildings, b => Assert.Equal(1, b.Owner)); // the core and the scout
     }
 
     [Fact]
@@ -100,19 +100,20 @@ public class PlacementTests
     public void CannotAffordOrBuildOnSomeoneElsesTile()
     {
         var (sim, tile) = NewSim();
-        Assert.Equal(PlaceResult.NotOwner, Check(sim, tile, "conveyor", 5, 5, player: 1));
+        Assert.Equal(PlaceResult.NoPresence, Check(sim, tile, "conveyor", 5, 5, player: 1));
         Assert.Equal(PlaceResult.CannotAfford, Check(sim, tile, "steel_mill", 5, 5));
     }
 
     [Fact]
-    public void CoreCannotBeRemoved()
+    public void TheLastCoreCannotBeRemoved()
     {
         var sim = new Simulation(TestContent.Load());
         var tile = sim.AddStartingTile(0, 0, Player, seed: 1);
-        var core = tile.Grid.Buildings.Single();
+        var core = tile.Grid.Buildings.Single(b => b.DefId == Simulation.CoreBuildingId);
+        int count = tile.Grid.BuildingCount;
         sim.Enqueue(new RemoveBuildingCommand(Player, 0, core.X, core.Y));
         sim.Step();
-        Assert.Equal(1, tile.Grid.BuildingCount);
+        Assert.Equal(count, tile.Grid.BuildingCount);
     }
 
     [Fact]
