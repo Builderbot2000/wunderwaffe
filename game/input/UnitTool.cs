@@ -56,6 +56,8 @@ public partial class UnitTool : Node2D
         {
             if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
                 OrderToWorldTile();
+            else if (e.IsActionPressed(InputActions.UnitToggle))
+                Land();
             return;
         }
 
@@ -117,7 +119,8 @@ public partial class UnitTool : Node2D
         }
         else if (_host.Selected.Count > 0)
         {
-            line += "\nG: land selected units";
+            var landing = UnitAssembly.CheckDeploy(sim, _host.LocalPlayer, _host.Selected.Min(), out _);
+            line += landing == DeployResult.Ok ? "\nG: land selected units" : $"\nCan't land here: {landing}";
             int stuck = _host.Selected.Count(id => sim.UnitById(id) is { MaxSpeed: <= 0 });
             if (stuck > 0)
                 line += $"\n{stuck} selected can't move: no thruster";
@@ -187,6 +190,12 @@ public partial class UnitTool : Node2D
             _host.Sim.Enqueue(new ActivateUnitCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y));
             return;
         }
+        Land();
+    }
+
+    /// <summary>Lands the selected units where they are (UD-011); on any tile, so a scout can take a foothold (WM-015).</summary>
+    void Land()
+    {
         foreach (int id in _host.Selected.Order())
             _host.Sim.Enqueue(new DeployUnitCommand(_host.LocalPlayer, id));
         _host.Selected.Clear();

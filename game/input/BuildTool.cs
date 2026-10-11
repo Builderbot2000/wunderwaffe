@@ -67,11 +67,15 @@ public partial class BuildTool : Node2D
         _host.ShowOnlyIn(this, ViewMode.Tile, () => _lastActionCell = new(-1, -1));
     }
 
-    /// <summary>One slot per building, in buildings.json order, or per recipe for crafters that need one chosen.</summary>
+    /// <summary>
+    /// One slot per building, in buildings.json order, or per recipe for crafters that need one chosen; then the frame.
+    /// Cores and platforms (WM-016, FB-017) come after the frame, past the number keys, since they are rarely built.
+    /// </summary>
     void BuildPalette(Simulation sim)
     {
         var content = sim.Content;
-        foreach (var def in content.BuildingList.Where(b => b.Id != Simulation.CoreBuildingId))
+        static bool Rare(BuildingDef d) => d.Kind is BuildingKind.Core or BuildingKind.Platform;
+        foreach (var def in content.BuildingList.Where(d => !Rare(d)))
         {
             var crafting = content.RecipesByBuilding.GetValueOrDefault(def.Id)?
                 .Where(r => r.Inputs.Count > 0).ToList() ?? [];
@@ -89,6 +93,8 @@ public partial class BuildTool : Node2D
             }
         }
         _tools.Add(new Tool(FrameId, null, "Unit Frame") { IconId = Sprites.Frame });
+        foreach (var def in content.BuildingList.Where(Rare))
+            _tools.Add(new Tool(def.Id, null, def.Name) { IconId = def.Id });
     }
 
     public override void _UnhandledInput(InputEvent e)

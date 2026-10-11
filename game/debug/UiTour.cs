@@ -56,12 +56,15 @@ public partial class UiTour : Node
         Step(10, "port zones shot", () => { Shot("05c_port_zones"); Key(Godot.Key.Escape); });
         Step(5, "world again", () => { Key(Godot.Key.Tab); });
         Step(10, "select coal tile", SelectCoalNeighbour);
-        Step(10, "world tile panel", () => { Shot("07_world_coal"); Press("Claim"); });
-        Step(10, "claimed", () =>
+        Step(1, "lift off scout", LiftOffScout);
+        Step(10, "select scout", SelectScout);
+        Step(10, "world tile panel", () => { Shot("07_world_coal"); Press("Send units"); });
+        Step(30, "scout sent", () =>
         {
-            int tiles = _host.Sim.Tiles.Count(t => t.Owner == _host.LocalPlayer);
-            Log(tiles == 2 ? "claimed the coal tile" : $"FAIL: own {tiles} tiles after Claim");
-            Shot("07b_claimed");
+            // WM-006: the scout flies to the coal tile's victory circle; landing there and holding it claims the tile.
+            var scout = _host.Sim.Units.FirstOrDefault(u => u.Owner == _host.LocalPlayer);
+            Log(scout is { Moving: true } ? "scout on its way to the coal tile's circle" : "FAIL: the scout didn't take the order");
+            Shot("07b_scout_sent");
         });
         Step(1, "back to tile", () => Key(Godot.Key.Tab));
         Step(5, "pause", () => { Key(Godot.Key.Escape); });
@@ -128,6 +131,28 @@ public partial class UiTour : Node
         var coal = _host.Sim.Neighbors(home).First(n => n.Grid.DepositCounts().ContainsKey("coal"));
         map.SelectedTileId = coal.Id;
         Log($"selected coal tile {coal.Id}");
+    }
+
+    /// <summary>Lifts off the starting scout, as G over its unit core would; <see cref="SelectScout"/> then clicks it.</summary>
+    void LiftOffScout()
+    {
+        var home = _host.Sim.Tiles[_host.Sim.StartTileId];
+        var core = home.Grid.Buildings.First(b => b.Kind == Sim.Content.BuildingKind.UnitCore);
+        _host.Sim.Enqueue(new ActivateUnitCommand(_host.LocalPlayer, home.Id, core.X, core.Y));
+    }
+
+    void SelectScout()
+    {
+        _host.Selected.Clear();
+        if (_host.Sim.Units.LastOrDefault(u => u.Owner == _host.LocalPlayer) is { } scout)
+        {
+            _host.Selected.Add(scout.Id);
+            Log($"lifted off scout {scout.Id}");
+        }
+        else
+        {
+            Log("FAIL: the starting scout didn't lift off");
+        }
     }
 
     /// <summary>Picks the export port, which shows the tile's I/O zones, and hovers the first zone's label.</summary>

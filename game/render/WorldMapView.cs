@@ -12,7 +12,8 @@ namespace Wunderwaffe.Game.Render;
 /// The world layer (WM-001, WM-007): the irregular tiles over the world's terrain, drawn from a blurred picture of
 /// every tile's local map (<see cref="WorldSnapshot"/>, refreshed every few view switches), tinted by owner, with
 /// borders, labels, what each tile holds, links between ports and units. Click selects, double-click or Enter opens
-/// an owned tile, C claims the selected one (WM-006).
+/// a tile you have presence on, C sends the selected units to the selected tile's victory circle (WM-006). Every
+/// tile's circle is drawn with each claimant's progress as an arc (WM-014), and Contested tiles are outlined (WM-004).
 /// </summary>
 public partial class WorldMapView : Node2D
 {
@@ -24,8 +25,8 @@ public partial class WorldMapView : Node2D
 
     static readonly Color Border = new(0f, 0f, 0f, 0.55f);
     static readonly Color Selected = new(1f, 1f, 1f);
-    static readonly Color Claimable = new(1f, 0.85f, 0.25f);
-    static readonly Color TooPoor = new(0.8f, 0.45f, 0.2f);
+    static readonly Color Contested = new(1f, 0.3f, 0.2f);
+    static readonly Color Circle = new(1f, 1f, 1f, 0.7f);
 
     SimHost _host = null!;
     WorldSnapshot? _snapshot;
@@ -98,7 +99,8 @@ public partial class WorldMapView : Node2D
         }
         else if (e.IsActionPressed(InputActions.WorldClaim))
         {
-            _host.Sim.Enqueue(new ClaimTileCommand(_host.LocalPlayer, SelectedTileId));
+            if (_host.Sim.TryGetTile(SelectedTileId) is { } tile && _host.Selected.Count > 0)
+                _host.Sim.Enqueue(new MoveUnitsCommand(_host.LocalPlayer, [.. _host.Selected.Order()], tile.Id, tile.CircleX, tile.CircleY));
         }
     }
 
@@ -175,13 +177,13 @@ public partial class WorldMapView : Node2D
     {
         var sim = _host.Sim;
         var font = ThemeDB.FallbackFont;
+        var contested = Territory.ContestedTiles(sim);
+        int capture = Expansion.CaptureTicks(sim);
         foreach (var tile in sim.Tiles)
         {
-            var claim = Expansion.Check(sim, _host.LocalPlayer, tile.Id, out _);
-            if (claim == ClaimResult.Ok)
-                _overlay.DrawMultiline(Outline(tile), Claimable, 3);
-            else if (claim == ClaimResult.CannotAfford)
-                _overlay.DrawMultiline(Outline(tile), TooPoor, 3);
+            if (contested[tile.Id])
+                _overlay.DrawMultiline(Outline(tile), Contested, 4);
+            DrawCircle(tile, capture);
         }
         if (sim.TryGetTile(SelectedTileId) is { } selected)
             _overlay.DrawMultiline(Outline(selected), Selected, 3);
@@ -236,6 +238,24 @@ public partial class WorldMapView : Node2D
                 _overlay.DrawString(ThemeDB.FallbackFont, (a + b) / 2 + perp * 20, n == 1 ? "1 port" : $"{n} ports",
                     HorizontalAlignment.Left, -1, FontSize - 4, Colors.White);
             }
+        }
+    }
+
+    /// <summary>
+    /// The tile's victory circle, in its owner's colour, with an arc per player claiming it showing how far along they are.
+    /// </summary>
+    void DrawCircle(TileState tile, int capture)
+    {
+        var c = new Vector2(tile.OriginX + tile.CircleX + 0.5f, tile.OriginY + tile.CircleY + 0.5f) * CellPx;
+        float r = Sim.Balance.CircleRadius * CellPx;
+        var ring = tile.Owner == TileState.Unowned ? Circle : Palette.Owner(tile.Owner);
+        _overlay.DrawArc(c, r, 0, Mathf.Tau, 48, ring, 2.5f);
+        float inner = r - 5;
+        foreach (var (player, ticks) in tile.ClaimTicks)
+        {
+            float t = Mathf.Clamp((float)ticks / capture, 0f, 1f);
+            _overlay.DrawArc(c, inner, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * t, 48, Palette.Owner(player), 5f);
+            inner -= 6;
         }
     }
 

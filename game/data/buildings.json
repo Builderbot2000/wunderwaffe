@@ -1,5 +1,5 @@
 [
-  { "id": "core",        "name": "Core",        "kind": "core",        "width": 3, "height": 3, "power": 0,  "hp": 1000, "cost": { "copper_ore": 100, "iron_ore": 50 } },
+  { "id": "core",        "name": "Core",        "kind": "core",        "width": 3, "height": 3, "power": 0,  "hp": 1000, "cost": {} },
   { "id": "drill",       "name": "Drill",       "width": 2, "height": 2, "power": 0,  "hp": 200, "cost": { "copper_ore": 10 } },
   { "id": "conveyor",    "name": "Conveyor",    "kind": "conveyor",    "speed": 4, "width": 1, "height": 1, "power": 0,  "hp": 20, "cost": { "copper_ore": 1 } },
   { "id": "smelter",     "name": "Smelter",     "width": 2, "height": 2, "power": 0,  "hp": 250, "cost": { "copper_ore": 20, "iron_ore": 10 } },

@@ -2,7 +2,8 @@ namespace Wunderwaffe.Sim.World.Gen;
 
 /// <summary>
 /// Phase four, after deposits: each tile's victory circle (WM-014). The circle goes where the most deposit cells fall in
-/// its reach, among the centres that keep it at least <see cref="Balance.CircleClearance"/> cells off the tile's border.
+/// the circle, among the centres that keep it at least <see cref="Balance.CircleClearance"/> cells off the tile's border
+/// (or, when no deposit is in reach of those, just wholly inside the tile).
 /// Ties go to the centre deepest inside the tile, then the lowest row and column. A tile too small for that relaxes
 /// the clearance, and one too small for the circle at all gets its deepest cell. Ocean tiles have no deposits, so their
 /// circle is simply the deepest spot.
@@ -15,41 +16,62 @@ internal static class Circles
         int w = grid.Width, h = grid.Height, r = Balance.CircleRadius;
         var depth = Depth(grid);
 
-        // Deposit cells in the (2r+1)-square around each centre, from a summed-area table: a cheap stand-in for the circle.
-        var sum = new int[(w + 1) * (h + 1)];
+        // Deposit cells in reach of each centre, exactly: per row of the circle, a run of a row's running sums.
+        var row = new int[h * (w + 1)];
         for (int y = 0; y < h; y++)
         {
             for (int x = 0; x < w; x++)
-            {
-                int d = grid.InBounds(x, y) && grid.DepositAt(x, y) != null ? 1 : 0;
-                sum[(y + 1) * (w + 1) + x + 1] = d + sum[y * (w + 1) + x + 1] + sum[(y + 1) * (w + 1) + x] - sum[y * (w + 1) + x];
-            }
+                row[y * (w + 1) + x + 1] = row[y * (w + 1) + x] + (grid.InBounds(x, y) && grid.DepositAt(x, y) != null ? 1 : 0);
         }
+        var half = new int[r + 1];
+        for (int dy = 0; dy <= r; dy++)
+            half[dy] = (int)Core.IntMath.ISqrt((long)r * r - (long)dy * dy);
         int Deposits(int x, int y)
         {
-            int x0 = Math.Max(0, x - r), y0 = Math.Max(0, y - r), x1 = Math.Min(w, x + r + 1), y1 = Math.Min(h, y + r + 1);
-            return sum[y1 * (w + 1) + x1] - sum[y0 * (w + 1) + x1] - sum[y1 * (w + 1) + x0] + sum[y0 * (w + 1) + x0];
+            int n = 0;
+            for (int dy = -r; dy <= r; dy++)
+            {
+                int cy = y + dy;
+                if (cy < 0 || cy >= h)
+                    continue;
+                int hw = half[Math.Abs(dy)], x0 = Math.Max(0, x - hw), x1 = Math.Min(w, x + hw + 1);
+                if (x1 > x0)
+                    n += row[cy * (w + 1) + x1] - row[cy * (w + 1) + x0];
+            }
+            return n;
         }
 
         int deepest = depth.Max();
         // A centre at depth d (Chebyshev steps to the nearest outside cell) has every cell within r of it inside the
-        // tile when d > r; the clearance asks for more where the tile allows.
-        int need = Math.Min(deepest, r + 1 + Balance.CircleClearance);
-        (int X, int Y) best = (0, 0);
-        long bestScore = -1;
-        for (int y = 0; y < h; y++)
+        // tile when d > r. The clearance asks for more where the tile allows; if that leaves no deposits in reach, the
+        // circle may come up to the border instead, but stays wholly inside where it can.
+        (int X, int Y, int Deposits) Best(int need)
         {
-            for (int x = 0; x < w; x++)
+            (int X, int Y, int Deposits) best = (0, 0, -1);
+            long bestScore = -1;
+            for (int y = 0; y < h; y++)
             {
-                int d = depth[y * w + x];
-                if (d < need)
-                    continue;
-                long score = (long)Deposits(x, y) * 1_000_000 + d;
-                if (score > bestScore)
-                    (best, bestScore) = ((x, y), score);
+                for (int x = 0; x < w; x++)
+                {
+                    int d = depth[y * w + x];
+                    if (d < need)
+                        continue;
+                    int n = Deposits(x, y);
+                    long score = (long)n * 1_000_000 + d;
+                    if (score > bestScore)
+                        (best, bestScore) = ((x, y, n), score);
+                }
             }
+            return best;
         }
-        return best;
+        var clear = Best(Math.Min(deepest, r + 1 + Balance.CircleClearance));
+        if (clear.Deposits <= 0 && deepest > r + 1 + Balance.CircleClearance)
+        {
+            var near = Best(r + 1);
+            if (near.Deposits > 0)
+                return (near.X, near.Y);
+        }
+        return (clear.X, clear.Y);
     }
 
     /// <summary>

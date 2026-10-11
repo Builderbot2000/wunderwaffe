@@ -120,7 +120,7 @@ public partial class Hud : Control
         _sideInfo = Ui.Column(4);
         side.AddChild(_sideInfo);
         var buttons = Ui.Row();
-        _claim = Ui.Button("Claim (C)", ClaimSelected);
+        _claim = Ui.Button("Send units (C)", SendToCircle);
         _enter = Ui.Button("Open tile (Enter)", () => _host.EnterTile(SelectedWorldTile().Id));
         buttons.AddChild(_claim);
         buttons.AddChild(_enter);

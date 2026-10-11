@@ -108,6 +108,10 @@ public partial class Hud
                 return $"can't build on {Content.TerrainList[tile.Grid.TerrainAt(cell.X, cell.Y)].Name.ToLowerInvariant()}";
             case PlaceResult.NotOwner:
                 return "not your tile";
+            case PlaceResult.NoPresence:
+                return "land a unit here first: you need a building or unit on a tile to build on it";
+            case PlaceResult.EnemyCircle:
+                return "an enemy building holds this victory circle";
             default:
                 return result.ToString();
         }
