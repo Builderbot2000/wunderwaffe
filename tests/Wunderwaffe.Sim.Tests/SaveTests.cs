@@ -14,7 +14,7 @@ public class SaveTests(ITestOutputHelper output)
     /// A small session through every command kind: a mining line, a destroyed belt, a unit lifted off and flown, all spread
     /// over a few in-game minutes.
     /// </summary>
-    static Simulation Session()
+    internal static Simulation Session()
     {
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         var home = sim.Tiles[sim.StartTileId];

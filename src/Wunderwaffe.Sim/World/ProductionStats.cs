@@ -126,4 +126,31 @@ public sealed class ProductionStats
     }
 
     long Slot(long[] ring, int back) => _bucket - back < 0 ? 0 : ring[(int)((_bucket - back) % Buckets)];
+
+    // ---- Snapshots (NF-008). ----
+
+    internal Core.StatsSnap Snap()
+    {
+        static List<Core.SeriesSnap> Of<TKey>(Table<TKey> t) where TKey : notnull =>
+            t.Sorted.Select(kv => new Core.SeriesSnap(kv.Key.ToString()!, [.. kv.Value.Ring], kv.Value.Total)).ToList();
+        return new(_bucket, Of(_made), Of(_used), Of(_sent));
+    }
+
+    /// <summary>Puts a snapshot back into fresh stats.</summary>
+    internal void Restore(Core.StatsSnap snap)
+    {
+        static void Fill<TKey>(Table<TKey> t, List<Core.SeriesSnap> rows, Func<string, TKey> key) where TKey : notnull
+        {
+            foreach (var r in rows)
+            {
+                var series = t.Get(key(r.Key));
+                r.Ring.CopyTo(series.Ring, 0);
+                series.Total = r.Total;
+            }
+        }
+        _bucket = snap.Bucket;
+        Fill(_made, snap.Made, k => k);
+        Fill(_used, snap.Used, k => k);
+        Fill(_sent, snap.Sent, int.Parse);
+    }
 }

@@ -63,6 +63,13 @@ public sealed partial class Simulation
         }
     }
 
+    internal void RestoreProjectiles(IEnumerable<Projectile> projectiles, int nextId)
+    {
+        _projectiles.Clear();
+        _projectiles.AddRange(projectiles);
+        _nextProjectileId = nextId;
+    }
+
     internal void RestoreClock(long tick, int nextUnitId, IEnumerable<LoggedCommand> log)
     {
         Tick = tick;

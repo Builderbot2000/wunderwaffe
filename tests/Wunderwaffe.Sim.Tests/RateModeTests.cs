@@ -11,7 +11,7 @@ public class RateModeTests(ITestOutputHelper output)
     const int East = 0, West = 2;
     const int Minute = 60 * Simulation.TicksPerSecond;
 
-    static Simulation RateSim() => new(TestContent.Load()) { RateModeEnabled = true };
+    static Simulation RateSim() => new(TestContent.Unpowered()) { RateModeEnabled = true };
 
     static void View(Simulation sim, int player, TileState? tile)
     {

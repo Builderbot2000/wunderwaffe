@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using Xunit.Abstractions;
@@ -32,6 +33,7 @@ public class SnapshotTests(ITestOutputHelper output)
             foreach (var item in new[] { "copper_ore", "iron_ore", "copper_plate", "iron_plate", "steel" })
                 Sim.Enqueue(new DebugGrantCommand(Me, _home.Id, item, 10_000));
             Sim.Step();
+            int before = _home.Grid.BuildingCount;
 
             // Drills on the tile's own deposits (generated from the seed, so a replay has them too): copper straight into a
             // core of its own, iron through a smelter into another.
@@ -43,7 +45,7 @@ public class SnapshotTests(ITestOutputHelper output)
             Place(Sim, _home, "smelter", iron.X + 2, iron.Y, recipe: "smelt_iron");
             Place(Sim, _home, "core", iron.X + 4, iron.Y);
             Sim.Step();
-            Assert.Equal(6, _home.Grid.BuildingCount);
+            Assert.Equal(before + 5, _home.Grid.BuildingCount);
 
             var (x, y) = Open(_home, 3, 1);
             _unit = AbstractTravelTests.Scout(Sim, _home, x + 1, y);
@@ -168,5 +170,109 @@ public class SnapshotTests(ITestOutputHelper output)
         Assert.True(loaded.FromSnapshot && loaded.Matches);
         Assert.True(Replay.Load(TestContent.Load(), save, useSnapshot: false).StateHash() == a.Sim.StateHash());
         output.WriteLine($"30 min twice plus a full replay in {sw.Elapsed.TotalSeconds:F1} s");
+    }
+    /// <summary>
+    /// Takes a snapshot of a replay of <paramref name="sim"/>'s log at each of <paramref name="seconds"/>, and checks that
+    /// resuming from it (through JSON, as a save does) reaches the same final state as the original, without falling back.
+    /// </summary>
+    static void EverySnapshotResumes(Simulation sim, IEnumerable<int> seconds)
+    {
+        var save = SaveFile.From(sim);
+        foreach (int at in seconds)
+        {
+            var replay = new Replay(TestContent.Load(), save, useSnapshot: false);
+            replay.Advance(at * Simulation.TicksPerSecond);
+            var snap = SaveFile.FromJson((save with { Snapshot = Snapshot.Capture(replay.Sim) }).ToJson());
+            var resumed = new Replay(TestContent.Load(), snap);
+            Assert.True(resumed.FromSnapshot, $"{at} s: restoring alone diverged");
+            resumed.Advance(int.MaxValue);
+            Assert.True(resumed.FromSnapshot && resumed.Matches, $"{at} s: resuming from the snapshot diverged");
+        }
+    }
+
+    [Fact]
+    public void SnapshotsAnywhereInASessionOfEveryCommandResume()
+    {
+        // NF-008 against everything the commands touch: frames, sorters, units, squads, rally, combat orders, damage,
+        // wrecks, landing, blueprints and the factory.
+        var sim = SaveTests.Session();
+        EverySnapshotResumes(sim, Enumerable.Range(0, 10).Select(i => 1 + i * 3));
+    }
+
+    [Fact]
+    public void SnapshotsCarryPowerLogisticsAndAFirefight()
+    {
+        // NF-008 against factory and combat state: power networks with a battery and a fuel generator, storage, relays,
+        // a sorter, a laser turret firing at an enemy scout (projectiles, block damage, wrecks).
+        var sim = Simulation.NewGame(TestContent.Load(), new GameSetup(3, 3, 7, Players: 2));
+        var home = sim.Tiles[sim.StartTileIds[0]];
+        var away = sim.Tiles[sim.StartTileIds[1]];
+        foreach (var item in new[] { "copper_ore", "iron_ore", "copper_plate", "iron_plate", "steel", "fuel" })
+            sim.Enqueue(new DebugGrantCommand(Me, home.Id, item, 5_000));
+        sim.Enqueue(new SetViewedTileCommand(Me, home.Id));
+        sim.Step();
+
+        var core = home.Grid.Buildings.First(b => b.Kind == BuildingKind.Core);
+        var (x, y) = Open(home, 14, 6);
+        void Put(string id, int dx, int dy, int rotation = 0, string? recipe = null) =>
+            sim.Enqueue(new PlaceBuildingCommand(Me, home.Id, id, x + dx, y + dy, rotation, recipe));
+        // A battery, a fuel generator, a laser turret and a second core on the core's network: each touching it.
+        void Touching(string id, string? recipe = null)
+        {
+            for (int dy = -3; dy <= core.Height; dy++)
+            {
+                for (int dx = -3; dx <= core.Width; dx++)
+                {
+                    if (Placement.Check(sim, home, Me, id, core.X + dx, core.Y + dy, 0, recipe, out _) == PlaceResult.Ok)
+                    {
+                        sim.Enqueue(new PlaceBuildingCommand(Me, home.Id, id, core.X + dx, core.Y + dy, 0, recipe));
+                        sim.Step();
+                        var placed = home.Grid.BuildingAt(core.X + dx, core.Y + dy)!;
+                        if (home.Grid.Touching(placed).Contains(core))
+                            return;
+                        sim.Enqueue(new RemoveBuildingCommand(Me, home.Id, core.X + dx, core.Y + dy));
+                        sim.Step();
+                    }
+                }
+            }
+            throw new InvalidOperationException($"no room for {id} by the core");
+        }
+        Touching("laser_turret");
+        Touching("battery");
+        Touching("fuel_generator", "burn_fuel");
+        Touching("core"); // Spare supply, so the battery charges.
+        Put("supply_depot", 4, 0);
+        // Belts with a junction, a router, a sorter and a bridge pair, fed by the depot.
+        Put("conveyor", 6, 0);
+        Put("junction", 7, 0);
+        Put("router", 8, 0);
+        Put("sorter", 9, 0);
+        Put("bridge", 10, 0);
+        Put("bridge", 12, 0);
+        Put("conveyor", 13, 0);
+        sim.Enqueue(new SetFilterCommand(Me, home.Id, x + 9, y, "iron_plate"));
+        sim.Step();
+
+        // The enemy's starting scout lifts off and flies over the turret.
+        var scoutCore = away.Grid.Buildings.First(b => b.DefId == "unit_core" && b.Owner == Them);
+        sim.Enqueue(new ActivateUnitCommand(Them, away.Id, scoutCore.X, scoutCore.Y));
+        sim.Step();
+        var scout = sim.Units.Last(u => u.Owner == Them);
+        var laser = home.Grid.Buildings.First(b => b.DefId == "laser_turret");
+        sim.Enqueue(new MoveUnitsCommand(Them, [scout.Id], home.Id, laser.X + 2, laser.Y + 2));
+        long fired = 0;
+        for (int i = 0; i < 240 * Simulation.TicksPerSecond && sim.UnitById(scout.Id) != null; i++)
+        {
+            sim.Step();
+            fired = Math.Max(fired, sim.Projectiles.Count);
+        }
+        for (int i = 0; i < 10 * Simulation.TicksPerSecond; i++)
+            sim.Step();
+        output.WriteLine($"{sim.Tick / Simulation.TicksPerSecond} s; projectiles at once: {fired}; scout alive: {sim.UnitById(scout.Id) != null}");
+        Assert.True(fired > 0, "the turret never fired");
+        Assert.Contains(PowerNet.Networks(home), n => n.Stored > 0);
+
+        int end = (int)(sim.Tick / Simulation.TicksPerSecond);
+        EverySnapshotResumes(sim, Enumerable.Range(1, 8).Select(i => end * i / 9));
     }
 }
