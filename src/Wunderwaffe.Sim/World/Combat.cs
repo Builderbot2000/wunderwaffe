@@ -44,20 +44,24 @@ public static class Combat
     public static WeaponStatus? StatusOf(PlacedBuilding b) => b.Kind == BuildingKind.Weapon ? b.Combat!.Status : null;
 
     /// <summary>
-    /// The unit's worst weapon problem: <see cref="WeaponStatus.NoAmmo"/> when every live weapon that wants a target
-    /// is dry, for the warning; null for a unit with no live weapons.
+    /// How the unit's live weapons are doing, for its warning (CB-004): <see cref="WeaponStatus.Firing"/> if any fires,
+    /// else <see cref="WeaponStatus.NoAmmo"/> if any has a target but no ammo, else the first weapon's status. Null for
+    /// a unit with no live weapons.
     /// </summary>
     public static WeaponStatus? UnitWeaponStatus(Simulation sim, Unit u)
     {
-        WeaponStatus? best = null;
+        WeaponStatus? first = null;
+        bool dry = false;
         for (int i = 0; i < u.Blocks.Count; i++)
         {
             if (u.Blocks[i].Hp <= 0 || u.BlockCombat[i] is not { } c || sim.Content.Buildings[u.Blocks[i].DefId].Kind != BuildingKind.Weapon)
                 continue;
-            if (best == null || c.Status == WeaponStatus.Firing || (c.Status == WeaponStatus.NoTarget && best != WeaponStatus.Firing))
-                best = c.Status;
+            if (c.Status == WeaponStatus.Firing)
+                return WeaponStatus.Firing;
+            dry |= c.Status == WeaponStatus.NoAmmo;
+            first ??= c.Status;
         }
-        return best;
+        return dry ? WeaponStatus.NoAmmo : first;
     }
 
     /// <summary>Longest range of the unit's live weapons, in cells; 0 if it has none (UD-007: lost weapons can't fire).</summary>

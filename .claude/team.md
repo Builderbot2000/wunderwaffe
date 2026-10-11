@@ -20,6 +20,16 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   local player is still `SimHost.LocalPlayer` = 0, and the new-game menu has no player count yet (G).
 - **Saves** are not backward compatible (greenfield). Bump `SaveFile.CurrentVersion` when replay results change.
 
+## Combat conventions (silo F)
+
+- All damage goes through `Combat.DamageBuilding` / `Combat.DamageBlock`; removal by force through
+  `Combat.DestroyBuilding` / `Combat.DestroyUnit` (wreck left, held items lost). Don't write `Hp` elsewhere.
+- Wrecks are a separate `TileGrid` layer, not `PlacedBuilding`s: the entity sim, pathing and collisions never see
+  them. Placement-like checks must also test `TileGrid.WreckFree`/`WreckAt` (done in `Placement.Check`, `CheckFrame`,
+  `CheckDeploy`).
+- A dead unit block (Hp 0) stays in `Unit.Blocks`; anything that reads block function must skip `Hp <= 0`, and
+  `Unit.RecomputeStats` rebuilds engines/cargo/radius after a block dies or is rebuilt.
+
 ## Tick order inside `Simulation.Step`
 
 `Simulation.Step` (`src/Wunderwaffe.Sim/Simulation.cs`) runs these phases in this order. Today only the phases marked
@@ -31,7 +41,7 @@ file. Don't add empty stubs ahead of time.
 | 1 | Commands | shared | exists: the `_pending` loop (`LoggedCommand` into `_log`, then `Command.Apply`) |
 | 2 | Territory / claim timers | A | after the command loop, before the tile loop |
 | 3 | Tile entities, incl. power and boosters | B | exists: `foreach (var tile in _tiles) TileEntities.Step(this, tile);` (power/boosters go inside `TileEntities.Step` or right beside it) |
-| 4 | Combat (weapons, damage, wrecks) | F | after the tile loop, before `UnitPhysics.Step` |
+| 4 | Combat (weapons, damage, wrecks) | F | exists: `Combat.Step(this);` |
 | 5 | Unit physics and steering | E | exists: `UnitPhysics.Step(this);` |
 | 6 | Rate mode / abstract travel | C | after `UnitPhysics.Step`, before `Progression.Step` |
 | 7 | Goals / victory | G | exists: `Progression.Step(this);` (victory checks go right after it) |

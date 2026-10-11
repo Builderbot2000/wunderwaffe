@@ -293,6 +293,22 @@ public class CombatTests
     }
 
     [Fact]
+    public void AUnitOutOfAmmoStopsFiringAndWarns()
+    {
+        var (sim, mine, theirs) = Arena();
+        var unit = Gunship(sim, mine, Me, 25, 15);
+        Put(sim, theirs, Them, "smelter", 2, 15, recipe: "smelt_iron");
+        Run(sim, 60);
+        Assert.Equal(WeaponStatus.NoAmmo, Combat.UnitWeaponStatus(sim, unit));
+        Assert.Equal(250, At(theirs, 2, 15).Hp);
+
+        // Back inside a friendly radius it refills and opens fire (CB-004).
+        Put(sim, mine, Me, "supply_depot", 20, 14);
+        Assert.True(RunUntil(sim, () => At(theirs, 2, 15).Hp < 250, 120));
+        Assert.Equal(WeaponStatus.Firing, Combat.UnitWeaponStatus(sim, unit));
+    }
+
+    [Fact]
     public void AUnitWithStorageSuppliesItsFriends()
     {
         var (sim, mine, _) = Arena();

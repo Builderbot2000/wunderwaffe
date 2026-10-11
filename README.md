@@ -71,6 +71,20 @@ A unit is a group of buildings standing on **frame** (key `0` in the build palet
 - **Landing:** `DeployUnitCommand` puts the blocks and frame back on the tile, turned to the nearest quarter turn of the unit's heading, if the cells are free, buildable, inside the tile, and on a tile the player owns.
 - **Controls** (no building picked): left-click or drag a box to select your units (Shift adds), right-click to move them, and right-click past the tile's border to send them into the tile there. On the world map, right-click sends the selection to the clicked spot. With a building picked, left places and right removes, as before.
 
+## Combat
+
+- **Sight:** everyone sees everything (OQ-29). Weapons fire at any enemy (another player's unit or building) in range.
+- **Weapons** are blocks (`"kind": "weapon"`): on a tile they are turrets, on a unit they are its guns. Each tick a weapon keeps its target while it is alive and in range, and every quarter second looks for the nearest enemy: unit blocks first, then buildings. Shells fly at the weapon's speed and hit the first enemy thing on their path; beams (speed 0) hit along their whole length the tick they fire. Your own blocks, bare frame and wrecks don't stop shots. Hits land on a block's exact square, so a unit is hit block by block.
+- **Damage types (CB-002):** a weapon's `type` against a block's `resist` percent: damage = base x (100 - resist) / 100.
+- **Per-block damage (UD-007):** a destroyed unit block stays attached as a dead wreck (the unit never splits) and stops working: lose the thrusters and the unit slows or stops, lose the guns and it can't fire. Destroying the unit core destroys the unit, and its blocks fall as wrecks where it was (on free buildable cells).
+- **Wrecks (CB-006):** a destroyed building leaves a wreck in its cells; the items it held are lost. Units fly over wrecks, but nothing can be built on one. Pick any building and right-click a wreck to salvage 25% of its cost.
+- **Ammo (CB-004):** a gun with an `ammo` item fires one per shot from a magazine. Turrets are loaded by belts and machines next to them, and from a resource radius. Units reload from their cargo (ammo racks) and from a resource radius. A weapon with a target but no ammo stops and shows a red "!". Lasers use no ammo; on a tile they need power.
+- **Resource radius (FB-018):** a tile core (16 cells) and supply depots (12 cells) share the tile's stock with your units and turrets in range; a unit carrying a supply depot shares its cargo the same way. Resupply happens every half second. The radius shows round a selected unit that has one, and round the core or depot under the cursor.
+- **Defences (FB-010):** gun and laser turrets, walls (high HP, resist kinetic) and shield generators. A shield absorbs enemy shots that cross into its bubble while it has charge, and recharges over time; shots fired from inside aren't stopped.
+- **Repair (CB-005):** a repair bay heals your buildings and unit blocks within its radius, paying iron plate per 50 hp from its tile, and rebuilds a unit's destroyed blocks for their full cost. A repair block on a unit pays from its cargo, then from a resource radius.
+- **Interdiction (IO-006):** a destroyed port's wreck disrupts the link: the world map draws a red "Disrupted" line until the wreck is cleared and a port rebuilt.
+- **Orders:** with units selected, right-click an enemy unit or building to attack it: they close to weapon range and fire until it is gone. **T** then right-click is an attack-move: they move there but stop to fight anything in range on the way. A plain move cancels an attack.
+
 ## Content notes
 
 - `terrain.json` lists terrains in classification order: a generated cell gets the first whose `elevation` and `moisture` bands (0-1000, inclusive) contain it; sea level is 400. `buildable` gates placement and frames; `water` marks coasts and ocean; `river` marks the terrain used for river cells (buildable for now, so rivers don't cut tiles up); `deposits` weights where each ore's patches are centred. Content validation checks every elevation and moisture is covered.
@@ -78,7 +92,8 @@ A unit is a group of buildings standing on **frame** (key `0` in the build palet
 - Item `tier`: 1 raw, 2 refined, 3 advanced, 4 exotic. A recipe can't output an item more than one tier above its best input (RS-001).
 - Recipe `ticks` are at 60 ticks/second. A recipe with empty `inputs` is extraction.
 - Items with `"regional": true` (coal) never appear on a starting tile and appear on 35% of other tiles, always including at least one neighbour of each start (RS-003).
-- Building `hp`: hit points of one placed block, kept while it rides on a unit. Must be > 0. Nothing deals damage yet.
+- Building `hp`: hit points of one placed block, kept while it rides on a unit. Must be > 0.
+- Combat fields on buildings, all optional: `weapon` (`range` cells, `damage`, `cooldown` ticks, `type`, `speed` cells/s with 0 a beam, `ammo` item and `magazine`), `resist` (percent per damage type; each type must be dealt by some weapon), `shield` (`radius`, `capacity`, `regen` per second), `repair` (`radius`, `rate` hp/s, `cost` per `per` hp), `supplyRadius` (cells) and `storage` (cargo items on a unit). Kinds `weapon`, `shield` and `repair` require their block.
 - Goal conditions: `produce` (an item, counted when a batch finishes, extraction included), `claim` (tiles owned), `ship` (items arriving through import ports), `launch` (units lifted off). Counters are per player, empire-wide (TT-005).
 - `goals.json` is the guided objective chain, completed in order. `DemoLoopTests` plays the whole chain with real content and no cheats, so a content change that breaks the loop fails the tests.
 - Build-menu order (and hotkeys 1-9, 0) is `buildings.json` order; crafters with several recipes get one slot per recipe, and the unit frame is last.

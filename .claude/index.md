@@ -7,19 +7,20 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | File | Owns |
 |---|---|
 | `Simulation.cs` | Core state: tiles, map, units, players, command log. `NewGame` (settles every player of the setup), `Step` (tick order; see `team.md`), `Enqueue`, lookups (`TryGetTile`, `TileAtCell`, `ResolveCell`, `Neighbors`, `UnitById`, `PlayerOrNull`), `StartTileId`/`StartTileIds`, `StateHash()`. Command handlers `TryClaim`/`TryPlace`/`TryRemove`. `TicksPerSecond`=60, `CoreBuildingId`. |
+| `Simulation.Combat.cs` | Partial: `Projectiles` (spent ones linger a tick for drawing), projectile ids, alert throttle. |
 | `Simulation.World.cs` | Partial: world building. `GenerateWorld` (runs Gen phases, `ChooseStarts` = placeholder farthest-point spread per player, regional deposits RS-003), `AddTile`/`AddStartingTile` (hand-built square tiles for tests), `SettleStartingTile`, `CreateTile`, `RebuildTopology` (adjacency + zones), `CoreSpot`/`PlaceCore`. `DefaultTileSize`=96. |
 | `Balance.cs` | Code-side tuning: `StartingItems`, `ClaimCost`, `ClaimedTileItems`, `FrameCost`, `RefundPercent`, `RegionalChancePercent`, land-share thresholds. |
 | `GameSetup.cs` | Record (Width, Height, Seed, Players=1) in nominal tiles; `Default`, `ParseSeed` (text → FNV hash). |
-| `Content/Defs.cs` | JSON records: `ItemDef`, `RecipeDef` (empty inputs = extraction), `BuildingDef` (`Hp` per block, +`Footprint(rotation)`), `BuildingKind` enum, `UnlockCondition` (goal conditions: `produce`/`claim`/`ship`/`launch`), `GoalDef`, `TerrainDef` (bands, deposit weights). |
+| `Content/Defs.cs` | JSON records: `ItemDef`, `RecipeDef` (empty inputs = extraction), `BuildingDef` (`Hp` per block, +`Footprint(rotation)`), `BuildingKind` enum, combat sub-records `WeaponDef`/`ShieldDef`/`RepairDef` + `Resist`/`SupplyRadius`/`Storage` (`DamageTaken`), `UnlockCondition` (goal conditions: `produce`/`claim`/`ship`/`launch`), `GoalDef`, `TerrainDef` (bands, deposit weights). |
 | `Content/ContentDb.cs` | Loads + validates all JSON (`FromJson`, throws `ContentException` with every error). Lookups: `Items`, `Recipes`, `Buildings`, `BuildingList` (menu order), `Goals`, `TerrainList`, `RecipesByBuilding`, `DefaultTerrain`, `RiverTerrain`, `Classify(elev, moist)`. |
-| `Core/Command.cs` | Every player action as a JSON-polymorphic record with `Apply(sim)`: place/remove building, claim, place/remove frame, activate/deploy/move units, debug grant. No tech tree, so no unlock command. `LoggedCommand`. |
+| `Core/Command.cs` | Every player action as a JSON-polymorphic record with `Apply(sim)`: place/remove building, claim, place/remove frame, activate/deploy/move units, attack/attack_building/attack_move, debug grant/damage. No tech tree, so no unlock command. `LoggedCommand`. |
 | `Core/SaveFile.cs` | `SaveFile` (setup + log + hash, `CurrentVersion`), `Replay` (sliced re-simulation, `Matches`), `SaveException`. |
 | `Core/StateHash.cs` | FNV-1a over tiles, buildings, entity state, players, units. Must cover all sim state. |
 | `Core/Inventory.cs` | Sorted item counts (long); `Add`, `Has`, `TryTake` (all or nothing). Throws on underflow. |
 | `Core/Rng.cs` | SplitMix64, seeded; `Next`, `Range`. |
 | `Core/IntMath.cs` | `FloorDiv` (int/long), `ISqrt`. |
 | `World/TileState.cs` | A territory: id, name, origin, centre, neighbours, biome, `Owner` (`Unowned`=-1), `Inventory`, `Grid`, `ToGlobal`. |
-| `World/TileGrid.cs` | `PlacedBuilding` (def id, kind, `Owner` = placing player, `Hp`, footprint, rotation, recipe, runtime state). `TileGrid`: cell → building, deposits, mask/buildable/terrain, frames, zones, kind lists (`Belts`, `Machines`, `ExportPorts`, `ImportPorts`), `Revision` (bumped on every change). `InRect` = in box, `InBounds` = in tile. |
+| `World/TileGrid.cs` | `PlacedBuilding` (def id, kind, `Owner` = placing player, `Hp`, footprint, rotation, recipe, runtime state incl. `Combat`). `TileGrid`: cell → building, deposits, mask/buildable/terrain, frames, zones, kind lists (`Belts`, `Machines`, `ExportPorts`, `ImportPorts`, `CombatBuildings`, `Suppliers`), wreck layer (`WreckAt`, `WreckFree`, `Wrecks`), `BuildingById`, `Revision` (bumped on every change). `InRect` = in box, `InBounds` = in tile. |
 | `World/Entities.cs` | Runtime state: `BeltState` (4 items/cell, positions 0..128), `MachineState` (+`MachineStatus`), `ExportState` + `Shipment`. |
 | `World/TileEntities.cs` | Per-tick tile sim: machines work and dump to neighbours, belts advance/hand off, export ports send/deliver. `TryInsert` = who accepts what. `Drain` returns a removed building's items. |
 | `World/Placement.cs` | `Placement.Check` → `PlaceResult` + `PlacementPlan`: ownership, bounds, overlap, terrain, port zones, recipe resolution (extractors pick by deposit), cost. |
@@ -30,7 +31,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/WorldMap.cs` | Global grid: terrain, elevation, tile id per cell; adjacency (`MinBorderCells`=3), `BorderCells(from,to)`, `Grow` for hand-built worlds. |
 | `World/TileGenerator.cs` | Deposit patches on a tile, weighted by terrain (`GenerateDeposits`, `exclude` for regional items). |
 | `World/Direction.cs` | N/E/S/W, `Dx`/`Dy`, `FromRotation` (0=east, clockwise), `Opposite`. |
-| `World/Units.cs` | `Unit` rigid body (mass, inertia, radius, thrusters, max speed computed in ctor), order/path state; `UnitBlock` (carries the building's `Hp`), `UnitCell`, `Thruster`. |
+| `World/Units.cs` | `Unit` rigid body (mass, inertia, radius; thrusters, max speed, cargo room, supply radius from live blocks via `RecomputeStats`), order/path state, `BlockCombat`, `CoreBlock`, `Cargo`; `UnitBlock` (carries the building's `Hp`), `UnitCell`, `Thruster`. |
 | `World/UnitAssembly.cs` | Frames (`CheckFrame`, place/remove), lift-off (`CheckActivate` flood-fills frame from a unit core → `Activate` spawns unit), landing (`CheckDeploy` → `Deploy`). Result enums. `MaxCells`=64. |
 | `World/UnitSim.cs` | Move orders: `Order` (formation, `MoveResult`), `FindRoute` (BFS over tiles). |
 | `World/UnitPhysics.cs` | Per-tick flight controller, border portals, path following, tile tracking, collisions with buildings and units. |
@@ -41,6 +42,10 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `World/Gen/Zones.cs` | Phase 3: per-tile I/O zones by multi-source BFS from borders. |
 | `World/Gen/Noise.cs` | Integer value noise + fractal octaves. |
 | `World/Gen/TileNames.cs` | Seeded made-up-language tile names, unique per world. |
+| `World/Combat.cs` | Combat (tick phase 4): `Step` (recharge, resupply, orders, fire, repair, shots), damage API (`DamageBuilding`, `DestroyBuilding`, `DamageBlock`, `DestroyUnit`, `ClearWreck`), queries (`Dps`, `StatusOf`, `UnitWeaponStatus`, `WeaponRange`, `LinkDisrupted`, `BlockWorld`). `CombatPower` seam (power, silo B). Alert seam in `Attacked`. |
+| `World/CombatState.cs` | `WeaponStatus`, `CombatState` (ammo, cooldown, shield charge, target, repair credit), `Target`, `Wreck`, `Projectile`. |
+| `World/CombatOrders.cs` | Seam to movement (silo E): `CombatOrder`, `Issue`/`Chase`/`Halt`/`Resume`/`MayChase`/`CanFire`; at merge forwards to `UnitSim` and `Unit.Order`. |
+| `World/ResourceRadius.cs` | FB-018: `SupplierFor(sim, unit)`, `Covers`, `Centre`, `Step` (every 30 ticks: magazines, cargo, turrets). |
 
 ## game/ (Godot project; namespaces `Wunderwaffe.Game[.Input/.Render/.Screens/.Debug]`)
 
@@ -59,6 +64,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `render/TileView.cs` | Tile layer: terrain image, MultiMesh layers (ground, deposits, frames, buildings, belt items), outline/zones. Redraws on `Revision`. `Rect` (quad transform), `CellAt` (canvas pos → cell). |
 | `render/TileShapes.cs` | Cached per-tile geometry: border outline, zone runs/outlines/label points. |
 | `render/MachineStatusView.cs` | Pulsing dots on stopped machines (FB-006). |
+| `render/CombatView.cs` | Wrecks, dead unit blocks, HP bars, shots/beams, shields, no-ammo "!", resource radius of selected units / hovered supplier. |
 | `render/UnitView.cs` | Units on the tile view (blocks rotated by heading, selection, destination line). `PixelPos`, `InView`. |
 | `render/WorldMapView.cs` | World layer: snapshot texture, owner tint, borders, labels, claimable outlines, port links, unit dots; select/enter/claim input. `CellPx`=2, `CellAt`, `Center`, `Fit`. |
 | `render/WorldSnapshot.cs` | Downsampled picture of every tile's contents for the world map; `Refresh` repaints changed tiles. |
@@ -98,6 +104,8 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `SimulationTests.cs` | Determinism, starting tile. |
 | `StressTests.cs` | NF-001 tick budget with thousands of buildings. |
 | `DemoLoopTests.cs` | Plays the whole `goals.json` chain with no cheats: content changes that break the loop fail here. |
+| `CombatTests.cs` | Turrets, ammo/logistics, lasers, shields, per-block damage, wrecks, attack orders, resource radius, repair, interdiction, determinism. |
+| `CombatStressTests.cs` | ~280 gunships and turrets in a firefight within a tick budget. |
 
 ## Other
 
