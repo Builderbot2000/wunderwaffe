@@ -93,7 +93,7 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 | `input/UnitTool.cs` | Unit selection (click/box, Shift adds), move/patrol orders (tile and world map), H hold, X retreat, Q squad, T formation, V stance, E escort, Y rally, Ctrl/Alt+1-9 control groups (UI-only), G = lift off / land (land also on the world map), `Status` text, `Notice` (unreachable moves, via `UnitNav.Plan`). Active when no building is picked. |
 | `input/CameraController.cs` | Pan/zoom; keeps separate camera per view; fits the world map. Consumes `SimHost.FocusCell`. |
 | `render/Palette.cs` | `CellPx`=16, placeholder colours (spread by id), terrain colours, `Zone`, `Owner`. `ColourMode` (`Normal`, `RedGreen`, `BlueYellow`; `Mode`) drives `Owner`, `Good`/`Bad`, ghosts (UI-005). |
-| `render/Sprites.cs` | `res://assets/sprites/{id}.png` lookup with cache; null if missing (callers fall back to colours). |
+| `render/Sprites.cs` | `res://assets/sprites/{id}.png` lookup with cache; null if missing (callers fall back to colours). `Ground`, `Frame`, `Platform` layer ids. |
 | `render/TileView.cs` | Tile layer: terrain image, MultiMesh layers (ground, deposits, frames, buildings, belt items), outline/zones. Redraws on `Revision`. `Rect` (quad transform), `CellAt` (canvas pos → cell). |
 | `render/TileShapes.cs` | Cached per-tile geometry: border outline, zone runs/outlines/label points. |
 | `render/MachineStatusView.cs` | Pulsing dots on stopped machines (FB-006). |
@@ -167,4 +167,4 @@ One line per file: what it owns, key members, gotchas. Paths from repo root. Kee
 
 ## Other
 
-`README.md` (player-facing behaviour, design notes), `src/Wunderwaffe.Cli` (NF-009 headless driver: `JsonDriver` on stdin/stdout, `--data <dir>`), `.claude/team.md` (agent-team conventions: tick order, silo file ownership, rules for shared hotspots), `tools/pixellab_gen.py` (sprite generation via PixelLab API, `PIXELLAB_API_KEY` from env or `.env`), `art/` (sprite pipeline: `jobs.json`, palette, mockups; see `art/README.md`), `.vscode/` (Play/Open Editor launch configs, build/test tasks).
+`README.md` (player-facing behaviour, design notes), `src/Wunderwaffe.Cli` (NF-009 headless driver: `JsonDriver` on stdin/stdout, `--data <dir>`), `.claude/team.md` (agent-team conventions: tick order, silo file ownership, rules for shared hotspots), `tools/pixellab_gen.py` (sprite generation via PixelLab API, `PIXELLAB_API_KEY` from env or `.env`), `art/` (sprite pipeline: `jobs.json`, `blockouts/` + `make_blockouts.py`, palette, mockups; see `art/README.md`), `.vscode/` (Play/Open Editor launch configs, build/test tasks).

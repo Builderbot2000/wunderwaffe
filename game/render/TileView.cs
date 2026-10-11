@@ -57,7 +57,7 @@ public partial class TileView : Node2D
         _ground.SelfModulate = Colors.White with { A = GroundDetail };
         _deposits = AddLayer(this, "Deposits", null);
         _depositIcons = AddGroup("DepositIcons");
-        _platforms = AddLayer(this, "Platforms", null);
+        _platforms = AddLayer(this, "Platforms", Sprites.Get(Sprites.Platform));
         _frames = AddLayer(this, "Frames", Sprites.Get(Sprites.Frame));
         _buildings = AddLayer(this, "Buildings", null);
         _buildingSprites = AddGroup("BuildingSprites");
@@ -240,12 +240,14 @@ public partial class TileView : Node2D
                     cells.Add((x, y));
             }
         }
+        // With a sprite the deck tiles edge to edge, like frames.
+        bool sprite = _platforms.Texture != null;
         var mm = _platforms.Multimesh;
         mm.InstanceCount = cells.Count;
         for (int i = 0; i < cells.Count; i++)
         {
-            mm.SetInstanceTransform2D(i, Rect(cells[i].X, cells[i].Y, 1, 1, 0.03f, 0));
-            mm.SetInstanceColor(i, Palette.Platform);
+            mm.SetInstanceTransform2D(i, Rect(cells[i].X, cells[i].Y, 1, 1, sprite ? 0 : 0.03f, 0));
+            mm.SetInstanceColor(i, sprite ? Colors.White : Palette.Platform);
         }
     }
 

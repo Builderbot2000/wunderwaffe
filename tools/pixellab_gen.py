@@ -6,6 +6,7 @@ Each generation costs one trial generation / a few cents, so keep jobs small.
     python tools/pixellab_gen.py jobs.json out_dir
 
 jobs.json: [{"name": "drill", "description": "...", "size": 32, ...extra params}]
+"size" is square; "width"/"height" instead give a non-square canvas (e.g. 1x2 boosters at 32x64).
 Optional "endpoint" (default "create-image-pixflux", e.g. "create-image-bitforge").
 Any "*_image" value given as a file path (relative to jobs.json) is sent as base64.
 """
@@ -45,13 +46,14 @@ def api_key() -> str:
 
 def generate(job: dict, key: str, base: Path) -> bytes:
     job = dict(job)
-    size = job.pop("size")
+    size = job.pop("size", None)
+    width, height = job.pop("width", size), job.pop("height", size)
     job.pop("name")
     endpoint = job.pop("endpoint", "create-image-pixflux")
     for k, v in job.items():
         if k.endswith("_image") and isinstance(v, str):
             job[k] = {"type": "base64", "base64": base64.b64encode((base / v).read_bytes()).decode()}
-    body = {**STYLE, **job, "image_size": {"width": size, "height": size}}
+    body = {**STYLE, **job, "image_size": {"width": width, "height": height}}
     req = urllib.request.Request(
         f"{API}/{endpoint}",
         data=json.dumps(body).encode(),

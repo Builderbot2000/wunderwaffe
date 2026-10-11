@@ -13,6 +13,7 @@ public static class Sprites
 
     public const string Ground = "ground";
     public const string Frame = "frame";
+    public const string Platform = "platform";
 
     static readonly Dictionary<string, Texture2D?> Cache = [];
 
