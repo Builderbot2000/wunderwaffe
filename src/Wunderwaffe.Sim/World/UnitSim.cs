@@ -320,7 +320,7 @@ public static class UnitSim
 
     // ---------------------------------------------------------------- stances and combat hooks
 
-    /// <summary>Gives units a stance (UC-004). Anchors them where they stand.</summary>
+    /// <summary>Gives units a stance (UC-004). Anchors them where they stand; a chase the old stance began ends.</summary>
     internal static void SetStance(Simulation sim, int player, IReadOnlyList<int> unitIds, Stance stance)
     {
         if (!Enum.IsDefined(stance))
@@ -329,6 +329,18 @@ public static class UnitSim
         {
             u.Stance = stance;
             (u.AnchorX, u.AnchorY) = (u.X, u.Y);
+            if (u.Chasing && u.Order?.Kind is not (OrderKind.Attack or OrderKind.AttackMove))
+            {
+                if (u.Order == null)
+                {
+                    u.Chasing = false;
+                    u.Route = null;
+                }
+                else
+                {
+                    Resume(sim, u);
+                }
+            }
         }
     }
 
@@ -457,7 +469,7 @@ public static class UnitSim
         if (u.Stance == Stance.Aggressive)
         {
             bool wide = u.Order == null || u.Route == null || u.Chasing;
-            target = wide ? NearestOnTile(sim, u) : NearestUnit(sim, u, u.X, u.Y, (long)range * S);
+            target = wide ? NearestOnTile(sim, u, buildings: u.Order == null) : NearestUnit(sim, u, u.X, u.Y, (long)range * S);
         }
         else
         {
@@ -519,8 +531,11 @@ public static class UnitSim
         return best;
     }
 
-    /// <summary>The nearest enemy unit on the unit's tile, else the nearest enemy building there (UC-004 aggressive).</summary>
-    static (long X, long Y)? NearestOnTile(Simulation sim, Unit u)
+    /// <summary>
+    /// The nearest enemy unit on the unit's tile, else, if <paramref name="buildings"/>, the nearest enemy building there
+    /// (UC-004 aggressive: an idle unit goes for anything; one stopped on its way fights units, then carries on).
+    /// </summary>
+    static (long X, long Y)? NearestOnTile(Simulation sim, Unit u, bool buildings)
     {
         (long X, long Y)? best = null;
         long bestD = long.MaxValue;
@@ -532,7 +547,7 @@ public static class UnitSim
             if (d < bestD)
                 (best, bestD) = ((e.X, e.Y), d);
         }
-        if (best != null)
+        if (best != null || !buildings)
             return best;
         var tile = sim.Tiles[u.TileId];
         foreach (var b in tile.Grid.Buildings)

@@ -185,7 +185,6 @@ public class MovementTests
         Assert.False(unit.Moving);
         Assert.Equal(OrderKind.Hold, unit.Order?.Kind);
         Assert.True(Math.Abs(unit.VX) + Math.Abs(unit.VY) < S / 100);
-        Assert.False(UnitSim.MayChase(sim, unit, unit.X + S, unit.Y));
     }
 
     [Fact]
@@ -323,46 +322,7 @@ public class MovementTests
         Assert.Empty(sim.Squads.ById(1)!.Members);
     }
 
-    // --- stances (UC-004) ---
-
-    [Fact]
-    public void ADefensiveUnitReturnsToItsAnchorPastTheLeash()
-    {
-        var sim = NewSim();
-        var tile = Tile(sim, size: 60);
-        var unit = Scout(sim, tile, 10, 10);
-        sim.Enqueue(new SetStanceCommand(Me, [unit.Id], Stance.Defensive));
-        sim.Step();
-        var (ax, ay) = (unit.AnchorX, unit.AnchorY);
-        Assert.True(UnitSim.MayChase(sim, unit, ax + 5L * S, ay));
-        Assert.False(UnitSim.MayChase(sim, unit, ax + (UnitSim.LeashCells + 2L) * S, ay));
-
-        // Combat chases something far off; past the leash the unit gives up and goes home.
-        UnitSim.Chase(sim, unit, ax + 40L * S, ay);
-        Assert.True(unit.Chasing);
-        double farthest = 0;
-        for (int i = 0; i < 3000; i++)
-        {
-            sim.Step();
-            farthest = Math.Max(farthest, Dist(unit.X, unit.Y, ax, ay));
-        }
-        Assert.False(unit.Chasing);
-        Assert.True(farthest < UnitSim.LeashCells + 6, $"went {farthest:F1} cells out");
-        Assert.True(Dist(unit.X, unit.Y, ax, ay) < 2, "didn't come back to its anchor");
-    }
-
-    [Fact]
-    public void HoldFireNeverFiresOrChases()
-    {
-        var sim = NewSim();
-        var tile = Tile(sim);
-        var unit = Scout(sim, tile, 10, 10);
-        Assert.True(UnitSim.CanFire(unit));
-        sim.Enqueue(new SetStanceCommand(Me, [unit.Id], Stance.HoldFire));
-        sim.Step();
-        Assert.False(UnitSim.CanFire(unit));
-        Assert.False(UnitSim.MayChase(sim, unit, unit.X + S, unit.Y));
-    }
+    // Stances (UC-004) are in StanceTests.
 
     // --- factory rally (UC-006) ---
 

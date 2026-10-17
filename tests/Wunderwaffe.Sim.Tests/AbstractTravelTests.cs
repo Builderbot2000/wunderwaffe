@@ -33,6 +33,23 @@ public class AbstractTravelTests
     }
 
     [Fact]
+    public void AUnitNobodyWatchesIsANodeAndTakesAboutAsLongAsAFlyingOne()
+    {
+        var (full, fu, _) = Trip(rateMode: false);
+        var (rate, ru, rfar) = Trip(rateMode: true);
+        Assert.False(full.IsAbstract(fu));
+        Assert.True(rate.IsAbstract(ru));
+
+        long eta = AbstractTravel.Eta(rate, ru);
+        long flown = Arrive(full, fu), travelled = Arrive(rate, ru);
+        Assert.Equal(rfar.Id, ru.TileId);
+        Assert.True(Math.Abs(ru.X - (rfar.OriginX + 25L) * S - S / 2) < S && Math.Abs(ru.Y - (rfar.OriginY + 15L) * S - S / 2) < S);
+        // UC-009: travel time matches the full sim within a set tolerance.
+        Assert.InRange(travelled, flown * (100 - AbstractTravel.TolerancePercent) / 100, flown * (100 + AbstractTravel.TolerancePercent) / 100);
+        Assert.InRange(eta, travelled - 1, travelled + 1);
+    }
+
+    [Fact]
     public void OpeningItsTileMaterialisesItWhereItIs()
     {
         var (sim, u, far) = Trip(rateMode: true);
