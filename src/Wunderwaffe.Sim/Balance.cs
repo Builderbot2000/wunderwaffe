@@ -6,9 +6,6 @@ namespace Wunderwaffe.Sim;
 /// </summary>
 public static class Balance
 {
-    /// <summary>What a new player's core starts with (WM-005): doubled for 256-cell tiles (OQ-35), where belts run longer.</summary>
-    public static readonly IReadOnlyDictionary<string, int> StartingItems = Items(("copper_ore", 600), ("iron_ore", 300));
-
     /// <summary>Radius of every tile's victory circle, in cells (WM-014): 1/8 of a nominal tile (OQ-35).</summary>
     public const int CircleRadius = Simulation.DefaultTileSize / 8;
 

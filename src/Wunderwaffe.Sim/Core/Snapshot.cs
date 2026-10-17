@@ -128,7 +128,7 @@ public sealed record CombatSnap(int Ammo, int Cooldown, int Charge, WeaponStatus
 
 /// <summary>A unit factory's state; its steps are rebuilt from the projection (<c>UnitFactory.StepsOf</c>).</summary>
 public sealed record FactorySnap(Blueprint? Projected, int OX, int OY, int Next, bool Working, int Progress,
-    Dictionary<string, int> Buffer, FactoryStatus Status, AssembleResult LiftOff, int Built);
+    Dictionary<string, int> Buffer, FactoryStatus Status, AssembleResult LiftOff, int Built, FactoryMode Mode = FactoryMode.Continuous);
 
 public sealed record StorageSnap(int DumpWait, int DumpCursor, Dictionary<string, int> Output, int OutputCount);
 
@@ -146,7 +146,7 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
             : null,
         b.Export is { } e ? new ExportSnap(e.Cursor, [.. e.InFlight]) : null,
         CombatSnap.Of(b.Combat),
-        b.Factory is { } f ? new FactorySnap(f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, new(f.Buffer), f.Status, f.LiftOff, f.Built) : null,
+        b.Factory is { } f ? new FactorySnap(f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, new(f.Buffer), f.Status, f.LiftOff, f.Built, f.Mode) : null,
         b.Storage is { } s ? new StorageSnap(s.DumpWait, s.DumpCursor, new(s.Output), s.OutputCount) : null,
         b.Battery?.Charge,
         b.Relay is { } r ? new RelaySnap(r.Cursor, r.Lanes.Select(l => l.ToList()).ToList()) : null,
@@ -187,6 +187,7 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
         {
             (f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, f.Status, f.LiftOff, f.Built) =
                 (fs.Projected, fs.OX, fs.OY, fs.Next, fs.Working, fs.Progress, fs.Status, fs.LiftOff, fs.Built);
+            f.Mode = fs.Mode;
             f.Steps = fs.Projected is { } bp ? UnitFactory.StepsOf(content, bp, fs.OX, fs.OY) : [];
             foreach (var (id, n) in fs.Buffer)
                 f.Buffer[id] = n;

@@ -210,7 +210,7 @@ public class WorldGenTests
         var core = Assert.Single(home.Grid.Buildings, b => b.DefId == "core");
         Assert.True(home.InCircle(core.X + 1, core.Y + 1), "the core stands in the start's victory circle");
         Assert.True(home.Grid.HasFrame(core.X, core.Y));
-        Assert.Equal(Balance.StartingItems["iron_ore"], core.Stock!.Get("iron_ore"));
+        Assert.Equal(Harness.StartItems(sim)["iron_ore"], core.Stock!.Get("iron_ore"));
         Assert.Equal(["thruster", "core", "thruster"], home.Grid.Buildings.Select(b => b.DefId));
     }
 

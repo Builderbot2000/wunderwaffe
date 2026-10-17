@@ -75,7 +75,7 @@ public class FactoryTests
         Assert.Equal(1, sim.PlayerOrNull(Me)!.Launched);
         // And it starts on the next copy.
         Assert.Equal(0, f.Next);
-        Assert.NotEqual(FactoryStatus.LiftOffFailed, f.Status);
+        Assert.NotEqual(FactoryStatus.Stopped, f.Status);
     }
 
     [Fact]
@@ -220,6 +220,90 @@ public class FactoryTests
             .Replace("\"kind\": \"thruster\",", "\"kind\": \"thruster\", \"upkeep\": { \"unobtainium\": 1 },")));
         Assert.Contains(e.Errors, m => m.Contains("unit_factory") && m.Contains("radius"));
         Assert.Contains(e.Errors, m => m.Contains("thruster") && m.Contains("upkeep"));
+    }
+
+    [Fact]
+    public void AManualFactoryBuildsOneUnitPerTriggerAndTakesNothingInBetween()
+    {
+        // OQ-43: manual production; projecting counts as the first trigger.
+        var sim = OreSim();
+        var tile = Tile(sim, size: 40);
+        var factory = FedFactory(sim, tile);
+        var f = factory.Factory!;
+        sim.Enqueue(new SetFactoryModeCommand(Me, tile.Id, 11, 11, FactoryMode.Manual));
+        Project(sim, tile, Scout, 14, 11);
+        Assert.True(RunUntil(sim, () => sim.Units.Count == 1, 6000));
+        sim.Step();
+        Assert.Equal(FactoryStatus.AwaitingTrigger, f.Status);
+        Assert.Equal(FactoryControlResult.Ok, UnitFactory.CheckTrigger(tile, Me, 11, 11));
+        Assert.Equal(FactoryControlResult.NotOwner, UnitFactory.CheckTrigger(tile, Them, 11, 11));
+        Assert.Equal(FactoryControlResult.NotStopped, UnitFactory.CheckResume(tile, Me, 11, 11));
+
+        // Idle until triggered: the drills keep running but the factory takes nothing.
+        long buffered = f.Buffer.Values.Sum();
+        Run(sim, 900);
+        Assert.Single(sim.Units);
+        Assert.Equal(buffered, f.Buffer.Values.Sum());
+        Assert.Equal(0, f.Next);
+
+        // Move the first unit off the build site, then trigger one more.
+        sim.Enqueue(new MoveUnitsCommand(Me, [sim.Units[0].Id], tile.Id, 30, 30));
+        Run(sim, 300);
+        sim.Enqueue(new TriggerFactoryCommand(Me, tile.Id, 11, 11));
+        sim.Step();
+        Assert.Equal(FactoryControlResult.NotAwaiting, UnitFactory.CheckTrigger(tile, Me, 11, 11));
+        Assert.True(RunUntil(sim, () => sim.Units.Count == 2, 6000));
+        sim.Step();
+        Assert.Equal(FactoryStatus.AwaitingTrigger, f.Status);
+
+        // Switching to continuous starts the next copy at once.
+        sim.Enqueue(new SetFactoryModeCommand(Me, tile.Id, 11, 11, FactoryMode.Continuous));
+        Run(sim, 2);
+        Assert.Equal(FactoryMode.Continuous, f.Mode);
+        Assert.NotEqual(FactoryStatus.AwaitingTrigger, f.Status);
+    }
+
+    [Fact]
+    public void AFailedLiftOffStopsTheFactoryWithAnAlertUntilResumed()
+    {
+        // OQ-44: no endless retry; the factory stops, says why, raises an alert and waits for the player.
+        var sim = OreSim();
+        var tile = Tile(sim, size: 40);
+        var factory = FedFactory(sim, tile);
+        var f = factory.Factory!;
+        Project(sim, tile, Scout, 14, 11);
+        Assert.True(RunUntil(sim, () => tile.Grid.FrameCount == 8, 6000));
+        // A second core half on the frame: the finished scout can't lift off.
+        Place(sim, tile, "core", 17, 12);
+        Assert.True(RunUntil(sim, () => f.Status == FactoryStatus.Stopped, 6000));
+        Assert.Empty(sim.Units);
+        Assert.NotEqual(AssembleResult.Ok, f.LiftOff);
+        var alert = Assert.Single(sim.Events, e => e.Kind == GameEventKind.FactoryStopped);
+        Assert.Equal((Me, tile.Id, f.LiftOff.ToString()), (alert.Player, alert.TileId, alert.ItemId));
+
+        // Stopped: nothing changes and it takes no items, however long it waits.
+        var buffer = f.Buffer.ToList();
+        Run(sim, 600);
+        Assert.Equal(FactoryStatus.Stopped, f.Status);
+        Assert.Equal(buffer, f.Buffer.ToList());
+        Assert.Single(sim.Events, e => e.Kind == GameEventKind.FactoryStopped);
+        Assert.Equal(FactoryControlResult.NotAwaiting, UnitFactory.CheckTrigger(tile, Me, 11, 11));
+
+        // Resuming with the cause still there stops it again, with a fresh alert.
+        sim.Enqueue(new ResumeFactoryCommand(Me, tile.Id, 11, 11));
+        Run(sim, 2);
+        Assert.Equal(FactoryStatus.Stopped, f.Status);
+        Assert.Equal(2, sim.Events.Count(e => e.Kind == GameEventKind.FactoryStopped));
+
+        // Clear the cause and resume: it lifts off and carries on.
+        sim.Enqueue(new RemoveBuildingCommand(Me, tile.Id, 17, 12));
+        sim.Step();
+        Assert.Equal(FactoryControlResult.Ok, UnitFactory.CheckResume(tile, Me, 11, 11));
+        sim.Enqueue(new ResumeFactoryCommand(Me, tile.Id, 11, 11));
+        Run(sim, 2);
+        Assert.Single(sim.Units);
+        Assert.Equal(1, f.Built);
+        Assert.Equal(FactoryStatus.Waiting, f.Status);
     }
 
     static bool RunUntil(Simulation sim, Func<bool> done, int maxTicks)

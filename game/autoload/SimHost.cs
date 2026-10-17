@@ -409,6 +409,8 @@ public partial class SimHost : Node
     static ContentDb LoadContent()
     {
         static string Read(string name) => FileAccess.GetFileAsString($"res://data/{name}");
-        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"));
+        var prefabs = DirAccess.GetFilesAt("res://data/prefabs").Where(f => f.EndsWith(".json")).Order(StringComparer.Ordinal)
+            .Select(f => Read($"prefabs/{f}"));
+        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"), prefabs);
     }
 }

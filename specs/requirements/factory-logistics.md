@@ -28,7 +28,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [FB-018](#fb-018-resource-radius) | Resource radius | Should | Done | Yes | Alpha | Functional | P3 | FB-007, CB-004 | New |  |
 | [FB-019](#fb-019-build-funds-from-cores) | Build funds from cores | Must | Done | Yes | MVP | Functional | P2 | WM-016, FB-007 | Review |  |
 | [FB-020](#fb-020-power-layer-nodes-and-cross-tile-power) | Power layer, nodes and cross-tile power | Must | Approved | No | MVP | Functional | P3 | FB-005, IO-002 | New |  |
-| [FB-021](#fb-021-prefab-blueprints) | Prefab blueprints | Must | Approved | No | MVP | Functional | P2 | FB-009, WM-005 | New |  |
+| [FB-021](#fb-021-prefab-blueprints) | Prefab blueprints | Must | In Progress | Partial | MVP | Functional | P2 | FB-009, WM-005 | New |  |
 
 ### FB-001 Tile local map
 
@@ -232,7 +232,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Acceptance criteria:** Prefabs are content: blueprint files shipped with the game data, loaded and validated like the other content (every block id exists, rotations and frame cells valid) and refused with an error otherwise. They show in the library alongside the player's own, marked as prefabs; they can be placed, projected by a factory and duplicated like any blueprint, but not renamed, retagged or deleted. Match setup places each player's starting layout from prefabs named in the setup (with the items their cores start with), instead of code; a map or setup can name extra prefabs for a seat, which is how an AI gets a head start (OQ-47). The AI picks its designs from the prefabs through the same queries as everyone else.
 
-**As built:** Not built: the library starts empty, the starting unit and items are set in code (Simulation.PlaceScout, Balance.StartingItems), and the AI's unit design is a constant (AiPlayer.UnitDesign).
+**As built:** game/data/prefabs/*.json, one PrefabDef each (id, name, tags, blocks, frames, items for the first core), loaded by ContentDb.FromJson and validated (Prefabs.Problems: block ids, recipes, rotations 0..3, overlaps, repeated frame cells, grid from (0, 0), unit blocks on frame, items need a core); errors refuse to load. GameSetup.StartPrefabs names prefab ids per seat (default "scout"; extras placed beside the first are an AI head start); Simulation.SettleStartingTile stamps them (Blueprints.Stamp), replacing the code start and Balance.StartingItems. One shipped prefab, scout.json, equals the old start with 600 copper ore + 300 iron ore. The library lists prefabs after the player's own, marked PREFAB, placeable, projectable, duplicable, not renamable/retaggable/deletable. GameQuery.Prefabs/Prefab list them (PrefabTests). Not yet: the AI still uses its constant design (AiPlayer.UnitDesign) instead of picking from GameQuery.Prefabs.
 
 **Notes:** Owner, 2026-10-17: define the system first; which prefabs ship is a later content and balance update. Saves already store the setup, so a save replays with the prefabs it was started with only while content doesn't change (OQ-34).
 

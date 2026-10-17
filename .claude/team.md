@@ -8,7 +8,7 @@ rules on top. Branch from the Wave 0 (foundation) commit.
 - **No tech tree (TT-001).** Every building and recipe is available from the start. `Progression` is only the goal
   chain (`goals.json`, `UnlockCondition` types `produce`/`claim`/`ship`/`launch`, counters on `PlayerState`).
 - **Building owner.** `PlacedBuilding.Owner` is the player who placed it (`PlaceBuildingCommand.Player`), the starting
-  player for the starting unit's blocks (`Simulation.PlaceStartingUnit`), or the unit's owner for blocks put back by
+  player for the start prefabs' blocks (`Simulation.SettleStartingTile`), or the unit's owner for blocks put back by
   landing (`UnitAssembly.Deploy`). It need not equal `TileState.Owner`; placement needs presence, not ownership (see Territory rules
   below). Frame cells have no owner: they belong to whoever owns the tile.
 - **Hit points.** `BuildingDef.Hp` (`hp` in `buildings.json`, validated > 0) is one block's full HP.
@@ -24,8 +24,8 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   `supplyRadius` and `capacity` (per item, validated > 0, cores only). Runtime stock is `PlacedBuilding.Stock`
   (hashed in `MixEntity`, in `BuildingSnap.Stock`); `TileGrid.Cores` lists them in id order. There is no
   `TileState.Inventory`. Every unit has exactly one core; on a unit its stock is `Unit.Cargo`.
-- **Start (WM-005).** No free core: `Simulation.SettleStartingTile` places a landed starting unit (thruster, 2x2 core,
-  thruster on a 4x2 frame) nearest the circle centre, its core holding `Balance.StartingItems`. In code until prefabs.
+- **Start (WM-005, FB-021).** No free core: `Simulation.SettleStartingTile` stamps the seat's start prefabs (default `scout`: thruster, 2x2 core,
+  thruster on a 4x2 frame, `game/data/prefabs/scout.json`) nearest the circle centre, its core holding the prefab's `items`.
 - **Lift-off and landing (UD-010).** `UnitAssembly.Launch` drains the core's stock and every lifted building's items
   (`TileEntities.Drain(b, into)`) into `Unit.Cargo`; `Deploy` puts the whole cargo back into the landed core.
 - **Elimination.** `Simulation.CoreCount` / `Victory.HasCore` count cores on tiles and units (every unit has one).

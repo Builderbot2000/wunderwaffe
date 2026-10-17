@@ -39,6 +39,9 @@ static class Harness
         return core;
     }
 
+    /// <summary>What a start's core holds: the default start prefab's items (FB-021).</summary>
+    public static IReadOnlyDictionary<string, int> StartItems(Simulation sim) => sim.Content.Prefabs[GameSetup.DefaultStart].Items!;
+
     /// <summary>Puts items into a core's stock.</summary>
     public static void Stock(PlacedBuilding core, string item, long n) => core.Stock!.Add(item, n);
 

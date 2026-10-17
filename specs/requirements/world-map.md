@@ -67,7 +67,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** On new game each player owns 1 tile and has a landed starting unit whose core stands inside the victory circle and holds the starting items; it can lift off like any unit; with several players, starts are spread fairly (OQ-22).
 
-**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (Simulation.PlaceStartingUnit: thruster, 2x2 core, thruster on a 4x2 frame, in code until prefabs, FB-021), whose core holds 600 copper ore + 300 iron ore (Balance.StartingItems; doubled for 256-cell tiles, OQ-35); it passes lift-off validation. Tested (SimulationTests, TerritoryTests).
+**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (the setup's start prefabs, FB-021; default game/data/prefabs/scout.json: thruster, 2x2 core, thruster on a 4x2 frame), whose core holds the prefab's items, 600 copper ore + 300 iron ore (doubled for 256-cell tiles, OQ-35); it passes lift-off validation. Tested (SimulationTests, TerritoryTests).
 
 **Notes:** Was: 'Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22). Start as a deployed unit instead of a free core, 2026-10-17 (OQ-37).
 

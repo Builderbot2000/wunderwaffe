@@ -29,6 +29,12 @@ public enum GameEventKind
 
     /// <summary>The player completed a goal; <see cref="GameEvent.ItemId"/> is the goal id.</summary>
     GoalCompleted,
+
+    /// <summary>
+    /// A unit factory of the player's stopped because its finished unit can't lift off (UD-006, OQ-44);
+    /// <see cref="GameEvent.ItemId"/> is the <c>AssembleResult</c> name.
+    /// </summary>
+    FactoryStopped,
 }
 
 /// <summary>

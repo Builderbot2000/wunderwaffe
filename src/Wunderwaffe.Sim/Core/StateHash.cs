@@ -178,6 +178,8 @@ internal sealed class StateHash
             Mix(f.Buffer);
             Mix((int)f.Status);
             Mix(f.Built);
+            Mix((int)f.Mode);
+            Mix((int)f.LiftOff);
         }
         if (b.Machine is { } mc)
             Mix(mc.OutputCredit);
