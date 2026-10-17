@@ -163,7 +163,7 @@ public partial class UiTour : Node
     void LiftOffScout()
     {
         var home = _host.Sim.Tiles[_host.Sim.StartTileId];
-        var core = home.Grid.Buildings.First(b => b.Kind == Sim.Content.BuildingKind.UnitCore);
+        var core = home.Grid.Buildings.First(b => b.Kind == Sim.Content.BuildingKind.Core);
         _host.Send(new ActivateUnitCommand(_host.LocalPlayer, home.Id, core.X, core.Y));
     }
 

@@ -23,14 +23,15 @@ public partial class Hud
             _host.Send(new MoveUnitsCommand(Me, [.. _host.Selected.Order()], tile.Id, tile.CircleX, tile.CircleY));
     }
 
-    static string InventoryKey(TileState tile) => string.Join(",", tile.Inventory.Entries.Select(kv => kv.Key + kv.Value));
+    string InventoryKey(TileState tile) => string.Join(",", Funds.Total(tile, Me).Select(kv => kv.Key + kv.Value));
 
+    /// <summary>The local player's funds on the tile: what their cores there hold (FB-019).</summary>
     void AddInventory(TileState tile)
     {
-        _sideInfo.AddChild(Ui.Heading($"Inventory · {GameText.Plural(tile.Grid.BuildingCount, "building", "buildings")}"));
+        _sideInfo.AddChild(Ui.Heading($"Your stock · {GameText.Plural(tile.Grid.BuildingCount, "building", "buildings")}"));
         var grid = new GridContainer { Columns = 2, MouseFilter = MouseFilterEnum.Ignore };
         grid.AddThemeConstantOverride("h_separation", 24);
-        foreach (var (id, n) in tile.Inventory.Entries)
+        foreach (var (id, n) in Funds.Total(tile, Me))
         {
             var name = Ui.Row(6);
             name.AddChild(Ui.Icon(id, 24));
@@ -42,7 +43,7 @@ public partial class Hud
             grid.AddChild(count);
         }
         if (grid.GetChildCount() == 0)
-            _sideInfo.AddChild(Ui.Label("Empty. Belt items into the core to stock it.", Ui.SmallFont, Ui.Muted));
+            _sideInfo.AddChild(Ui.Label("None. Land a unit here, or belt items into a core of yours.", Ui.SmallFont, Ui.Muted));
         else
             _sideInfo.AddChild(grid);
     }

@@ -108,15 +108,18 @@ public partial class DebugDriver : Node
                 FindRoom(tile);
                 break;
             case 5:
-                // Three framed cells with an engine on each end and the unit core between (commands: this is the setup).
-                // Unit parts cost steel.
-                foreach (var item in new[] { "steel", "iron_plate", "copper_plate" })
+                // Two rows of frame with an engine on each end of the top row and a 2x2 core between (commands: this
+                // is the setup). Unit parts cost steel; the grant goes into the starting unit's core.
+                foreach (var item in new[] { "steel", "iron_plate", "copper_plate", "copper_ore", "iron_ore" })
                     _host.Send(new DebugGrantCommand(me, tile.Id, item, 100));
-                for (int x = CoreX - 1; x <= CoreX + 1; x++)
-                    _host.Send(new PlaceFrameCommand(me, tile.Id, x, CoreY));
+                for (int y = CoreY; y <= CoreY + 1; y++)
+                {
+                    for (int x = CoreX - 1; x <= CoreX + 2; x++)
+                        _host.Send(new PlaceFrameCommand(me, tile.Id, x, y));
+                }
                 _host.Send(new PlaceBuildingCommand(me, tile.Id, "thruster", CoreX - 1, CoreY, 0));
-                _host.Send(new PlaceBuildingCommand(me, tile.Id, "unit_core", CoreX, CoreY));
-                _host.Send(new PlaceBuildingCommand(me, tile.Id, "thruster", CoreX + 1, CoreY, 0));
+                _host.Send(new PlaceBuildingCommand(me, tile.Id, "core", CoreX, CoreY));
+                _host.Send(new PlaceBuildingCommand(me, tile.Id, "thruster", CoreX + 2, CoreY, 0));
                 break;
             case 20:
                 GD.Print($"[drive] built: {tile.Grid.BuildingCount} buildings, {tile.Grid.FrameCount} frames");

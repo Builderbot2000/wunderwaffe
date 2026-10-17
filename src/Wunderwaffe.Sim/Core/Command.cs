@@ -69,7 +69,7 @@ public sealed record RemoveBuildingCommand(int Player, int TileId, int X, int Y)
     }
 }
 
-/// <summary>Lays a unit frame on a cell, paying <see cref="Balance.FrameCost"/> via <see cref="Territory.Payer"/>. Frames go under buildings too.</summary>
+/// <summary>Lays a unit frame on a cell, paying <see cref="Balance.FrameCost"/> from the player's cores there (<see cref="Funds"/>). Frames go under buildings too.</summary>
 public sealed record PlaceFrameCommand(int Player, int TileId, int X, int Y) : Command(Player)
 {
     internal override void Apply(Simulation sim)
@@ -90,7 +90,7 @@ public sealed record RemoveFrameCommand(int Player, int TileId, int X, int Y) : 
 }
 
 /// <summary>
-/// Triggers the unit core at (X, Y): the buildings on the frame joined to it lift off the tile as one unit.
+/// Triggers the core at (X, Y): the buildings on the frame joined to it lift off the tile as one unit.
 /// </summary>
 public sealed record ActivateUnitCommand(int Player, int TileId, int X, int Y) : Command(Player)
 {
@@ -116,13 +116,14 @@ public sealed record MoveUnitsCommand(int Player, int[] UnitIds, int TileId, int
     internal override void Apply(Simulation sim) => UnitSim.Order(sim, Player, UnitIds, TileId, X, Y);
 }
 
-/// <summary>Debug only: adds items to a tile. Must be disabled in multiplayer.</summary>
+/// <summary>Debug only: adds items to the player's first core on a tile (none: nothing). Must be disabled in multiplayer.</summary>
 public sealed record DebugGrantCommand(int Player, int TileId, string ItemId, int Amount) : Command(Player)
 {
     internal override void Apply(Simulation sim)
     {
-        if (sim.TryGetTile(TileId) is { } tile && sim.Content.Items.ContainsKey(ItemId) && Amount > 0)
-            tile.Inventory.Add(ItemId, Amount);
+        if (sim.TryGetTile(TileId) is { } tile && sim.Content.Items.ContainsKey(ItemId) && Amount > 0
+            && Funds.Cores(tile, Player).FirstOrDefault() is { } core)
+            core.Stock!.Add(ItemId, Amount);
     }
 }
 

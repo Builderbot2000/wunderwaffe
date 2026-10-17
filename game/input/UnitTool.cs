@@ -228,12 +228,12 @@ public partial class UnitTool : Node2D
 
         var cell = HoveredCell();
         var tile = _host.ViewedTile;
-        if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.UnitCore } core)
+        if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.HasFrame(core.X, core.Y))
         {
             var check = UnitAssembly.CheckActivate(sim, tile, _host.LocalPlayer, cell.X, cell.Y, out var plan);
             line += check == AssembleResult.Ok
                 ? $"\nG: lift off {plan!.Cells.Count} cells, {plan.Buildings.Count} blocks"
-                : $"\nUnit core: {check}";
+                : $"\nCore: {Screens.GameText.Assemble(check)}";
             line += sim.Squads.RallyOf(tile.Id, core.Id) is { } rally
                 ? $"\nRally: {(rally.RallyTileId >= 0 ? sim.Tiles[rally.RallyTileId].Name : "none")}{(sim.Squads.ById(rally.SquadId) is { } s ? $", joins {s.Name}" : "")} (Y to change)"
                 : "\nY: set rally point";
@@ -384,7 +384,7 @@ public partial class UnitTool : Node2D
     {
         var cell = HoveredCell();
         var tile = _host.ViewedTile;
-        if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.UnitCore })
+        if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.HasFrame(core.X, core.Y))
         {
             _host.Send(new ActivateUnitCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y));
             return;

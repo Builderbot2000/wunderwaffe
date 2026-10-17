@@ -102,7 +102,7 @@ public sealed partial class Simulation
     /// </summary>
     List<int> ChooseStarts(int w, int h, int players, ulong seed, int richnessPercent)
     {
-        var fits = _tiles.Where(t => CoreSpot(t) != null).ToList();
+        var fits = _tiles.Where(t => StartSpot(t) != null).ToList();
         if (fits.Count < players)
             throw new InvalidOperationException($"only {fits.Count} tiles have room for a core, {players} players need one each");
         var good = fits.Where(t => IsLand(t, Balance.StartLandPercent) && Neighbors(t).Count(n => IsLand(n, Balance.LandPercent)) >= 2).ToList();
@@ -227,7 +227,17 @@ public sealed partial class Simulation
         return tile;
     }
 
-    /// <summary>Adds a standalone hand-built first tile: seeded deposits, a core in the middle and starting items (WM-005).</summary>
+    /// <summary>
+    /// Puts a core straight onto a hand-built tile, unpaid and with no checks, for tests and benchmark scenes. Real
+    /// play builds cores like any building.
+    /// </summary>
+    public PlacedBuilding AddCore(TileState tile, int owner, int x, int y, string defId = CoreBuildingId)
+    {
+        var def = Content.Buildings[defId];
+        return tile.Grid.Add(def, owner, x, y, def.Width, def.Height, 0, null);
+    }
+
+    /// <summary>Adds a standalone hand-built first tile: seeded deposits and a landed starting unit in the middle (WM-005).</summary>
     public TileState AddStartingTile(int x, int y, int owner, ulong seed)
     {
         var tile = AddTile(x, y);
@@ -237,8 +247,8 @@ public sealed partial class Simulation
     }
 
     /// <summary>
-    /// Makes an existing unowned tile a player's first tile (WM-005): a core in its victory circle, starting items, and a
-    /// landed scout (see <see cref="PlaceScout"/>) for the first foothold on another tile.
+    /// Makes an existing unowned tile a player's first tile (WM-005): the player owns it and has a landed starting unit
+    /// (see <see cref="PlaceStartingUnit"/>) whose core stands in its victory circle and holds the starting items.
     /// </summary>
     public void SettleStartingTile(TileState tile, int owner)
     {
@@ -246,29 +256,31 @@ public sealed partial class Simulation
             throw new InvalidOperationException($"tile {tile.Id} is already owned");
         tile.Owner = owner;
         Player(owner);
-        if (PlaceCore(tile) is { } core)
-            PlaceScout(tile, owner, core.X, core.Y - ScoutGap);
-        tile.Inventory.Add(Balance.StartingItems);
+        if (StartSpot(tile) is { } spot)
+            PlaceStartingUnit(tile, owner, spot.X, spot.Y);
     }
 
-    /// <summary>Rows between the core and the starting scout, searched outward from there.</summary>
-    const int ScoutGap = 8;
+    /// <summary>The starting unit's frame: a thruster, a 2x2 core and a thruster, two rows deep.</summary>
+    const int StartWidth = 4, StartHeight = 2;
 
     /// <summary>
-    /// A landed scout: a thruster, a unit core and a thruster in a row on frame, all pushing east. Building or landing
-    /// needs presence on a tile (WM-015), so expansion starts with this flying to a neighbour's victory circle and
-    /// landing there. Placed near (x, y) on free buildable ground, if there is room.
+    /// The player's first core (WM-005, WM-016), landed as a scout: a thruster, a core and a thruster in a row on frame,
+    /// all pushing east, with the top-left at (x, y). The core holds <see cref="Balance.StartingItems"/>. Building or
+    /// landing needs presence on a tile (WM-015), so expansion starts with a unit flying to a neighbour's victory circle
+    /// and landing there; its core's stock pays for building there (FB-019). Kept in code until prefabs take it over.
     /// </summary>
-    void PlaceScout(TileState tile, int owner, int x, int y)
+    void PlaceStartingUnit(TileState tile, int owner, int x, int y)
     {
-        if (FreeSpot(tile, 3, 1, x, y) is not var (sx, sy))
-            return;
-        for (int i = 0; i < 3; i++)
+        for (int cy = y; cy < y + StartHeight; cy++)
         {
-            tile.Grid.SetFrame(sx + i, sy, true);
-            var def = Content.Buildings[i == 1 ? "unit_core" : "thruster"];
-            tile.Grid.Add(def, owner, sx + i, sy, 1, 1, 0, null);
+            for (int cx = x; cx < x + StartWidth; cx++)
+                tile.Grid.SetFrame(cx, cy, true);
         }
+        var thruster = Content.Buildings["thruster"];
+        tile.Grid.Add(thruster, owner, x, y, 1, 1, 0, null);
+        var core = tile.Grid.Add(CoreDef, owner, x + 1, y, CoreDef.Width, CoreDef.Height, 0, null);
+        tile.Grid.Add(thruster, owner, x + 1 + CoreDef.Width, y, 1, 1, 0, null);
+        core.Stock!.Add(Balance.StartingItems);
     }
 
     /// <summary>A tile for the cells of the map already marked with the next id, inside the given box.</summary>
@@ -330,15 +342,14 @@ public sealed partial class Simulation
     BuildingDef CoreDef => Content.Buildings[CoreBuildingId];
 
     /// <summary>
-    /// Where a core fits nearest the tile's victory circle centre (WM-005: a start's core stands in its circle). Null if
-    /// the tile has no room, as an all-water tile might not.
+    /// Where the starting unit fits nearest the tile's victory circle centre (WM-005: its core stands in the circle).
+    /// Null if the tile has no room, as an all-water tile might not.
     /// </summary>
-    (int X, int Y)? CoreSpot(TileState tile)
+    (int X, int Y)? StartSpot(TileState tile)
     {
-        var core = CoreDef;
-        if (tile.Grid.BuildableCount < core.Width * core.Height)
+        if (tile.Grid.BuildableCount < StartWidth * StartHeight)
             return null;
-        return FreeSpot(tile, core.Width, core.Height, tile.CircleX - core.Width / 2, tile.CircleY - core.Height / 2);
+        return FreeSpot(tile, StartWidth, StartHeight, tile.CircleX - StartWidth / 2, tile.CircleY - StartHeight / 2);
     }
 
     /// <summary>
@@ -391,8 +402,4 @@ public sealed partial class Simulation
         }
         return false;
     }
-
-    /// <summary>Puts a core of the tile's owner on the tile, if there is room for one.</summary>
-    PlacedBuilding? PlaceCore(TileState tile) =>
-        CoreSpot(tile) is { } spot ? tile.Grid.Add(CoreDef, tile.Owner, spot.X, spot.Y, CoreDef.Width, CoreDef.Height, 0, null) : null;
 }

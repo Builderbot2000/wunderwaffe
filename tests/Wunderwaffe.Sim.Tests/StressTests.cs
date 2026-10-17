@@ -3,6 +3,8 @@ using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using Xunit.Abstractions;
 
+using static Wunderwaffe.Sim.Tests.Harness;
+
 namespace Wunderwaffe.Sim.Tests;
 
 /// <summary>
@@ -88,14 +90,15 @@ public class StressTests(ITestOutputHelper output)
         for (int t = 0; t < Tiles; t++)
         {
             var tile = sim.AddTile(t, 0, owner: 0);
-            tile.Inventory.Add("copper_ore", 1_000_000);
+            foreach (var item in new[] { "copper_ore", "iron_plate", "copper_plate" })
+                Fund(sim, tile).Stock!.Add(item, 1_000_000);
             for (int r = 0; r < rows; r++)
             {
                 int y = r * 3;
                 Harness.Ore(tile, "iron_ore", 0, y);
                 Harness.Place(sim, tile, "drill", 0, y);
                 Harness.Belt(sim, tile, 2, y, 39);
-                Harness.Place(sim, tile, "core", 41, y);
+                Harness.Place(sim, tile, "core_large", 41, y);
             }
         }
         sim.Step();
@@ -123,12 +126,12 @@ public class StressTests(ITestOutputHelper output)
         Assert.All(small, t => Assert.False(RateMode.IsFullSim(sim, t)));
         Assert.All(small, t => Assert.True(t.Grid.BuildingCount >= 6, $"tile {t.Id}: {t.Grid.BuildingCount}"));
         // The links work: every importer gets its neighbour's ore.
-        Assert.All(small.Where((_, i) => i % 2 == 1), t => Assert.True(RateMode.RatesOf(sim, t).RateOf(FlowKind.Core, "iron_ore") > 0, $"tile {t.Id}"));
+        Assert.All(small.Where((_, i) => i % 2 == 1), t => Assert.True(RateMode.RatesOf(sim, t).Total(FlowKind.Core, "iron_ore") > 0, $"tile {t.Id}"));
 
-        long before = small.Sum(t => t.Inventory.Get("iron_plate"));
+        long before = small.Sum(t => Items(t, "iron_plate"));
         double msPerTick = MsPerTick(sim);
         output.WriteLine($"built in {build.ElapsedMilliseconds} ms; {msPerTick:F4} ms/tick");
-        Assert.True(small.Sum(t => t.Inventory.Get("iron_plate")) > before, "rate tiles made nothing");
+        Assert.True(small.Sum(t => Items(t, "iron_plate")) > before, "rate tiles made nothing");
         // 60 UPS gives the whole frame 16.7 ms; the sim keeps under a quarter of it.
         Assert.True(msPerTick < 4.0, $"{msPerTick:F4} ms/tick");
     }

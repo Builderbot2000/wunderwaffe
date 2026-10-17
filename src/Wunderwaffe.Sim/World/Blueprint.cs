@@ -45,7 +45,7 @@ public sealed record Blueprint(BlueprintBlock[] Blocks, BlueprintCell[] Frames)
         return (w, h);
     }
 
-    /// <summary>Has a unit core, so building it ends in a lift-off.</summary>
+    /// <summary>Has a core on frame, so building it ends in a lift-off.</summary>
     public bool IsUnit(IReadOnlyDictionary<string, BuildingDef> defs) =>
-        Blocks.Any(b => defs.TryGetValue(b.DefId, out var d) && d.Kind == BuildingKind.UnitCore);
+        Frames.Length > 0 && Blocks.Any(b => defs.TryGetValue(b.DefId, out var d) && d.Kind == BuildingKind.Core);
 }

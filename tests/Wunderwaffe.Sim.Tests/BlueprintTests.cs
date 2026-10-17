@@ -78,7 +78,7 @@ public class BlueprintTests
         LayDesign(sim, tile, 5, 5);
         var bp = Blueprints.FromUnitCore(sim, tile, Me, 5, 5, out _)!;
         var cost = UnitStats.Of(sim.Content, bp).Cost;
-        var before = tile.Inventory.Entries.ToDictionary(kv => kv.Key, kv => kv.Value);
+        var before = Funds.Total(tile, Me).ToDictionary(kv => kv.Key, kv => kv.Value);
 
         Assert.Equal(BlueprintResult.Ok, Blueprints.Check(sim, tile, Me, bp, 20, 20, 0, false, out var plan));
         Assert.Equal(cost, plan.Cost);
@@ -100,7 +100,7 @@ public class BlueprintTests
         Place(sim, tile, "conveyor", 23, 21); // where the last thruster would go
         sim.Step();
         int buildings = tile.Grid.BuildingCount, frames = tile.Grid.FrameCount;
-        var inventory = tile.Inventory.Entries.ToList();
+        var inventory = Funds.Total(tile, Me).ToList();
 
         Assert.Equal(BlueprintResult.Blocked, Blueprints.Check(sim, tile, Me, bp, 20, 20, 0, false, out var plan));
         var problem = Assert.Single(plan.Problems);
@@ -110,7 +110,7 @@ public class BlueprintTests
         sim.Enqueue(new PlaceBlueprintCommand(Me, tile.Id, bp, 20, 20));
         sim.Step();
         Assert.Equal((buildings, frames), (tile.Grid.BuildingCount, tile.Grid.FrameCount));
-        Assert.Equal(inventory, tile.Inventory.Entries.ToList());
+        Assert.Equal(inventory, Funds.Total(tile, Me).ToList());
 
         // Off the tile's edge counts too.
         Assert.Equal(BlueprintResult.Blocked, Blueprints.Check(sim, tile, Me, bp, 38, 38, 0, false, out _));
@@ -121,31 +121,32 @@ public class BlueprintTests
     {
         var sim = NewSim();
         var tile = sim.AddTile(0, 0, Me, 30);
-        tile.Inventory.Add("copper_ore", 5);
+        Fund(sim, tile).Stock!.Add("copper_ore", 5);
         var belts = new Blueprint([.. Enumerable.Range(0, 6).Select(i => new BlueprintBlock("conveyor", i, 0, 0))], []);
         Assert.Equal(BlueprintResult.CannotAfford, Blueprints.Check(sim, tile, Me, belts, 2, 2, 0, false, out var plan));
         Assert.Equal(6, plan.Cost["copper_ore"]);
         sim.Enqueue(new PlaceBlueprintCommand(Me, tile.Id, belts, 2, 2));
         sim.Step();
-        Assert.Equal(0, tile.Grid.BuildingCount);
+        Assert.DoesNotContain(tile.Grid.Buildings, b => b.DefId == "conveyor");
         Assert.Equal(5, Items(tile, "copper_ore"));
     }
 
     [Fact]
-    public void AreaRecordingTakesWholeBuildingsAndFrameButNotTheTileCore()
+    public void AreaRecordingTakesWholeBuildingsAndFrame()
     {
         var sim = NewSim();
         var tile = Tile(sim);
-        Place(sim, tile, "core", 2, 2);
+        Place(sim, tile, "core_large", 2, 2);
         Belt(sim, tile, 6, 3, 3);
         Place(sim, tile, "smelter", 9, 3, recipe: "smelt_copper"); // half in the box: left out
         Frame(sim, tile, 6, 5, 2);
         sim.Step();
 
+        // Cores are ordinary buildings now (WM-016), so they are recorded too.
         var bp = Blueprints.FromArea(tile, 2, 2, 8, 5)!;
-        Assert.Equal(["conveyor", "conveyor", "conveyor"], bp.Blocks.Select(b => b.DefId));
-        Assert.Equal(new BlueprintBlock("conveyor", 0, 0, 0), bp.Blocks[0]);
-        Assert.Equal([new BlueprintCell(0, 2), new BlueprintCell(1, 2)], bp.Frames);
+        Assert.Equal(["core_large", "conveyor", "conveyor", "conveyor"], bp.Blocks.Select(b => b.DefId));
+        Assert.Equal(new BlueprintBlock("conveyor", 4, 1, 0), bp.Blocks[1]);
+        Assert.Equal([new BlueprintCell(4, 3), new BlueprintCell(5, 3)], bp.Frames);
         Assert.Null(Blueprints.FromArea(tile, 20, 20, 3, 3));
     }
 
@@ -297,7 +298,7 @@ public class BlueprintTests
     /// <summary>A scout next to a core, whose resource radius (FB-018) pays its upkeep from the tile.</summary>
     static Unit Scout(Simulation sim, TileState tile)
     {
-        Place(sim, tile, "core", 4, 14);
+        Place(sim, tile, "core_large", 4, 14);
         Frame(sim, tile, 9, 10, 3);
         Place(sim, tile, "thruster", 9, 10);
         Place(sim, tile, "unit_core", 10, 10);
@@ -341,8 +342,8 @@ public class BlueprintTests
         var sim = UpkeepSim();
         var tile = sim.AddTile(0, 0, Me, 30);
         foreach (var item in new[] { "copper_plate", "iron_plate", "steel" })
-            tile.Inventory.Add(item, 1000);
-        tile.Inventory.Add("iron_ore", 6); // the frame, and nothing left over
+            Fund(sim, tile).Stock!.Add(item, 1000);
+        Fund(sim, tile).Stock!.Add("iron_ore", 6); // the frame, and nothing left over
         var unit = Scout(sim, tile);
         Run(sim, Balance.UpkeepPeriod);
         Assert.True(unit.Unsupplied);
@@ -351,7 +352,7 @@ public class BlueprintTests
         Run(sim, 2);
         Assert.False(unit.Moving);
 
-        tile.Inventory.Add("iron_ore", 10);
+        Fund(sim, tile).Stock!.Add("iron_ore", 10);
         Run(sim, Simulation.TicksPerSecond);
         Assert.False(unit.Unsupplied);
         Assert.Equal(8, Items(tile, "iron_ore"));

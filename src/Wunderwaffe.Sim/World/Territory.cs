@@ -3,7 +3,7 @@ using Wunderwaffe.Sim.Core;
 namespace Wunderwaffe.Sim.World;
 
 /// <summary>
-/// Who may act where (WM-015), who pays, and when a tile is Contested (WM-004). Read-only queries shared by placement,
+/// Who may act where (WM-015) and when a tile is Contested (WM-004); who pays is <see cref="Funds"/>. Read-only queries shared by placement,
 /// landing, the UI and the other silos; <see cref="DestroyBuilding"/> is the one write.
 /// </summary>
 public static class Territory
@@ -40,27 +40,7 @@ public static class Territory
         return Expansion.CircleOccupants(tile).Any(p => p != player);
     }
 
-    /// <summary>
-    /// The tile whose stock pays for <paramref name="player"/> building on <paramref name="tile"/>: the tile itself if
-    /// they own it and it can afford the cost, otherwise the first neighbouring tile they own (in id order) that can.
-    /// Null if none can. Nobody spends a stock that isn't theirs, so building on a tile you don't own is supplied from
-    /// next door.
-    /// </summary>
-    public static TileState? Payer(Simulation sim, TileState tile, int player, IReadOnlyDictionary<string, int> cost)
-    {
-        if (tile.Owner == player && tile.Inventory.Has(cost))
-            return tile;
-        foreach (var n in sim.Neighbors(tile))
-        {
-            if (n.Owner == player && n.Inventory.Has(cost))
-                return n;
-        }
-        return null;
-    }
 
-    /// <summary>Where a refund goes: the tile's stock if the player owns it, else their first neighbouring tile; null if neither.</summary>
-    internal static TileState? RefundTo(Simulation sim, TileState tile, int player) =>
-        tile.Owner == player ? tile : sim.Neighbors(tile).FirstOrDefault(n => n.Owner == player);
 
     /// <summary>
     /// A tile is Contested while a player other than its owner has a unit on it (WM-004, OQ-20); an unowned tile is

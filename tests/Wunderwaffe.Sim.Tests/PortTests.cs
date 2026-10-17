@@ -33,7 +33,7 @@ public class PortTests
         if (withReceivingBelt)
         {
             Belt(sim, b, 1, importRow, 8);          // (1..8, row)
-            Place(sim, b, "core", 9, importRow - 1); // Core rows importRow-1 .. importRow+1.
+            Place(sim, b, "core_large", 9, importRow - 1); // Core rows importRow-1 .. importRow+1.
         }
         return (sim, a, b);
     }
@@ -125,7 +125,7 @@ public class PortTests
         Place(sim, b, "export_port", 1, 15, West);
         Place(sim, a, "import_port", 28, 15, East);
         Belt(sim, a, 27, 15, 3, West);              // (27..25, 15)
-        Place(sim, a, "core", 22, 14);              // Covers (22..24, 14..16).
+        Place(sim, a, "core_large", 22, 14);              // Covers (22..24, 14..16).
         long aStart = Items(a, Iron), bStart = Items(b, Iron);
 
         Run(sim, 40 * Simulation.TicksPerSecond);
@@ -174,7 +174,8 @@ public class PortTests
     {
         var (sim, a, b) = Pair();
         b.Owner = Them;
-        Run(sim, 2000);
+        // Short of the capture time: my core on B stands in its circle and would claim it (WM-006).
+        Run(sim, Expansion.CaptureTicks(sim) - 60);
 
         Assert.Empty(a.Grid.BuildingAt(29, 10)!.Export!.InFlight);
         Assert.Equal(100_000, Items(b, Iron));

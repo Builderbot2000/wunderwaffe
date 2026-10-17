@@ -23,7 +23,11 @@ public enum BuildingKind
     /// <summary>Runs recipes (drills, smelters, mills). The default.</summary>
     Machine,
 
-    /// <summary>The tile's core: anything delivered to it goes into the tile inventory.</summary>
+    /// <summary>
+    /// A core (WM-016): holds its own stock up to <see cref="BuildingDef.Capacity"/> of each item (FB-007, FB-019), which
+    /// pays for building on its tile; supplies power and a resource radius; on frame it lifts the framed group off as a
+    /// unit, and its stock becomes the unit's cargo (UD-010). Every unit has exactly one.
+    /// </summary>
     Core,
 
     /// <summary>Carries items one cell in the direction it faces (FB-004).</summary>
@@ -34,9 +38,6 @@ public enum BuildingKind
 
     /// <summary>Receives items from the neighbouring tile whose I/O zone it stands in and puts them on adjacent belts.</summary>
     ImportPort,
-
-    /// <summary>Marks a unit: triggering it turns the framed blocks around it into a mobile unit.</summary>
-    UnitCore,
 
     /// <summary>Pushes a unit the way it faces while the unit is active. Inert on a tile.</summary>
     Thruster,
@@ -154,6 +155,7 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// <param name="Range">Bridges: the farthest cell ahead the next bridge may stand on.</param>
 /// <param name="Booster">Boosters: what it does to its hosts.</param>
 /// <param name="Menu">Build menu tab, one of <see cref="BuildingDef.Menus"/>.</param>
+/// <param name="Capacity">Cores only: most of each item its stock holds from deliveries (OQ-38, OQ-39); belts back up past it.</param>
 public sealed record BuildingDef(
     string Id,
     string Name,
@@ -182,15 +184,15 @@ public sealed record BuildingDef(
     int Discharge = 0,
     int Range = 0,
     BoosterDef? Booster = null,
-    string Menu = "")
+    string Menu = "",
+    int Capacity = 0)
 {
     /// <summary>Build menu tabs, in the order the HUD shows them (and Shift+1.. picks them).</summary>
     public static readonly string[] Menus = ["production", "logistics", "power", "units", "combat", "boosters"];
 
     /// <summary>
     /// Takes part in a tile's power network (FB-005): draws, supplies, stores or conducts. Thrusters only use power
-    /// on a unit, so they are inert on a tile; a landed unit core keeps supplying, so a scout powers an outpost on a
-    /// tile with no core.
+    /// on a unit, so they are inert on a tile; a landed unit's core keeps supplying, so a scout powers an outpost.
     /// </summary>
     public bool IsPower =>
         Kind != BuildingKind.Thruster

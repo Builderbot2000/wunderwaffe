@@ -104,7 +104,7 @@ public static class Palette
     public static Color Deposit(string itemId) => Deposits.GetValueOrDefault(itemId, Colors.Magenta);
 
     public static Color Building(string buildingId) =>
-        buildingId == Sim.Simulation.CoreBuildingId ? Core : Buildings.GetValueOrDefault(buildingId, Colors.Magenta);
+        buildingId.StartsWith(Sim.Simulation.CoreBuildingId, System.StringComparison.Ordinal) ? Core : Buildings.GetValueOrDefault(buildingId, Colors.Magenta);
 
     static void Spread(IEnumerable<string> ids, Dictionary<string, Color> into, float saturation, float value)
     {

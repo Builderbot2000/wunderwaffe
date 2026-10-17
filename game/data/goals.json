@@ -2,7 +2,7 @@
   {
     "id": "mine",
     "name": "Start mining",
-    "description": "Pick the Drill (Production tab, 1), place it on copper ore and run Conveyors (Logistics tab, 1) from it into your core. Belts face the way you rotate them (R).",
+    "description": "Your funds are what your cores on this tile hold, starting with your scout's. Build a second Core (Units tab, 2) off the scout's frame so this tile keeps funds when the scout leaves. Pick the Drill (Production tab, 1), place it on copper ore and run Conveyors (Logistics tab, 1) from it into that core. Belts face the way you rotate them (R).",
     "condition": { "type": "produce", "item": "copper_ore", "amount": 50 }
   },
   {
@@ -14,7 +14,7 @@
   {
     "id": "scout",
     "name": "Lift off your scout",
-    "description": "Steel needs coal, and your home tile has none. Your scout stands on its frame above the core: hover its unit core with no building picked and press G to lift it off.",
+    "description": "Steel needs coal, and your home tile has none. Your scout stands on its frame in the victory circle; its core's stock goes with it and pays for building where it lands, so leave some ore in it (or belt more in). Hover its core with no building picked and press G to lift it off.",
     "condition": { "type": "launch", "amount": 1 }
   },
   {
@@ -26,19 +26,19 @@
   {
     "id": "link",
     "name": "Link your tiles",
-    "description": "On the new tile, mine coal (buildings there are paid from your home tile until it has stock of its own) and belt it into an Export Port (Logistics tab, 2) placed in the I/O zone bordering your home tile. On your home tile, put an Import Port (Logistics tab, 3) in the zone bordering the coal tile: ports pair by zone, whichever way they face.",
+    "description": "On the new tile, mine coal (paid from what the landed scout's core brought) and belt it into an Export Port (Logistics tab, 2) placed in the I/O zone bordering your home tile. On your home tile, put an Import Port (Logistics tab, 3) in the zone bordering the coal tile: ports pair by zone, whichever way they face.",
     "condition": { "type": "ship", "amount": 30 }
   },
   {
     "id": "steel",
     "name": "Make steel",
-    "description": "A Steel Mill (Production tab, 4) costs copper plates too: smelt some with a Smelter making Copper Plate (Production tab, 2). Feed the mill iron plates and coal. Unit cores and thrusters need steel.",
+    "description": "A Steel Mill (Production tab, 4) costs copper plates too: smelt some with a Smelter making Copper Plate (Production tab, 2). Feed the mill iron plates and coal. Thrusters need steel.",
     "condition": { "type": "produce", "item": "steel", "amount": 20 }
   },
   {
     "id": "launch",
     "name": "Build a unit",
-    "description": "Lay Unit Frame (Units tab, 1), put a Unit Core (2) and Thrusters (3) on it, then hover the core with no building picked and press G.",
+    "description": "Lay Unit Frame (Units tab, 1), put a Core (2) and Thrusters (3) on it, then hover the core with no building picked and press G. Every unit has exactly one core.",
     "condition": { "type": "launch", "amount": 2 }
   }
 ]

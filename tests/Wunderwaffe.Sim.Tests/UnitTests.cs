@@ -58,11 +58,11 @@ public class UnitTests
     {
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         var home = sim.Tiles[sim.StartTileId];
-        home.Inventory.Add("copper_ore", 10_000);
-        home.Inventory.Add("iron_ore", 10_000);
-        home.Inventory.Add("steel", 1_000);
-        home.Inventory.Add("iron_plate", 1_000);
-        home.Inventory.Add("copper_plate", 1_000);
+        Fund(sim, home).Stock!.Add("copper_ore", 10_000);
+        Fund(sim, home).Stock!.Add("iron_ore", 10_000);
+        Fund(sim, home).Stock!.Add("steel", 1_000);
+        Fund(sim, home).Stock!.Add("iron_plate", 1_000);
+        Fund(sim, home).Stock!.Add("copper_plate", 1_000);
         var (x, y) = Open(home, 3, 1);
         var unit = Scout(sim, home, x + 1, y);
         Assert.Equal(home.Id, unit.TileId);
@@ -143,7 +143,7 @@ public class UnitTests
         var tile = Tile(sim);
         var unit = Scout(sim, tile);
 
-        Assert.Equal(0, tile.Grid.BuildingCount);
+        Assert.Equal(1, tile.Grid.BuildingCount); // the bank
         Assert.Equal(0, tile.Grid.FrameCount);
         Assert.Equal(3, unit.Cells.Count);
         Assert.Equal(2, unit.Thrusters.Count);
@@ -207,15 +207,15 @@ public class UnitTests
     }
 
     [Fact]
-    public void ActivationIsRefusedForTheTileCoreAndForPorts()
+    public void ActivationIsRefusedForASecondCoreAndForPorts()
     {
         var sim = NewSim();
         var tile = Tile(sim);
         Frame(sim, tile, 3, 3, 4, 3);
         Place(sim, tile, "unit_core", 3, 3);
-        Place(sim, tile, "core", 4, 3);
+        Place(sim, tile, "core_large", 4, 3);
         sim.Step();
-        Assert.Equal(AssembleResult.ContainsTileCore, UnitAssembly.CheckActivate(sim, tile, Me, 3, 3, out _));
+        Assert.Equal(AssembleResult.MultipleCores, UnitAssembly.CheckActivate(sim, tile, Me, 3, 3, out _));
 
         var sim2 = NewSim();
         var tile2 = Tile(sim2);
@@ -249,7 +249,7 @@ public class UnitTests
     }
 
     [Fact]
-    public void ItemsHeldByLiftedBuildingsGoBackToTheTile()
+    public void ItemsHeldByLiftedBuildingsRideAlongAsCargo()
     {
         var sim = NewSim();
         var tile = Tile(sim);
@@ -260,11 +260,35 @@ public class UnitTests
         Place(sim, tile, "drill", 12, 10);
         Run(sim, 61); // one iron ore in the drill's output buffer
         long before = Items(tile, "iron_ore");
+        Stock(tile.Grid.BuildingAt(10, 10)!, "copper_ore", 7);
 
+        // UD-010: the core's stock and what the lifted buildings held become the unit's cargo.
         sim.Enqueue(new ActivateUnitCommand(Me, tile.Id, 10, 10));
         sim.Step();
-        Assert.Single(sim.Units);
-        Assert.True(Items(tile, "iron_ore") > before);
+        var unit = Assert.Single(sim.Units);
+        Assert.True(unit.Cargo.Get("iron_ore") > 0);
+        Assert.Equal(7, unit.Cargo.Get("copper_ore"));
+        Assert.Equal(before, Items(tile, "iron_ore"));
+    }
+
+    [Fact]
+    public void LandingPutsTheCargoBackIntoTheCore()
+    {
+        var sim = NewSim();
+        var tile = Tile(sim);
+        LayScout(sim, tile, 10, 10);
+        Stock(tile.Grid.BuildingAt(10, 10)!, "copper_ore", 40);
+        sim.Enqueue(new ActivateUnitCommand(Me, tile.Id, 10, 10));
+        sim.Step();
+        var unit = sim.Units.Single();
+        Assert.Equal(40, unit.Cargo.Get("copper_ore"));
+        long funds = Items(tile, "copper_ore");
+
+        sim.Enqueue(new DeployUnitCommand(Me, unit.Id));
+        sim.Step();
+        var core = tile.Grid.Cores.Single(c => c.DefId == "unit_core");
+        Assert.Equal(40, core.Stock!.Get("copper_ore"));
+        Assert.Equal(funds + 40, Items(tile, "copper_ore"));
     }
 
     // --- moving ---
@@ -380,7 +404,8 @@ public class UnitTests
         var tiles = new TileState[3, 3];
         for (int y = 0; y < 3; y++)
             for (int x = 0; x < 3; x++)
-                tiles[x, y] = Tile(sim, x, y, size: 16);
+                tiles[x, y] = sim.AddTile(x, y, Me, 16);
+        Bank(sim, tiles[2, 2], Me, 12, 3); // clear of the corners the unit cuts through
         var unit = Scout(sim, tiles[2, 2], 8, 8);
 
         Move(sim, unit, tiles[0, 0], 8, 8);
@@ -431,7 +456,7 @@ public class UnitTests
     {
         var sim = NewSim();
         var tile = Tile(sim, size: 30);
-        Place(sim, tile, "core", 14, 9); // 3x3 square straight across the line y=10
+        Place(sim, tile, "core_large", 14, 9); // 3x3 square straight across the line y=10
         sim.Step();
         var unit = Scout(sim, tile, 6, 10);
         Move(sim, unit, tile, 25, 10);
@@ -496,7 +521,7 @@ public class UnitTests
         var unit = Scout(sim, tile, 6, 10);
         Move(sim, unit, tile, 25, 10);
         Run(sim, 30);
-        Place(sim, tile, "core", 14, 9);
+        Place(sim, tile, "core_large", 14, 9);
         Assert.True(RunUntil(sim, () => !unit.Moving, 2500), "never arrived");
         Run(sim, 200);
         Assert.True(CellsTo(unit, 25, 10) < 1.5);

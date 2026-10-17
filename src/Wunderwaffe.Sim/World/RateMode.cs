@@ -106,7 +106,9 @@ public static class RateMode
         switch (f.Kind)
         {
             case FlowKind.Core:
-                tile.Inventory.Add(f.Item, n);
+                // Into that core's stock, held to its capacity: past it the full sim's belts would back up (OQ-39).
+                if (tile.Grid.BuildingById(f.PortId) is { Stock: { } stock } core)
+                    stock.Add(f.Item, Math.Max(0, Math.Min(n, core.Def.Capacity - stock.Get(f.Item))));
                 break;
             case FlowKind.Produced:
                 tile.Stats.RecordMade(f.Item, n);

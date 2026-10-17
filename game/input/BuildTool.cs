@@ -90,12 +90,12 @@ public partial class BuildTool : Node2D
 
     /// <summary>
     /// One entry per building, in buildings.json order within its tab, or per recipe for crafters that need one chosen.
-    /// The frame leads the units tab. Cores and platforms (WM-016, FB-017) come last in theirs, since they are rarely built.
+    /// The frame leads the units tab. Platforms (FB-017) come last in theirs, since they are rarely built.
     /// </summary>
     void BuildPalette(Simulation sim)
     {
         var content = sim.Content;
-        static bool Rare(BuildingDef d) => d.Kind is BuildingKind.Core or BuildingKind.Platform;
+        static bool Rare(BuildingDef d) => d.Kind is BuildingKind.Platform;
         var tools = new List<Tool> { new(FrameId, null, "Unit Frame", "Unit Frame", System.Array.IndexOf(BuildingDef.Menus, "units")) { IconId = Sprites.Frame } };
         foreach (var def in content.BuildingList.OrderBy(Rare))
         {

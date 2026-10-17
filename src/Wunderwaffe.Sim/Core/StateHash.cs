@@ -80,7 +80,6 @@ internal sealed class StateHash
                     Mix(y * g.Width + x);
             }
         }
-        Mix(t.Inventory.Entries);
         foreach (var b in g.Buildings)
         {
             Mix(b.Id);
@@ -131,6 +130,8 @@ internal sealed class StateHash
 
     void MixEntity(PlacedBuilding b)
     {
+        if (b.Stock is { } stock)
+            Mix(stock.Entries);
         if (b.Belt is { } belt)
         {
             Mix(belt.Count);

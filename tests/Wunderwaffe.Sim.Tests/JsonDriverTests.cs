@@ -75,16 +75,23 @@ public class JsonDriverTests(ITestOutputHelper output)
                 c.Step(600);
         }
 
-        // Goals 1-2: copper ore and iron plates into the core.
-        int core = Core(home);
+        // Goals 1-2: a base core off the starting unit's frame, so home keeps funds when the scout leaves (FB-019),
+        // then copper ore, iron ore and iron plates into it.
+        int scoutCoreId = Core(home);
+        var baseSpot = c.Query("FindSpot", new { tileId = home, buildingId = "core" })!;
+        Assert.True(Build(home, [new JsonObject { ["BuildingId"] = "core", ["X"] = (int)baseSpot["X"]!, ["Y"] = (int)baseSpot["Y"]!, ["Rotation"] = 0 }]));
+        int core = c.Query("Buildings", new { tileId = home })!.AsArray().Where(b => (string)b!["DefId"]! == "core").Max(b => (int)b!["Id"]!);
+        Assert.NotEqual(scoutCoreId, core);
         Assert.True(Build(home, Line(home, "copper_ore", [], core)));
+        Assert.True(Build(home, Line(home, "iron_ore", [], core)));
         Assert.True(Build(home, Line(home, "iron_ore", [new { BuildingId = "smelter", RecipeId = "smelt_iron" }], core)));
         Assert.True(Build(home, Line(home, "copper_ore", [], core)));
         RunUntil(() => goal() >= 2, 600);
         Assert.Equal(2, goal());
 
         // Goal 3: lift off the starting scout, which stands on its frame on the home tile.
-        var scoutCore = c.Query("FindBuilding", new { tileId = home, defId = "unit_core" })!;
+        var scoutCore = c.Query("FindBuilding", new { tileId = home, defId = "core" })!;
+        Assert.Equal(scoutCoreId, (int)scoutCore["Id"]!);
         int sx = (int)scoutCore["X"]!, sy = (int)scoutCore["Y"]!;
         Assert.Equal("Ok", (string)c.Query("CheckActivate", new { tileId = home, x = sx, y = sy })!);
         c.Command(new JsonObject { ["type"] = "activate_unit", ["Player"] = 0, ["TileId"] = home, ["X"] = sx, ["Y"] = sy });
@@ -111,8 +118,8 @@ public class JsonDriverTests(ITestOutputHelper output)
         RunUntil(() => (int)c.Query("Tile", new { tileId = coal })!["Owner"]! == 0, 120);
         Assert.Equal(4, goal());
 
-        // Goal 5: coal drill into an export port facing home (wired to the landed scout's unit core); import port and
-        // steel mill at home, belt to the core.
+        // Goal 5: coal drill into an export port facing home, paid from what the landed scout's core brought; import
+        // port and steel mill at home, belt to the base core.
         var spot = c.Query("FindSpot", new { tileId = coal, buildingId = "export_port", zone = home })!;
         Assert.True(Build(coal, [new JsonObject { ["BuildingId"] = "export_port", ["X"] = (int)spot["X"]!, ["Y"] = (int)spot["Y"]!, ["Rotation"] = 0 }]));
         int export = (int)c.Query("FindBuilding", new { tileId = coal, defId = "export_port" })!["Id"]!;
@@ -126,16 +133,17 @@ public class JsonDriverTests(ITestOutputHelper output)
         RunUntil(() => goal() >= 6, 1200);
         Assert.Equal(6, goal());
 
-        // Goal 7: thruster, unit core, thruster on frame, then lift off.
-        var frame = c.Query("FindFrame", new { tileId = home, width = 3, height = 1 })!;
+        // Goal 7: thruster, core, thruster on a 4x2 frame, then lift off.
+        var frame = c.Query("FindFrame", new { tileId = home, width = 4, height = 2 })!;
         int fx = (int)frame["X"]!, fy = (int)frame["Y"]!;
         var unit = new JsonArray(
             new JsonObject { ["BuildingId"] = "thruster", ["X"] = fx, ["Y"] = fy, ["Rotation"] = 0 },
-            new JsonObject { ["BuildingId"] = "unit_core", ["X"] = fx + 1, ["Y"] = fy, ["Rotation"] = 0 },
-            new JsonObject { ["BuildingId"] = "thruster", ["X"] = fx + 2, ["Y"] = fy, ["Rotation"] = 0 });
-        RunUntil(() => (bool)c.Query("CanAfford", new { tileId = home, cost = new Dictionary<string, int> { ["steel"] = 20, ["copper_plate"] = 20 } })!, 1200);
-        for (int x = fx; x < fx + 3; x++)
-            c.Command(new JsonObject { ["type"] = "place_frame", ["Player"] = 0, ["TileId"] = home, ["X"] = x, ["Y"] = fy });
+            new JsonObject { ["BuildingId"] = "core", ["X"] = fx + 1, ["Y"] = fy, ["Rotation"] = 0 },
+            new JsonObject { ["BuildingId"] = "thruster", ["X"] = fx + 3, ["Y"] = fy, ["Rotation"] = 0 });
+        RunUntil(() => (bool)c.Query("CanAfford", new { tileId = home, cost = new Dictionary<string, int> { ["steel"] = 10, ["iron_plate"] = 20, ["iron_ore"] = 26 } })!, 1200);
+        for (int y = fy; y < fy + 2; y++)
+            for (int x = fx; x < fx + 4; x++)
+                c.Command(new JsonObject { ["type"] = "place_frame", ["Player"] = 0, ["TileId"] = home, ["X"] = x, ["Y"] = y });
         Assert.True(Build(home, unit));
         Assert.Equal("Ok", (string)c.Query("CheckActivate", new { tileId = home, x = fx + 1, y = fy })!);
         c.Command(new JsonObject { ["type"] = "activate_unit", ["Player"] = 0, ["TileId"] = home, ["X"] = fx + 1, ["Y"] = fy });

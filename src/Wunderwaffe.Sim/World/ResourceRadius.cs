@@ -6,7 +6,8 @@ namespace Wunderwaffe.Sim.World;
 /// <summary>
 /// The resource radius (FB-018, CB-004), From the Depths style: cores, storage buildings and units with storage share
 /// stock with friendly units and weapons within <see cref="BuildingDef.SupplyRadius"/> cells, with no logistics. A tile
-/// supplier shares its tile's inventory; a unit shares its <see cref="Unit.Cargo"/>. Today it carries ammo; power and
+/// supplier (core or storage) shares its owner's funds on that tile, drawn from their first core there, as payments
+/// are (FB-019, OQ-38); a unit shares its <see cref="Unit.Cargo"/>. Today it carries ammo; power and
 /// fuel join when they exist (silo B), and unit upkeep (silo D) pays through <see cref="SupplierFor"/>.
 /// Outside every radius a unit lives off its cargo.
 /// </summary>
@@ -37,12 +38,12 @@ public static class ResourceRadius
     internal static Inventory? SupplierAt(Simulation sim, int player, long x, long y, int tileId, Unit? except)
     {
         var tile = sim.Tiles[tileId];
-        if (TileSupplies(tile, player, x, y))
-            return tile.Inventory;
+        if (TileSupplier(tile, player, x, y) is { } here)
+            return here;
         foreach (var n in sim.Neighbors(tile))
         {
-            if (TileSupplies(n, player, x, y))
-                return n.Inventory;
+            if (TileSupplier(n, player, x, y) is { } there)
+                return there;
         }
         foreach (var u in sim.Units)
         {
@@ -52,18 +53,19 @@ public static class ResourceRadius
         return null;
     }
 
-    /// <summary>The tile's stock is the owner's, so only an owned tile with a supplier of theirs in reach shares it.</summary>
-    static bool TileSupplies(TileState tile, int player, long x, long y)
+    /// <summary>
+    /// The player's funds on the tile, as the stock of their first core there, if a supplier of theirs (core or
+    /// storage) reaches the point. Null if none reaches, or they have no core on the tile.
+    /// </summary>
+    static Inventory? TileSupplier(TileState tile, int player, long x, long y)
     {
-        if (tile.Owner != player)
-            return false;
         foreach (var b in tile.Grid.Suppliers)
         {
             var (cx, cy) = Centre(tile, b);
             if (b.Owner == player && Within(cx, cy, x, y, b.SupplyRadius))
-                return true;
+                return Funds.Cores(tile, player).FirstOrDefault()?.Stock;
         }
-        return false;
+        return null;
     }
 
     static bool Within(long ax, long ay, long bx, long by, int cells)

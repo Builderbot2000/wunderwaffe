@@ -284,13 +284,13 @@ public static class UnitFactory
         return true;
     }
 
-    /// <summary>A removed factory's items go back to the tile.</summary>
-    internal static void Drain(TileState tile, FactoryState f)
+    /// <summary>A removed factory's items, the block in progress included.</summary>
+    internal static void Drain(FactoryState f, Core.Inventory into)
     {
         foreach (var (id, n) in f.Buffer)
-            tile.Inventory.Add(id, n);
+            into.Add(id, n);
         if (f is { Working: true, Current: { } current })
-            tile.Inventory.Add(current.Cost);
+            into.Add(current.Cost);
     }
 
     /// <summary>Every factory on every tile, in tile then building id order. Runs right after the tile entities.</summary>
@@ -386,7 +386,7 @@ public static class UnitFactory
     {
         var f = factory.Factory!;
         var defs = sim.Content.Buildings;
-        int core = Array.FindIndex(bp.Blocks, b => defs[b.DefId].Kind == BuildingKind.UnitCore);
+        int core = Array.FindIndex(bp.Blocks, b => defs[b.DefId].Kind == BuildingKind.Core);
         if (core >= 0)
         {
             var b = bp.Blocks[core];

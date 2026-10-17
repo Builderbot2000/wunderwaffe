@@ -60,7 +60,7 @@ public class FactoryTests
         var seen = new List<int>();
         for (int i = 0; i < 3000 && sim.Units.Count == 0; i++)
         {
-            int placed = tile.Grid.FrameCount * 10 + tile.Grid.Buildings.Count(b => b.X >= 14);
+            int placed = tile.Grid.FrameCount * 10 + tile.Grid.Buildings.Count(b => b.X >= 14 && b.DefId != "bank");
             if (seen.Count == 0 || seen[^1] != placed)
                 seen.Add(placed);
             sim.Step();
@@ -190,12 +190,12 @@ public class FactoryTests
         long held = f.Buffer.Values.Sum() + (f.Working ? f.Current!.Value.Cost.Values.Sum() : 0);
         Assert.True(held > 0);
 
-        long before = tile.Inventory.Entries.Sum(kv => kv.Value);
+        long before = Funds.Total(tile, Me).Sum(kv => kv.Value);
         long refund = sim.Content.Buildings["unit_factory"].Cost.Values.Sum();
         sim.Enqueue(new RemoveBuildingCommand(Me, tile.Id, 11, 11));
         sim.Step();
         // Drills keep feeding the belt in the meantime, so compare at least.
-        Assert.True(tile.Inventory.Entries.Sum(kv => kv.Value) >= before + refund + held);
+        Assert.True(Funds.Total(tile, Me).Sum(kv => kv.Value) >= before + refund + held);
     }
 
     [Fact]

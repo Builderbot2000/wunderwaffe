@@ -182,17 +182,14 @@ public static class Combat
 
     /// <summary>
     /// Deconstructs the wreck on a cell (CB-006), like removing a building: anyone with presence on the tile may, and
-    /// <see cref="Balance.WreckRefundPercent"/> of its cost goes where <see cref="Territory.RefundTo"/> says, or is lost.
+    /// <see cref="Balance.WreckRefundPercent"/> of its cost goes to the player's nearest core there, or is lost.
     /// </summary>
     internal static bool ClearWreck(Simulation sim, TileState tile, int player, int x, int y)
     {
         if (!Territory.HasPresence(sim, player, tile) || tile.Grid.WreckAt(x, y) is not { } w)
             return false;
         tile.Grid.RemoveWreck(w);
-        if (Territory.RefundTo(sim, tile, player) is not { } to)
-            return true;
-        foreach (var (id, n) in sim.Content.Buildings[w.DefId].Cost)
-            to.Inventory.Add(id, (long)n * Balance.WreckRefundPercent / 100);
+        Funds.Refund(tile, player, w.X, w.Y, w.Width, w.Height, sim.Content.Buildings[w.DefId].Cost, Balance.WreckRefundPercent);
         return true;
     }
 
@@ -502,7 +499,7 @@ public static class Combat
     /// <summary>
     /// Each repair block heals friendly damaged buildings and unit blocks in reach, nearest cells first, and revives a
     /// friendly unit's destroyed blocks for their full cost. It pays <see cref="RepairDef.Cost"/> per
-    /// <see cref="RepairDef.Per"/> hit points from its tile's inventory (on a unit: cargo, then the resource radius).
+    /// <see cref="RepairDef.Per"/> hit points from its owner's cores on its tile (on a unit: cargo, then the resource radius).
     /// </summary>
     static void Repair(Simulation sim)
     {
@@ -513,7 +510,8 @@ public static class Combat
                 if (sim.Content.Buildings[b.DefId].Repair is { } r && tile.Owner == b.Owner && CombatPower.Has(tile, b))
                 {
                     var (x, y) = ResourceRadius.Centre(tile, b);
-                    Heal(sim, r, b.Combat!, b.Owner, x, y, tile.Inventory, null);
+                    var owner = b.Owner;
+                    Heal(sim, r, b.Combat!, owner, x, y, cost => Funds.TryPay(tile, owner, cost));
                 }
             }
         }
@@ -524,13 +522,15 @@ public static class Combat
                 if (u.Blocks[i].Hp > 0 && sim.Content.Buildings[u.Blocks[i].DefId].Repair is { } r)
                 {
                     var (x, y) = BlockWorld(u, u.Blocks[i]);
-                    Heal(sim, r, u.BlockCombat[i]!, u.Owner, x, y, u.Cargo, ResourceRadius.SupplierFor(sim, u));
+                    var spare = ResourceRadius.SupplierFor(sim, u);
+                    Heal(sim, r, u.BlockCombat[i]!, u.Owner, x, y, cost => u.Cargo.TryTake(cost) || spare?.TryTake(cost) == true);
                 }
             }
         }
     }
 
-    static void Heal(Simulation sim, RepairDef r, CombatState state, int owner, long x, long y, Inventory pay, Inventory? spare)
+    /// <param name="pay">Pays a cost (a repair batch or a block to revive), all or nothing; false if it can't.</param>
+    static void Heal(Simulation sim, RepairDef r, CombatState state, int owner, long x, long y, Func<IReadOnlyDictionary<string, int>, bool> pay)
     {
         int budget = r.Rate * RepairTicks / Simulation.TicksPerSecond;
         long reach = (long)r.Radius * S;
@@ -538,7 +538,7 @@ public static class Combat
         // Pays for up to `hp` hit points from prepaid credit, buying more as needed; returns what it could cover.
         int Afford(int hp)
         {
-            while (state.RepairDebt < hp && (pay.TryTake(r.Cost) || (spare != null && spare.TryTake(r.Cost))))
+            while (state.RepairDebt < hp && pay(r.Cost))
                 state.RepairDebt += r.Per;
             int got = Math.Min(hp, state.RepairDebt);
             state.RepairDebt -= got;
@@ -588,7 +588,7 @@ public static class Combat
                 if (blk.Hp <= 0)
                 {
                     // Rebuilding a destroyed block costs the block itself.
-                    if (!pay.TryTake(def.Cost) && (spare == null || !spare.TryTake(def.Cost)))
+                    if (!pay(def.Cost))
                         continue;
                     blk.Hp = 1;
                     revived = true;

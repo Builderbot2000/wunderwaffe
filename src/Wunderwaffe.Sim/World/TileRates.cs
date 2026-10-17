@@ -3,7 +3,7 @@ namespace Wunderwaffe.Sim.World;
 /// <summary>Where a rate-mode flow of items goes (FB-012).</summary>
 public enum FlowKind
 {
-    /// <summary>Into the tile core, so into the tile inventory.</summary>
+    /// <summary>Into one core (<see cref="Flow.PortId"/>), so into its owner's funds on the tile (FB-019).</summary>
     Core,
 
     /// <summary>Made by the tile's machines; counts toward the owner's goals, like the full sim's batches.</summary>
@@ -21,7 +21,8 @@ public enum FlowKind
 
 /// <summary>
 /// One steady-state item flow of a tile, in items per tick times <see cref="RateModel.One"/>.
-/// <paramref name="PortId"/> is the export port's building id for <see cref="FlowKind.Export"/>, else 0.
+/// <paramref name="PortId"/> is the export port's building id for <see cref="FlowKind.Export"/>, the core's for
+/// <see cref="FlowKind.Core"/> (so per player per core), else 0.
 /// </summary>
 public readonly record struct Flow(FlowKind Kind, int PortId, string Item, long Rate) : IComparable<Flow>
 {

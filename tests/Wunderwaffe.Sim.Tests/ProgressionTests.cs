@@ -21,7 +21,7 @@ public class ProgressionTests
 
     const string Buildings = """
         [
-          { "id": "core", "name": "Core", "menu": "production", "kind": "core", "width": 1, "height": 1, "power": 0, "hp": 100, "cost": {} },
+          { "id": "core", "name": "Core", "menu": "production", "kind": "core", "width": 1, "height": 1, "power": 0, "capacity": 100, "hp": 100, "cost": { "ore": 1 } },
           { "id": "drill", "name": "Drill", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
           { "id": "furnace", "name": "Furnace", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
           { "id": "wall", "name": "Wall", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} }
@@ -65,7 +65,7 @@ public class ProgressionTests
         var theirs = sim.AddTile(1, 0, Them, size: 10);
         theirs.Grid.SetDeposit(0, 0, "ore");
         sim.Enqueue(new PlaceBuildingCommand(Them, theirs.Id, "drill", 0, 0));
-        sim.Enqueue(new PlaceBuildingCommand(Them, theirs.Id, "core", 1, 0));
+        sim.AddCore(theirs, Them, 1, 0);
         Run(sim, 40);
         Assert.Equal(0, sim.PlayerOrNull(Me)?.ProducedOf("ore") ?? 0);
         Assert.True(sim.PlayerOrNull(Them)!.ProducedOf("ore") >= 3);
@@ -83,7 +83,7 @@ public class ProgressionTests
         Assert.Equal(0, Progression.Progress(sim, Me, Progression.CurrentGoal(sim, Me)!.Condition));
 
         sim.Enqueue(new PlaceBuildingCommand(Me, tile.Id, "drill", 0, 0));
-        sim.Enqueue(new PlaceBuildingCommand(Me, tile.Id, "core", 1, 0));
+        sim.AddCore(tile, Me, 1, 0);
         Run(sim, 30);
         Assert.Equal(2, me.GoalsDone);
         Assert.Null(Progression.CurrentGoal(sim, Me));
@@ -102,7 +102,7 @@ public class ProgressionTests
         Place(sim, a, "export_port", 29, 10, 0);
         Place(sim, b, "import_port", 0, 10, 2);
         Belt(sim, b, 1, 10, 3);
-        Place(sim, b, "core", 4, 9);
+        Place(sim, b, "core_large", 4, 9);
         Run(sim, 60 * 20);
         long shipped = sim.PlayerOrNull(Me)!.Shipped;
         Assert.True(shipped >= 5, $"shipped {shipped}");

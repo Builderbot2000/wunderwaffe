@@ -87,7 +87,7 @@ public partial class Hud
             var tool = BuildTool.Tools[i];
             var b = _toolButtons[i];
             b.SetPressedNoSignal(i == BuildTool.SelectedIndex);
-            bool afford = tile.Inventory.Has(ToolCost(tool));
+            bool afford = Funds.CanPay(tile, Me, ToolCost(tool));
             b.Modulate = afford ? Colors.White : new Color(1f, 0.55f, 0.55f, 0.6f);
             b.TooltipText = ToolTooltip(tool);
         }
@@ -130,9 +130,9 @@ public partial class Hud
             case PlaceResult.Ok:
                 return "click or drag to place";
             case PlaceResult.CannotAfford:
-                var missing = ToolCost(tool).Where(kv => tile.Inventory.Get(kv.Key) < kv.Value)
-                    .Select(kv => $"{kv.Value - tile.Inventory.Get(kv.Key)} more {GameText.ItemName(Content, kv.Key)}");
-                return "needs " + string.Join(", ", missing);
+                var missing = ToolCost(tool).Where(kv => Funds.Available(tile, Me, kv.Key) < kv.Value)
+                    .Select(kv => $"{kv.Value - Funds.Available(tile, Me, kv.Key)} more {GameText.ItemName(Content, kv.Key)}");
+                return "needs " + string.Join(", ", missing) + " in your cores here";
             case PlaceResult.NeedsDeposit:
                 return "must sit on an ore deposit";
             case PlaceResult.Blocked:

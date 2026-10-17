@@ -19,18 +19,13 @@ public class TerritoryTests
     }
 
     /// <summary>
-    /// Puts a building of <paramref name="player"/> on a tile they don't hold, standing in for a unit having landed there
-    /// first: the tile is lent to them for the placement.
+    /// Puts a building of <paramref name="player"/> straight onto a tile, unpaid, standing in for a unit having landed
+    /// there first.
     /// </summary>
     static void Plant(Simulation sim, TileState tile, int player, string building, int x, int y)
     {
-        int owner = tile.Owner;
-        tile.Owner = player;
-        tile.Inventory.Add(sim.Content.Buildings[building].Cost);
-        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, building, x, y));
-        sim.Step();
-        tile.Owner = owner;
-        Assert.Equal(player, tile.Grid.BuildingAt(x, y)?.Owner);
+        var def = sim.Content.Buildings[building];
+        tile.Grid.Add(def, player, x, y, def.Width, def.Height, 0, null);
     }
 
     static int Capture(Simulation sim) => Expansion.CaptureTicks(sim);
@@ -40,23 +35,114 @@ public class TerritoryTests
     [Fact]
     public void BuildingNeedsABuildingOrUnitOnTheTile()
     {
-        var (sim, home, east) = TwoTiles();
+        var (sim, _, east) = TwoTiles();
         Assert.Equal(PlaceResult.NoPresence, Placement.Check(sim, east, Me, "conveyor", 0, 0, 0, null, out _));
-
         Plant(sim, east, Me, "conveyor", 0, 0);
-        Assert.Equal(PlaceResult.Ok, Placement.Check(sim, east, Me, "conveyor", 1, 0, 0, null, out var plan));
-        // East has no stock of its own (and isn't mine), so my neighbouring home tile pays.
-        Assert.Same(home, plan.Payer);
-        long copper = Items(home, "copper_ore");
+        Assert.NotEqual(PlaceResult.NoPresence, Placement.Check(sim, east, Me, "conveyor", 1, 0, 0, null, out _));
+    }
+
+    [Fact]
+    public void ANeighboursStockNeverPaysOnlyCoresOnTheTileDo()
+    {
+        // FB-019: home is mine and stocked, but east is paid only from my cores standing on east.
+        var (sim, home, east) = TwoTiles();
+        Plant(sim, east, Me, "conveyor", 0, 0);
+        long homeCopper = Items(home, "copper_ore");
+        Assert.Equal(PlaceResult.CannotAfford, Placement.Check(sim, east, Me, "conveyor", 1, 0, 0, null, out _));
         Place(sim, east, "conveyor", 1, 0);
         sim.Step();
-        Assert.Equal(copper - 1, Items(home, "copper_ore"));
-        Assert.Equal(0, Items(east, "copper_ore"));
+        Assert.Null(east.Grid.BuildingAt(1, 0));
 
-        // Removing my own building there refunds home.
+        // Their core there doesn't pay for me either.
+        Stock(sim.AddCore(east, Them, 10, 10), "copper_ore", 50);
+        Assert.Equal(PlaceResult.CannotAfford, Placement.Check(sim, east, Me, "conveyor", 1, 0, 0, null, out _));
+
+        var mine = sim.AddCore(east, Me, 20, 20);
+        Stock(mine, "copper_ore", 5);
+        Place(sim, east, "conveyor", 1, 0);
+        sim.Step();
+        Assert.Equal("conveyor", east.Grid.BuildingAt(1, 0)?.DefId);
+        Assert.Equal(4, mine.Stock!.Get("copper_ore"));
+        Assert.Equal(homeCopper, Items(home, "copper_ore"));
+
+        // Removing it refunds my core on east, not home.
         sim.Enqueue(new RemoveBuildingCommand(Me, east.Id, 1, 0));
         sim.Step();
-        Assert.Equal(copper, Items(home, "copper_ore"));
+        Assert.Equal(5, mine.Stock!.Get("copper_ore"));
+        Assert.Equal(homeCopper, Items(home, "copper_ore"));
+    }
+
+    [Fact]
+    public void CoresPayInIdOrderAllOrNothing()
+    {
+        // OQ-38: the lowest-id core pays first, each item topped up from the next; a cost the cores can't cover
+        // together takes nothing.
+        var sim = NewSim();
+        var tile = sim.AddTile(0, 0, Me, Size);
+        var first = sim.AddCore(tile, Me, 20, 20);
+        var second = sim.AddCore(tile, Me, 24, 20);
+        Stock(first, "copper_ore", 15);
+        Stock(second, "copper_ore", 20);
+        Stock(second, "iron_ore", 30);
+        // A smelter costs 20 copper ore and 10 iron ore.
+        Place(sim, tile, "smelter", 2, 2, recipe: "smelt_iron");
+        sim.Step();
+        Assert.Equal("smelter", tile.Grid.BuildingAt(2, 2)?.DefId);
+        Assert.Equal(0, first.Stock!.Get("copper_ore"));
+        Assert.Equal((15L, 20L), (second.Stock!.Get("copper_ore"), second.Stock.Get("iron_ore")));
+
+        // 15 copper ore left in all: a second smelter is refused and nothing is taken.
+        Assert.Equal(PlaceResult.CannotAfford, Placement.Check(sim, tile, Me, "smelter", 5, 5, 0, "smelt_iron", out _));
+        Place(sim, tile, "smelter", 5, 5, recipe: "smelt_iron");
+        sim.Step();
+        Assert.Null(tile.Grid.BuildingAt(5, 5));
+        Assert.Equal((15L, 20L), (second.Stock!.Get("copper_ore"), second.Stock.Get("iron_ore")));
+    }
+
+    [Fact]
+    public void RefundsGoToTheNearestCoreOrAreLost()
+    {
+        // OQ-39: a removed building's refund and held items go to its owner's nearest core on the tile.
+        var sim = NewSim();
+        var tile = sim.AddTile(0, 0, Me, Size);
+        var west = sim.AddCore(tile, Me, 0, 10);
+        var east = sim.AddCore(tile, Me, 26, 10);
+        Stock(west, "copper_ore", 100);
+        Place(sim, tile, "conveyor", 22, 10);
+        sim.Step();
+        Assert.Equal(99, west.Stock!.Get("copper_ore"));
+        sim.Enqueue(new RemoveBuildingCommand(Me, tile.Id, 22, 10));
+        sim.Step();
+        Assert.Equal((99L, 1L), (west.Stock!.Get("copper_ore"), east.Stock!.Get("copper_ore")));
+
+        // With no core of mine on the tile, removal still works and the refund is lost.
+        var bare = sim.AddTile(1, 0, Me, Size);
+        Plant(sim, bare, Me, "conveyor", 3, 3);
+        sim.Enqueue(new RemoveBuildingCommand(Me, bare.Id, 3, 3));
+        sim.Step();
+        Assert.Null(bare.Grid.BuildingAt(3, 3));
+        Assert.Empty(bare.Grid.Cores);
+    }
+
+    [Fact]
+    public void AFullCoreRefusesDeliveriesAndTheBeltBacksUp()
+    {
+        // OQ-39: capacity is per item; a full core takes no more of that item, so the belt into it fills.
+        var sim = NewSim();
+        var tile = Tile(sim, 0, 0, Size);
+        var core = sim.AddCore(tile, Me, 10, 10);
+        int cap = core.Def.Capacity;
+        Stock(core, "copper_ore", cap - 3);
+        Ore(tile, "copper_ore", 2, 10);
+        Place(sim, tile, "drill", 2, 10);
+        Belt(sim, tile, 4, 10, 6);
+        Run(sim, 60 * 60);
+        Assert.Equal(cap, core.Stock!.Get("copper_ore"));
+        var belt = tile.Grid.BuildingAt(9, 10)!.Belt!;
+        Assert.Equal(BeltState.Capacity, belt.Count);
+
+        // Iron ore is counted apart: there is still room for it.
+        Assert.True(Funds.Accepts(core, "iron_ore"));
     }
 
     [Fact]
@@ -77,7 +163,7 @@ public class TerritoryTests
         east.Owner = Them;
         int cx = east.CircleX, cy = east.CircleY;
         Plant(sim, east, Them, "conveyor", cx, cy);
-        Plant(sim, east, Me, "conveyor", 0, 0); // my foothold, outside the circle
+        Bank(sim, east, Me, 0, 2); // my foothold and funds, outside the circle
 
         Assert.Equal(PlaceResult.EnemyCircle, Placement.Check(sim, east, Me, "conveyor", cx + 2, cy, 0, null, out _));
         Assert.Equal(PlaceResult.Ok, Placement.Check(sim, east, Me, "conveyor", 1, 0, 0, null, out _));
@@ -102,11 +188,10 @@ public class TerritoryTests
         Run(sim, 60);
         Plant(sim, east, Them, "conveyor", cx + 1, cy);       // a rival in the circle, a second behind
         Plant(sim, east, Them, "conveyor", 0, 0);             // and one outside it
-        // A tile lent for planting is its planter's, which pauses their timer for that tick.
-        Assert.Equal(62, Expansion.Progress(east, Me));
+        Assert.Equal(60, Expansion.Progress(east, Me));
         Assert.Equal(0, Expansion.Progress(east, Them));
 
-        Run(sim, Capture(sim) - 63);
+        Run(sim, Capture(sim) - 61);
         Assert.Equal(TileState.Unowned, east.Owner);
         sim.Step();
         Assert.Equal(Me, east.Owner);
@@ -159,7 +244,7 @@ public class TerritoryTests
         var home = sim.AddTile(0, 0, size: Size);
         var east = sim.AddTile(1, 0, size: Size);
         sim.SettleStartingTile(home, Me);
-        var core = home.Grid.Buildings.Single(b => b.DefId == "unit_core");
+        var core = home.Grid.Cores.Single();
         Assert.Equal(PlaceResult.NoPresence, Placement.Check(sim, east, Me, "conveyor", 0, 0, 0, null, out _));
 
         sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
@@ -178,6 +263,10 @@ public class TerritoryTests
         Run(sim, Capture(sim) + 1);
         Assert.Equal(Me, east.Owner);
         Assert.Equal(3, east.Grid.BuildingCount);
+        // The starting items came along in the core and pay for building here now (FB-019).
+        Assert.Equal(Balance.StartingItems["copper_ore"], Items(east, "copper_ore"));
+        Assert.Equal(0, Items(home, "copper_ore"));
+        Assert.Equal(PlaceResult.Ok, Placement.Check(sim, east, Me, "conveyor", 0, 0, 0, null, out _));
     }
 
     [Fact]
@@ -238,25 +327,47 @@ public class TerritoryTests
     public void CoresAreBuildableAndOnlyTheLastOneStays()
     {
         var sim = NewSim();
-        var home = Tile(sim, 0, 0, Size);
-        Place(sim, home, "core", 2, 2);
-        Place(sim, home, "core", 10, 2);
+        var home = Tile(sim, 0, 0, Size); // its bank core is the first
+        Place(sim, home, "core_large", 2, 2);
         sim.Step();
         Assert.Equal(2, sim.CoreCount(Me));
 
+        // Nothing is free: a core costs its variant's cost (OQ-37). Removing one hands its stock and refund to the
+        // nearest core left.
+        long copper = Items(home, "copper_ore");
         sim.Enqueue(new RemoveBuildingCommand(Me, home.Id, 2, 2));
         sim.Step();
         Assert.Equal(1, sim.CoreCount(Me));
-        sim.Enqueue(new RemoveBuildingCommand(Me, home.Id, 10, 2));
+        Assert.True(Items(home, "iron_plate") > 0);
+        Assert.Equal(copper, Items(home, "copper_ore"));
+        sim.Enqueue(new RemoveBuildingCommand(Me, home.Id, Size - 1, Size - 1));
         sim.Step();
         Assert.Equal(1, sim.CoreCount(Me));
 
-        // Destruction takes the last one too (combat's job; a debug command until then).
-        long copper = Items(home, "copper_ore");
-        sim.Enqueue(new DebugDestroyCommand(Me, home.Id, 10, 2));
+        // Destruction takes the last one too, and its items are lost (OQ-39).
+        sim.Enqueue(new DebugDestroyCommand(Me, home.Id, Size - 1, Size - 1));
         sim.Step();
         Assert.Equal(0, sim.CoreCount(Me));
-        Assert.Equal(copper, Items(home, "copper_ore")); // no refund
+        Assert.Equal(0, Items(home, "copper_ore"));
+    }
+
+    [Fact]
+    public void APlayerWithOnlyACoreOnAUnitIsStillInTheMatch()
+    {
+        // WM-016: elimination counts cores on units too.
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default with { Players = 2 });
+        var home = sim.Tiles[sim.StartTileId];
+        var core = home.Grid.Cores.Single(c => c.Owner == Me);
+        sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
+        Run(sim, Victory.CheckEvery * 2);
+        Assert.Single(sim.Units, u => u.Owner == Me);
+        Assert.Equal(1, sim.CoreCount(Me));
+        Assert.True(Victory.HasCore(sim, Me));
+        Assert.False(Victory.IsEliminated(sim, Me));
+
+        Combat.DestroyUnit(sim, sim.Units.Single(u => u.Owner == Me));
+        Run(sim, Victory.CheckEvery * 2);
+        Assert.True(Victory.IsEliminated(sim, Me));
     }
 
     [Fact]
@@ -287,8 +398,8 @@ public class TerritoryTests
                         && content.TerrainList[g.TerrainAt(x + 1, y)] is { Water: true, Buildable: false })
                     {
                         t.Owner = Me;
-                        t.Inventory.Add("copper_ore", 1000);
-                        t.Inventory.Add("iron_ore", 1000);
+                        Fund(sim, t).Stock!.Add("copper_ore", 1000);
+                        Fund(sim, t).Stock!.Add("iron_ore", 1000);
                         return (sim, t, x, y);
                     }
                 }
@@ -410,7 +521,7 @@ public class TerritoryTests
         var east = sim.AddTile(1, 0, size: Size);
         var north = sim.AddTile(1, 1, size: Size);
         sim.SettleStartingTile(home, Me);
-        var core = home.Grid.Buildings.Single(b => b.DefId == "unit_core");
+        var core = home.Grid.Cores.Single();
         sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
         sim.Step();
         var scout = Assert.Single(sim.Units);
@@ -425,7 +536,7 @@ public class TerritoryTests
         Assert.Empty(sim.Units);
         Assert.Equal(TileState.Unowned, east.Owner);
 
-        var landed = east.Grid.Buildings.Single(b => b.DefId == "unit_core");
+        var landed = east.Grid.Cores.Single();
         Assert.Equal(AssembleResult.Ok, UnitAssembly.CheckActivate(sim, east, Me, landed.X, landed.Y, out _));
         Assert.Equal(AssembleResult.NotOwner, UnitAssembly.CheckActivate(sim, east, Them, landed.X, landed.Y, out _));
         sim.Enqueue(new ActivateUnitCommand(Me, east.Id, landed.X, landed.Y));
@@ -439,36 +550,43 @@ public class TerritoryTests
     }
 
     [Fact]
-    public void FramesOnATileYouDontOwnArePaidAndRefundedNextDoor()
+    public void FramesOnATileYouDontOwnArePaidFromYourCoresThere()
     {
         var (sim, home, east) = TwoTiles();
         Plant(sim, east, Me, "conveyor", 2, 2);
-        long iron = home.Inventory.Get("iron_ore");
+        long iron = Items(home, "iron_ore");
         Assert.Equal(PlaceResult.NoPresence, UnitAssembly.CheckFrame(sim, east, Them, 5, 5));
+        Assert.Equal(PlaceResult.CannotAfford, UnitAssembly.CheckFrame(sim, east, Me, 5, 5));
+        var mine = sim.AddCore(east, Me, 20, 20);
+        Stock(mine, "iron_ore", 10);
         Assert.Equal(PlaceResult.Ok, UnitAssembly.CheckFrame(sim, east, Me, 5, 5));
         sim.Enqueue(new PlaceFrameCommand(Me, east.Id, 5, 5));
         sim.Step();
         Assert.True(east.Grid.HasFrame(5, 5));
-        Assert.True(home.Inventory.Get("iron_ore") < iron);
-        Assert.True(east.Inventory.Get("iron_ore") == 0);
+        Assert.Equal(10 - Balance.FrameCost["iron_ore"], mine.Stock!.Get("iron_ore"));
         sim.Enqueue(new RemoveFrameCommand(Me, east.Id, 5, 5));
         sim.Step();
         Assert.False(east.Grid.HasFrame(5, 5));
-        Assert.Equal(iron, home.Inventory.Get("iron_ore"));
+        Assert.Equal(10, mine.Stock!.Get("iron_ore"));
+        Assert.Equal(iron, Items(home, "iron_ore"));
     }
 
     [Fact]
-    public void ABlueprintOnATileYouDontOwnIsPaidNextDoor()
+    public void ABlueprintOnATileYouDontOwnIsPaidFromYourCoresThere()
     {
         var (sim, home, east) = TwoTiles();
         Plant(sim, east, Me, "conveyor", 2, 2);
-        long copper = home.Inventory.Get("copper_ore");
+        long copper = Items(home, "copper_ore");
         var belts = new Blueprint([new BlueprintBlock("conveyor", 0, 0, 0), new BlueprintBlock("conveyor", 1, 0, 0)], []);
+        Assert.Equal(BlueprintResult.CannotAfford, Blueprints.Check(sim, east, Me, belts, 5, 5, 0, false, out _));
+        var mine = sim.AddCore(east, Me, 20, 20);
+        Stock(mine, "copper_ore", 10);
         Assert.Equal(BlueprintResult.Ok, Blueprints.Check(sim, east, Me, belts, 5, 5, 0, false, out var plan));
         sim.Enqueue(new PlaceBlueprintCommand(Me, east.Id, belts, 5, 5));
         sim.Step();
         Assert.Equal(3, east.Grid.Buildings.Count(b => b.DefId == "conveyor"));
-        Assert.Equal(copper - plan.Cost["copper_ore"], home.Inventory.Get("copper_ore"));
+        Assert.Equal(10 - plan.Cost["copper_ore"], mine.Stock!.Get("copper_ore"));
+        Assert.Equal(copper, Items(home, "copper_ore"));
         Assert.Equal(BlueprintResult.Blocked, Blueprints.Check(sim, east, Them, belts, 8, 8, 0, false, out _));
     }
 
@@ -478,7 +596,7 @@ public class TerritoryTests
         // D's UD-003 power rule and E's UD-004 locomotion rule: thrusters only, no power draw.
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         var home = sim.Tiles[sim.StartTileId];
-        var core = home.Grid.Buildings.Single(b => b.DefId == "unit_core");
+        var core = home.Grid.Cores.Single();
         Assert.Equal(AssembleResult.Ok, UnitAssembly.CheckActivate(sim, home, Me, core.X, core.Y, out _));
         sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
         sim.Step();
@@ -494,7 +612,7 @@ public class TerritoryTests
         {
             var sim = Simulation.NewGame(content, GameSetup.Default with { Seed = seed });
             var home = sim.Tiles[sim.StartTileId];
-            var core = home.Grid.Buildings.Single(b => b.DefId == "unit_core");
+            var core = home.Grid.Cores.Single();
             sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
             sim.Step();
             var scout = Assert.Single(sim.Units);

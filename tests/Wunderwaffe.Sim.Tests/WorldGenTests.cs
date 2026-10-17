@@ -206,10 +206,12 @@ public class WorldGenTests
         var home = sim.Tiles[sim.StartTileId];
         Assert.True(home.Grid.BuildableCount * 100 >= home.Grid.Area * 60);
         Assert.True(sim.Neighbors(home).Count(n => n.Grid.BuildableCount * 100 >= n.Grid.Area * 30) >= 2);
+        // WM-005: no free core, but a landed starting unit whose core stands in the circle and holds the starting items.
         var core = Assert.Single(home.Grid.Buildings, b => b.DefId == "core");
         Assert.True(home.InCircle(core.X + 1, core.Y + 1), "the core stands in the start's victory circle");
-        // And the scout for the first foothold elsewhere (WM-015).
-        Assert.Equal(["thruster", "unit_core", "thruster"], home.Grid.Buildings.Where(b => b.DefId != "core").Select(b => b.DefId));
+        Assert.True(home.Grid.HasFrame(core.X, core.Y));
+        Assert.Equal(Balance.StartingItems["iron_ore"], core.Stock!.Get("iron_ore"));
+        Assert.Equal(["thruster", "core", "thruster"], home.Grid.Buildings.Select(b => b.DefId));
     }
 
     [Theory]

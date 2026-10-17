@@ -29,7 +29,7 @@ public class RateModeTests(ITestOutputHelper output)
         var sim = RateSim();
         var home = Tile(sim, 0, 0);
         var east = Tile(sim, 1, 0);
-        Place(sim, home, "core", 12, 12);
+        Place(sim, home, "core_large", 12, 12);
 
         // Copper drill -> belt -> core (row 13).
         Ore(home, "copper_ore", 2, 12);
@@ -66,7 +66,7 @@ public class RateModeTests(ITestOutputHelper output)
         return (sim, home, east);
     }
 
-    static Dictionary<string, long> Stock(TileState t) => t.Inventory.Entries.ToDictionary(kv => kv.Key, kv => kv.Value);
+    static Dictionary<string, long> Stock(TileState t) => Funds.Total(t, Me).ToDictionary(kv => kv.Key, kv => kv.Value);
 
     static Dictionary<string, long> Delta(Dictionary<string, long> before, Dictionary<string, long> after) =>
         after.Keys.Union(before.Keys).ToDictionary(k => k, k => after.GetValueOrDefault(k) - before.GetValueOrDefault(k));
@@ -120,7 +120,7 @@ public class RateModeTests(ITestOutputHelper output)
         // lower than the belts'.
         var sim = RateSim();
         var t = Tile(sim, 0, 0);
-        Place(sim, t, "core", 12, 12);
+        Place(sim, t, "core_large", 12, 12);
         for (int y = 8; y <= 10; y += 2)
         {
             Ore(t, "iron_ore", 5, y);
@@ -131,8 +131,8 @@ public class RateModeTests(ITestOutputHelper output)
         Belt(sim, t, 9, 13, 3);                                     // ...then east (9..11, 13) into the core.
         sim.Step();
         var rates = RateMode.RatesOf(sim, t);
-        Assert.True(rates.RateOf(FlowKind.Core, "iron_plate") > 0);
-        Assert.Equal(rates.Total(FlowKind.Produced, "iron_plate"), rates.RateOf(FlowKind.Core, "iron_plate"));
+        Assert.True(rates.Total(FlowKind.Core, "iron_plate") > 0);
+        Assert.Equal(rates.Total(FlowKind.Produced, "iron_plate"), rates.Total(FlowKind.Core, "iron_plate"));
     }
 
     [Fact]
@@ -142,17 +142,17 @@ public class RateModeTests(ITestOutputHelper output)
         var (sim, home, east) = Factory();
         var rates = RateMode.RatesOf(sim, home);
         long perDrill = RateModel.One / 60;
-        Assert.InRange(rates.RateOf(FlowKind.Core, "copper_ore"), perDrill - 2, perDrill);
-        Assert.InRange(rates.RateOf(FlowKind.Core, "iron_plate"), perDrill / 2 - 2, perDrill / 2);
-        Assert.InRange(rates.RateOf(FlowKind.Core, "copper_plate"), perDrill / 2 - 2, perDrill / 2);
-        Assert.InRange(rates.RateOf(FlowKind.Core, "iron_ore"), 2 * perDrill - 4, 2 * perDrill);
-        Assert.Equal(rates.RateOf(FlowKind.Draw, "iron_ore"), rates.RateOf(FlowKind.Core, "iron_ore"));
-        Assert.Equal(rates.RateOf(FlowKind.Core, "iron_ore"), RateMode.RatesOf(sim, east).Total(FlowKind.Export, "iron_ore"));
+        Assert.InRange(rates.Total(FlowKind.Core, "copper_ore"), perDrill - 2, perDrill);
+        Assert.InRange(rates.Total(FlowKind.Core, "iron_plate"), perDrill / 2 - 2, perDrill / 2);
+        Assert.InRange(rates.Total(FlowKind.Core, "copper_plate"), perDrill / 2 - 2, perDrill / 2);
+        Assert.InRange(rates.Total(FlowKind.Core, "iron_ore"), 2 * perDrill - 4, 2 * perDrill);
+        Assert.Equal(rates.RateOf(FlowKind.Draw, "iron_ore"), rates.Total(FlowKind.Core, "iron_ore"));
+        Assert.Equal(rates.Total(FlowKind.Core, "iron_ore"), RateMode.RatesOf(sim, east).Total(FlowKind.Export, "iron_ore"));
 
         // A belt is the bottleneck: sixteen drills on one belt deliver its 1/8 item per tick, not 16/60.
         var busy = RateSim();
         var t = Tile(busy, 0, 0);
-        Place(busy, t, "core", 25, 0);
+        Place(busy, t, "core_large", 25, 0);
         Belt(busy, t, 0, 2, 25);                         // (0..24, 2) into the core's west side.
         for (int i = 0; i < 8; i++)
         {
@@ -162,7 +162,7 @@ public class RateModeTests(ITestOutputHelper output)
             Place(busy, t, "drill", i * 3, 3);
         }
         busy.Step();
-        Assert.InRange(RateMode.RatesOf(busy, t).RateOf(FlowKind.Core, "iron_ore"), RateModel.One / 8 - 16, RateModel.One / 8);
+        Assert.InRange(RateMode.RatesOf(busy, t).Total(FlowKind.Core, "iron_ore"), RateModel.One / 8 - 16, RateModel.One / 8);
     }
 
     [Fact]
@@ -193,7 +193,7 @@ public class RateModeTests(ITestOutputHelper output)
         long Weight(string item) => item.EndsWith("_plate") ? 2 : item.EndsWith("_ore") ? 1 : 0;
         foreach (var t in sim.Tiles)
         {
-            n += t.Inventory.Entries.Sum(kv => Weight(kv.Key) * kv.Value);
+            n += Funds.Total(t, Me).Sum(kv => Weight(kv.Key) * kv.Value);
             foreach (var b in t.Grid.Buildings)
             {
                 if (b.Belt is { } belt)
@@ -239,16 +239,16 @@ public class RateModeTests(ITestOutputHelper output)
         // FB-014: when imports fall short, output scales down, and the shortfall propagates; restoring recovers it.
         var (sim, home, east) = Factory();
         Run(sim, Minute);
-        Assert.True(RateMode.RatesOf(sim, home).RateOf(FlowKind.Core, "iron_ore") > 0);
+        Assert.True(RateMode.RatesOf(sim, home).Total(FlowKind.Core, "iron_ore") > 0);
 
         // East loses its drills: home's import dries up within a tick, the rest of home is untouched.
         sim.Enqueue(new RemoveBuildingCommand(Me, east.Id, 10, 9));
         sim.Enqueue(new RemoveBuildingCommand(Me, east.Id, 7, 11));
         sim.Step();
         var cut = RateMode.RatesOf(sim, home);
-        Assert.Equal(0, cut.RateOf(FlowKind.Core, "iron_ore"));
+        Assert.Equal(0, cut.Total(FlowKind.Core, "iron_ore"));
         Assert.Equal(0, cut.RateOf(FlowKind.Draw, "iron_ore"));
-        Assert.True(cut.RateOf(FlowKind.Core, "copper_ore") > 0);
+        Assert.True(cut.Total(FlowKind.Core, "copper_ore") > 0);
 
         // What was already in transit still arrives (nothing is lost), then the flow stops.
         Run(sim, Minute);
@@ -262,7 +262,7 @@ public class RateModeTests(ITestOutputHelper output)
         sim.Step();
         Run(sim, Minute);
         Assert.True(Items(home, "iron_ore") > before);
-        Assert.True(RateMode.RatesOf(sim, home).RateOf(FlowKind.Core, "iron_ore") > 0);
+        Assert.True(RateMode.RatesOf(sim, home).Total(FlowKind.Core, "iron_ore") > 0);
     }
 
     [Fact]
@@ -274,7 +274,7 @@ public class RateModeTests(ITestOutputHelper output)
         var a = Tile(sim, 0, 0);
         var b = Tile(sim, 1, 0);
         var c = Tile(sim, 2, 0);
-        Place(sim, a, "core", 10, 9);
+        Place(sim, a, "core_large", 10, 9);
         Place(sim, a, "import_port", 29, 10, East);
         Belt(sim, a, 28, 10, 16, West);                  // (28..13, 10) into the core's east side at x=12.
         Place(sim, b, "import_port", 29, 10, East);
@@ -286,13 +286,13 @@ public class RateModeTests(ITestOutputHelper output)
         Place(sim, c, "export_port", 0, 10, West);
         sim.Step();
 
-        Assert.True(RateMode.RatesOf(sim, a).RateOf(FlowKind.Core, "iron_ore") > 0);
+        Assert.True(RateMode.RatesOf(sim, a).Total(FlowKind.Core, "iron_ore") > 0);
         Run(sim, 2 * Minute);
         Assert.True(Items(a, "iron_ore") > 0);
 
         sim.Enqueue(new RemoveBuildingCommand(Me, c.Id, 10, 9));
         sim.Step();
-        Assert.Equal(0, RateMode.RatesOf(sim, a).RateOf(FlowKind.Core, "iron_ore"));
+        Assert.Equal(0, RateMode.RatesOf(sim, a).Total(FlowKind.Core, "iron_ore"));
         Assert.Equal(0, RateMode.RatesOf(sim, b).Total(FlowKind.Export, "iron_ore"));
     }
 
@@ -304,7 +304,7 @@ public class RateModeTests(ITestOutputHelper output)
         var sim = RateSim();
         var home = Tile(sim, 0, 0);
         var east = Tile(sim, 1, 0);
-        Place(sim, home, "core", 10, 9);
+        Place(sim, home, "core_large", 10, 9);
         Place(sim, home, "import_port", 29, 10, East);
         Belt(sim, home, 28, 10, 13, West);               // (28..16, 10) into the smelter at (14..15, 10..11).
         Place(sim, home, "smelter", 14, 10, recipe: "smelt_iron");
@@ -315,8 +315,8 @@ public class RateModeTests(ITestOutputHelper output)
         Place(sim, east, "export_port", 0, 10, West);
         sim.Step();
         var rates = RateMode.RatesOf(sim, home);
-        Assert.InRange(rates.RateOf(FlowKind.Core, "iron_plate"), RateModel.One / 120 - 2, RateModel.One / 120);
-        Assert.Equal(0, rates.RateOf(FlowKind.Core, "iron_ore"));
+        Assert.InRange(rates.Total(FlowKind.Core, "iron_plate"), RateModel.One / 120 - 2, RateModel.One / 120);
+        Assert.Equal(0, rates.Total(FlowKind.Core, "iron_ore"));
     }
 
     /// <summary>
@@ -356,7 +356,7 @@ public class RateModeTests(ITestOutputHelper output)
     static TileState TwentyDrillsOnOneCore(Simulation sim)
     {
         var t = Tile(sim, size: 44);
-        Place(sim, t, "core", 0, 8);                    // (0..2, 8..10).
+        Place(sim, t, "core_large", 0, 8);                    // (0..2, 8..10).
         Belt(sim, t, 22, 8, 20, West);                  // (22..3, 8) into the core.
         Belt(sim, t, 22, 10, 20, West);                 // (22..3, 10) into the core.
         Place(sim, t, "wire", 2, 7);
@@ -378,7 +378,7 @@ public class RateModeTests(ITestOutputHelper output)
         var sim = new Simulation(TestContent.Load()) { RateModeEnabled = true };
         var t = TwentyDrillsOnOneCore(sim);
         sim.Step();
-        Assert.InRange(RateMode.RatesOf(sim, t).RateOf(FlowKind.Core, "iron_ore"), 20 * (RateModel.One / 120) - 40, 20 * RateModel.One / 120);
+        Assert.InRange(RateMode.RatesOf(sim, t).Total(FlowKind.Core, "iron_ore"), 20 * (RateModel.One / 120) - 40, 20 * RateModel.One / 120);
 
         MatchesTheFullSim(TwentyDrillsOnOneCore, ("iron_ore", t => Items(t, "iron_ore")), ("made", t => t.Stats.MadeTotal("iron_ore")));
     }
@@ -387,7 +387,7 @@ public class RateModeTests(ITestOutputHelper output)
     static TileState BoostedDrill(Simulation sim)
     {
         var t = Tile(sim);
-        Place(sim, t, "core", 0, 0);                    // (0..2, 0..2); powers the drill it touches.
+        Place(sim, t, "core_large", 0, 0);                    // (0..2, 0..2); powers the drill it touches.
         Ore(t, "copper_ore", 3, 0);
         Place(sim, t, "drill", 3, 0);
         Place(sim, t, "overdrive_coil", 5, 0);
@@ -402,7 +402,7 @@ public class RateModeTests(ITestOutputHelper output)
         var sim = new Simulation(TestContent.Load()) { RateModeEnabled = true };
         var t = BoostedDrill(sim);
         sim.Step();
-        Assert.InRange(RateMode.RatesOf(sim, t).RateOf(FlowKind.Core, "copper_ore"), RateModel.One / 40 - 2, RateModel.One / 40);
+        Assert.InRange(RateMode.RatesOf(sim, t).Total(FlowKind.Core, "copper_ore"), RateModel.One / 40 - 2, RateModel.One / 40);
 
         MatchesTheFullSim(BoostedDrill, ("copper_ore", t => Items(t, "copper_ore")));
     }
@@ -414,7 +414,7 @@ public class RateModeTests(ITestOutputHelper output)
     static TileState FuelLine(Simulation sim)
     {
         var t = Tile(sim);
-        Place(sim, t, "core", 0, 2);                    // (0..2, 2..4).
+        Place(sim, t, "core_large", 0, 2);                    // (0..2, 2..4).
         Ore(t, "copper_ore", 0, 0);
         Place(sim, t, "drill", 0, 0);
         Place(sim, t, "fuel_press", 2, 0, recipe: "press_fuel");

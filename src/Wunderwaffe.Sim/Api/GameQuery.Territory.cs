@@ -27,10 +27,5 @@ public sealed partial class GameQuery
         return Enumerable.Range(0, contested.Length).Where(i => contested[i]).ToList();
     }
 
-    /// <summary>
-    /// The tile that would pay <paramref name="cost"/> for something built on the tile: the tile itself or an owned
-    /// neighbour (see <see cref="Territory.Payer"/>), or -1 if none can.
-    /// </summary>
-    public int Payer(int tileId, IReadOnlyDictionary<string, int> cost) =>
-        Sim.TryGetTile(tileId) is { } t ? Territory.Payer(Sim, t, Player, cost)?.Id ?? -1 : -1;
+
 }

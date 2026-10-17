@@ -22,7 +22,7 @@ public class BoosterTests
         Harness.Ore(tile, Iron, 0, 0);
         Place(sim, tile, "drill", 0, 0);
         Place(sim, tile, "overdrive_coil", 2, 0);
-        Place(sim, tile, "core", 0, 2);
+        Place(sim, tile, "core_large", 0, 2);
         Run(sim, 3601);
 
         Assert.Equal(25, Stats(sim, tile, 0, 0).Speed);
@@ -58,7 +58,7 @@ public class BoosterTests
         Harness.Ore(tile, Iron, 0, 0);
         Place(sim, tile, "drill", 0, 0);
         Place(sim, tile, "yield_sieve", 2, 0);
-        Place(sim, tile, "core", 0, 2);
+        Place(sim, tile, "core_large", 0, 2);
         Run(sim, 3001); // 50 batches.
 
         Assert.Equal(60, Made(tile, Iron));

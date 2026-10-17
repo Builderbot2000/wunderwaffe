@@ -46,8 +46,8 @@ public static class Blueprints
     // ---- Recording ----
 
     /// <summary>
-    /// Every building lying wholly inside the w x h box at (x, y), and every frame cell in it. The tile core is left
-    /// out. Null if the box holds nothing.
+    /// Every building lying wholly inside the w x h box at (x, y), and every frame cell in it. Null if the box holds
+    /// nothing.
     /// </summary>
     public static Blueprint? FromArea(TileState tile, int x, int y, int w, int h)
     {
@@ -55,7 +55,7 @@ public static class Blueprints
         var blocks = new List<BlueprintBlock>();
         foreach (var b in grid.Buildings)
         {
-            if (b.Kind != BuildingKind.Core && b.X >= x && b.Y >= y && b.X + b.Width <= x + w && b.Y + b.Height <= y + h)
+            if (b.X >= x && b.Y >= y && b.X + b.Width <= x + w && b.Y + b.Height <= y + h)
                 blocks.Add(new BlueprintBlock(b.DefId, b.X, b.Y, b.Rotation, b.RecipeId));
         }
         var frames = new List<BlueprintCell>();
@@ -71,7 +71,7 @@ public static class Blueprints
     }
 
     /// <summary>
-    /// The design standing on the frame joined to the unit core at (x, y): every block with its rotation, and the frame
+    /// The design standing on the frame joined to the core at (x, y): every block with its rotation, and the frame
     /// (UD-001). Only designs that would lift off are recorded, so the library never holds one that can't be built
     /// (UD-003); <paramref name="result"/> says why when it is null.
     /// </summary>
@@ -135,8 +135,8 @@ public static class Blueprints
     /// <summary>
     /// Whether the blueprint, turned and flipped, can be placed with its top-left at tile cell (x, y): every block
     /// passes <see cref="Placement.Check"/> (cost aside) without overlapping another, every frame cell passes
-    /// <see cref="UnitAssembly.CheckFrame"/> or is framed already, and <see cref="Territory.Payer"/> finds a tile that can pay
-    /// the total. All or nothing.
+    /// <see cref="UnitAssembly.CheckFrame"/> or is framed already, and the player's cores on the tile can pay the total
+    /// (<see cref="Funds.CanPay"/>). All or nothing.
     /// </summary>
     public static BlueprintResult Check(
         Simulation sim, TileState tile, int player, Blueprint blueprint, int x, int y, int rotation, bool flip, out BlueprintPlan plan)
@@ -185,7 +185,7 @@ public static class Blueprints
 
         if (problems.Count > 0)
             return BlueprintResult.Blocked;
-        return Territory.Payer(sim, tile, player, cost) != null ? BlueprintResult.Ok : BlueprintResult.CannotAfford;
+        return Funds.CanPay(tile, player, cost) ? BlueprintResult.Ok : BlueprintResult.CannotAfford;
     }
 
     /// <summary>
@@ -196,11 +196,6 @@ public static class Blueprints
         Simulation sim, TileState tile, int player, BlueprintBlock b, int x, int y, out PlacementPlan plan, bool ignoreCost)
     {
         string? recipe = b.RecipeId is { } id && sim.Content.Recipes.TryGetValue(id, out var r) && r.Inputs.Count == 0 ? null : b.RecipeId;
-        if (sim.Content.Buildings.TryGetValue(b.DefId, out var def) && def.Kind == BuildingKind.Core)
-        {
-            plan = default;
-            return PlaceResult.NoSuchBuilding;
-        }
         return Placement.Check(sim, tile, player, b.DefId, x, y, b.Rotation, recipe, out plan, ignoreCost);
     }
 
@@ -235,7 +230,7 @@ public static class Blueprints
         if (result != BlueprintResult.Ok)
             return result;
 
-        Territory.Payer(sim, tile, player, plan.Cost)!.Inventory.TryTake(plan.Cost);
+        Funds.TryPay(tile, player, plan.Cost);
         foreach (var (fx, fy) in plan.NewFrames)
             tile.Grid.SetFrame(fx, fy, true);
         foreach (var p in plan.Blocks)

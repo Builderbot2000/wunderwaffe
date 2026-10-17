@@ -31,7 +31,7 @@ public sealed class TileState(int id, int originX, int originY, TileGrid grid)
 
     public int Owner { get; set; } = Unowned;
 
-    public Inventory Inventory { get; } = new();
+
 
     public TileGrid Grid { get; } = grid;
 

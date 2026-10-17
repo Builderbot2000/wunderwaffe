@@ -59,7 +59,7 @@ public sealed record StatsSnap(long Bucket, List<SeriesSnap> Made, List<SeriesSn
 
 public sealed record ClaimSnap(int Player, int Ticks);
 
-public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingId, int NextWreckId, Dictionary<string, long> Inventory,
+public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingId, int NextWreckId,
     List<int> Frames, List<int> Platforms, List<BuildingSnap> Buildings, List<Wreck> Wrecks, List<ClaimSnap> Claims, StatsSnap Stats,
     bool Full, List<AccSnap> Rates)
 {
@@ -78,8 +78,7 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
         var rs = sim.RateState(t.Id);
         var acc = rs.Acc.Select((a, i) => (a, i)).Where(e => e.a != 0)
             .Select(e => new AccSnap(rs.AccKeys[e.i].Kind, rs.AccKeys[e.i].PortId, rs.AccKeys[e.i].Item, e.a)).ToList();
-        return new TileSnap(t.Id, t.Owner, g.Revision, g.NextBuildingId, g.NextWreckId,
-            t.Inventory.Entries.ToDictionary(kv => kv.Key, kv => kv.Value), frames, platforms,
+        return new TileSnap(t.Id, t.Owner, g.Revision, g.NextBuildingId, g.NextWreckId, frames, platforms,
             g.Buildings.Select(BuildingSnap.Of).ToList(), [.. g.Wrecks],
             t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc);
     }
@@ -87,10 +86,6 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
     internal void Restore(Simulation sim, TileState t)
     {
         t.Owner = Owner;
-        foreach (var (id, n) in t.Inventory.Entries.ToList())
-            t.Inventory.Add(id, -n);
-        foreach (var (id, n) in Inventory)
-            t.Inventory.Add(id, n);
         t.Claims.Clear();
         foreach (var c in Claims)
             t.Claims[c.Player] = c.Ticks;
@@ -141,7 +136,8 @@ public sealed record RelaySnap(int Cursor, List<List<RelayItem>> Lanes);
 
 public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X, int Y, int W, int H, int Rotation, string? RecipeId,
     BeltSnap? Belt, MachineSnap? Machine, ExportSnap? Export, CombatSnap? Combat = null, FactorySnap? Factory = null,
-    StorageSnap? Storage = null, long? BatteryCharge = null, RelaySnap? Relay = null, string? SorterFilter = null, bool SorterFlip = false)
+    StorageSnap? Storage = null, long? BatteryCharge = null, RelaySnap? Relay = null, string? SorterFilter = null, bool SorterFlip = false,
+    Dictionary<string, long>? Stock = null)
 {
     internal static BuildingSnap Of(PlacedBuilding b) => new(b.Id, b.DefId, b.Owner, b.Hp, b.X, b.Y, b.Width, b.Height, b.Rotation, b.RecipeId,
         b.Belt is { } belt ? new BeltSnap([.. belt.Items], [.. belt.Positions], belt.Count) : null,
@@ -155,7 +151,8 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
         b.Battery?.Charge,
         b.Relay is { } r ? new RelaySnap(r.Cursor, r.Lanes.Select(l => l.ToList()).ToList()) : null,
         b.Sorter?.Filter,
-        b.Sorter?.Flip ?? false);
+        b.Sorter?.Flip ?? false,
+        b.Stock?.Entries.ToDictionary(kv => kv.Key, kv => kv.Value));
 
     internal void Restore(ContentDb content, TileGrid g)
     {
@@ -184,6 +181,8 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
         }
         if (Combat is { } cs && b.Combat is { } c)
             cs.Restore(c);
+        foreach (var (id, n) in Stock ?? [])
+            b.Stock!.Add(id, n);
         if (Factory is { } fs && b.Factory is { } f)
         {
             (f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, f.Status, f.LiftOff, f.Built) =

@@ -206,7 +206,9 @@ internal static class TileEntities
         switch (target.Kind)
         {
             case BuildingKind.Core:
-                tile.Inventory.Add(item, 1);
+                if (!Funds.Accepts(target, item))
+                    return false;
+                target.Stock!.Add(item, 1);
                 return true;
 
             case BuildingKind.Conveyor:
@@ -434,10 +436,14 @@ internal static class TileEntities
         return -1;
     }
 
-    /// <summary>Everything a building holds, so removing it doesn't destroy items. Battery charge is lost.</summary>
-    public static void Drain(TileState tile, PlacedBuilding b)
+    /// <summary>
+    /// Moves everything a building holds into <paramref name="inv"/>, so removing it or lifting it off doesn't destroy
+    /// items. Battery charge is lost.
+    /// </summary>
+    public static void Drain(PlacedBuilding b, Core.Inventory inv)
     {
-        var inv = tile.Inventory;
+        if (b.Stock is { } stock)
+            inv.TakeAll(stock);
         if (b.Belt is { } belt)
         {
             for (int i = 0; i < belt.Count; i++)
@@ -464,7 +470,7 @@ internal static class TileEntities
         if (b.Combat is { Ammo: > 0, AmmoItem: { } ammo } c)
             inv.Add(ammo, c.Ammo);
         if (b.Factory is { } factory)
-            UnitFactory.Drain(tile, factory);
+            UnitFactory.Drain(factory, inv);
         if (b.Storage is { } store)
         {
             foreach (var (id, n) in store.Output)

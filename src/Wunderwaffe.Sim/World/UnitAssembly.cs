@@ -10,20 +10,19 @@ public enum AssembleResult
     /// <summary>No presence on the tile (WM-015), or the core or a block on the frame is someone else's.</summary>
     NotOwner,
 
-    /// <summary>The cell isn't a unit core.</summary>
+    /// <summary>The cell isn't a core.</summary>
     NoCore,
 
     /// <summary>The core isn't on a frame.</summary>
     NoFrame,
 
-    /// <summary>The frame joined to the core carries a second unit core.</summary>
+    /// <summary>The frame joined to the core carries a second core: every unit has exactly one (WM-016).</summary>
     MultipleCores,
 
     /// <summary>A building sits partly on the frame and partly off it.</summary>
     PartialBuilding,
 
-    /// <summary>The tile's own core is on the frame.</summary>
-    ContainsTileCore,
+
 
     /// <summary>Ports can't ride on a unit.</summary>
     InvalidBlock,
@@ -54,16 +53,16 @@ public enum DeployResult
 }
 
 /// <summary>
-/// Turning a framed group of buildings into a unit and back (units are blocks on a frame, lifted off by a unit
-/// core). Read-only checks are public so the UI can preview with the same rules the commands apply.
+/// Turning a framed group of buildings into a unit and back (units are blocks on a frame, lifted off by their core,
+/// UD-010). Read-only checks are public so the UI can preview with the same rules the commands apply.
 /// </summary>
 public static class UnitAssembly
 {
     public const int MaxCells = 64;
 
     /// <summary>
-    /// Laying a frame cell needs presence on the tile (WM-015), stays out of a blocked enemy circle, and is paid by
-    /// <see cref="Territory.Payer"/> (the tile, or a neighbour the player owns).
+    /// Laying a frame cell needs presence on the tile (WM-015), stays out of a blocked enemy circle, and is paid by the
+    /// player's cores on the tile (<see cref="Funds"/>).
     /// </summary>
     /// <param name="ignoreCost">Skip the cost check, for callers that pay a total themselves.</param>
     public static PlaceResult CheckFrame(Simulation sim, TileState tile, int player, int x, int y, bool ignoreCost = false)
@@ -80,24 +79,24 @@ public static class UnitAssembly
             return PlaceResult.Wreck;
         if (Territory.EnemyCircleBlocks(tile, player, x, y, 1, 1))
             return PlaceResult.EnemyCircle;
-        return ignoreCost || Territory.Payer(sim, tile, player, Balance.FrameCost) != null ? PlaceResult.Ok : PlaceResult.CannotAfford;
+        return ignoreCost || Funds.CanPay(tile, player, Balance.FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
     }
 
     internal static void PlaceFrame(Simulation sim, TileState tile, int player, int x, int y)
     {
         if (CheckFrame(sim, tile, player, x, y) != PlaceResult.Ok)
             return;
-        Territory.Payer(sim, tile, player, Balance.FrameCost)!.Inventory.TryTake(Balance.FrameCost);
+        Funds.TryPay(tile, player, Balance.FrameCost);
         tile.Grid.SetFrame(x, y, true);
     }
 
-    /// <summary>Frames are ownerless: anyone with presence may take one up; the refund goes to <see cref="Territory.RefundTo"/>.</summary>
+    /// <summary>Frames are ownerless: anyone with presence may take one up; the refund goes to their nearest core there, if any.</summary>
     internal static void RemoveFrame(Simulation sim, TileState tile, int player, int x, int y)
     {
         if (!tile.Grid.HasFrame(x, y) || !Territory.HasPresence(sim, player, tile))
             return;
         tile.Grid.SetFrame(x, y, false);
-        Territory.RefundTo(sim, tile, player)?.Inventory.Add(Balance.FrameCost);
+        Funds.Refund(tile, player, x, y, 1, 1, Balance.FrameCost);
     }
 
     /// <summary>Everything an activation would take, found by walking the frame out from the core.</summary>
@@ -109,7 +108,7 @@ public static class UnitAssembly
     /// <summary>
     /// Lift-off validation (UD-003): the frame joined to the core is connected and at most <paramref name="cap"/> cells
     /// (<see cref="MaxCells"/> by hand, the factory's block cap from a factory), every building on it lies wholly on it,
-    /// there is one unit core and no tile core or port, onboard power covers what the blocks draw, and the design has a
+    /// there is one core and no port, onboard power covers what the blocks draw, and the design has a
     /// locomotion class. <paramref name="offending"/> lists the blocks behind a refusal, for the UI to point at.
     /// </summary>
     public static AssembleResult CheckActivate(
@@ -121,7 +120,7 @@ public static class UnitAssembly
         if (!Territory.HasPresence(sim, player, tile))
             return AssembleResult.NotOwner;
         var grid = tile.Grid;
-        if (grid.BuildingAt(x, y) is not { Kind: BuildingKind.UnitCore } core)
+        if (grid.BuildingAt(x, y) is not { Kind: BuildingKind.Core } core)
             return AssembleResult.NoCore;
         if (core.Owner != player)
             return AssembleResult.NotOwner;
@@ -203,11 +202,9 @@ public static class UnitAssembly
                     return AssembleResult.PartialBuilding;
             }
         }
-        if (b.Kind == BuildingKind.Core)
-            return AssembleResult.ContainsTileCore;
         if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort)
             return AssembleResult.InvalidBlock;
-        if (b.Kind == BuildingKind.UnitCore && b != core)
+        if (b.Kind == BuildingKind.Core && b != core)
             return AssembleResult.MultipleCores;
         return AssembleResult.Ok;
     }
@@ -216,7 +213,7 @@ public static class UnitAssembly
         Launch(sim, tile, player, x, y, MaxCells, null, out _);
 
     /// <summary>
-    /// Lifts the design at the unit core (x, y) off as a unit, if <see cref="CheckActivate(Simulation, TileState, int, int, int, int, out Plan?, out List{PlacedBuilding})"/>
+    /// Lifts the design at the core (x, y) off as a unit, if <see cref="CheckActivate(Simulation, TileState, int, int, int, int, out Plan?, out List{PlacedBuilding})"/>
     /// passes with <paramref name="cap"/>. <paramref name="factory"/> is the factory that built it, if any.
     /// </summary>
     internal static AssembleResult Launch(
@@ -255,11 +252,11 @@ public static class UnitAssembly
         unit.UpkeepDue = sim.Tick + Balance.UpkeepPeriod;
         sim.Player(player).Launched++;
 
-        // The buildings are the unit now: lift them off, keeping any items they held on the tile.
+        // The buildings are the unit now: the core's stock and whatever the others held ride along as its cargo (UD-010).
         foreach (var b in buildings)
         {
             tile.Grid.Remove(b);
-            TileEntities.Drain(tile, b);
+            TileEntities.Drain(b, unit.Cargo);
         }
         foreach (var (cx, cy) in cells)
             tile.Grid.SetFrame(cx, cy, false);
@@ -268,7 +265,7 @@ public static class UnitAssembly
     }
 
     /// <summary>
-    /// Called once for every unit that lifts off, by hand (<paramref name="source"/> is its unit core, now gone) or from
+    /// Called once for every unit that lifts off, by hand (<paramref name="source"/> is its core, now gone) or from
     /// a factory (<paramref name="source"/> is the factory). The hook for rally and auto-squad (UC-006,
     /// <c>UnitSim.OnUnitBuilt</c>) and the unit-completed alert (UI-003, <c>sim.Raise</c>).
     /// </summary>
@@ -334,12 +331,15 @@ public static class UnitAssembly
         var tile = sim.Tiles[unit.TileId];
         foreach (var (x, y) in plan!.Cells)
             tile.Grid.SetFrame(x, y, true);
-        foreach (var (block, x, y, w, h, rotation) in plan.Blocks)
+        for (int i = 0; i < plan.Blocks.Count; i++)
         {
+            var (block, x, y, w, h, rotation) = plan.Blocks[i];
             var recipe = block.RecipeId == null ? null : sim.Content.Recipes[block.RecipeId];
-            tile.Grid.Add(sim.Content.Buildings[block.DefId], unit.Owner, x, y, w, h, rotation, recipe, block.Hp);
+            var b = tile.Grid.Add(sim.Content.Buildings[block.DefId], unit.Owner, x, y, w, h, rotation, recipe, block.Hp);
+            // The cargo goes back into the core: the tile's funds now (FB-019).
+            if (i == unit.CoreBlock)
+                b.Stock!.TakeAll(unit.Cargo);
         }
-        tile.Inventory.Add(unit.Cargo.Entries.ToDictionary(e => e.Key, e => (int)e.Value));
         sim.RemoveUnit(unit);
         return DeployResult.Ok;
     }

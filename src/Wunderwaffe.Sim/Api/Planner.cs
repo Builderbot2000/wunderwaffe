@@ -323,7 +323,7 @@ public static class Planner
         static long Dist(int ax, int ay, int bx, int by) => (long)(ax - bx) * (ax - bx) + (long)(ay - by) * (ay - by);
 
         /// <summary>
-        /// The building as a node if it may go at (x, y): legal now (cost aside), clear of planned buildings, and trading
+        /// The building as a node if it may go at (x, y): legal now (cost aside), clear of planned buildings and frame, and trading
         /// items only with <paramref name="feeder"/>, <paramref name="target"/> and cores.
         /// </summary>
         public Node? TryNode(int player, BuildingDef def, int x, int y, string? recipeId, string? onDeposit, Node? feeder, Node? target)
@@ -338,7 +338,7 @@ public static class Planner
             {
                 for (int cx = x; cx < x + plan.Width; cx++)
                 {
-                    if (At(cx, cy) != null)
+                    if (At(cx, cy) != null || _g.HasFrame(cx, cy))
                         return null;
                 }
             }
@@ -412,8 +412,11 @@ public static class Planner
         List<(int X, int Y)>? Wire(int player, List<Node> machines)
         {
             var wires = new List<(int X, int Y)>();
-            var sources = _g.Buildings.Where(b => Supplied(b) && !_g.HasFrame(b.X, b.Y)).ToList();
-            if (sources.Count == 0)
+            // A core supplies power whatever its network looks like yet: networks are rebuilt only when a full-sim tile
+            // steps, so a core just placed on a rate-mode tile has none.
+            var sources = _g.Buildings.Where(b => (Supplied(b) || b is { Kind: BuildingKind.Core, Def.PowerSupply: > 0 }) && !_g.HasFrame(b.X, b.Y)).ToList();
+            bool offFrame = sources.Count > 0;
+            if (!offFrame)
                 sources = _g.Buildings.Where(Supplied).ToList();
             if (!sim.Content.Buildings.TryGetValue("wire", out var wire) || sources.Count == 0)
                 return wires;
@@ -422,7 +425,7 @@ public static class Planner
             {
                 foreach (var m in machines)
                 {
-                    var joined = Joined(sources);
+                    var joined = Joined(sources, offFrame);
                     if (joined.Contains(m))
                         continue;
                     if (WireRoute(player, wire, m, joined) is not { } run)
@@ -446,8 +449,11 @@ public static class Planner
         /// <summary>A real building on a network with something that makes power.</summary>
         bool Supplied(PlacedBuilding b) => _g.Power.NetworkOf(b) is { } net && net.Members.Any(m => m.Def.PowerSupply > 0);
 
-        /// <summary>Every node, real or planned, joined by touching to one of <paramref name="sources"/>.</summary>
-        HashSet<Node> Joined(List<PlacedBuilding> sources)
+        /// <summary>
+        /// Every node, real or planned, joined by touching to one of <paramref name="sources"/>; not through buildings on
+        /// frame if <paramref name="offFrame"/>, since those may lift off.
+        /// </summary>
+        HashSet<Node> Joined(List<PlacedBuilding> sources, bool offFrame)
         {
             var joined = new HashSet<Node>();
             var stack = new Stack<Node>();
@@ -462,7 +468,7 @@ public static class Planner
                 var n = stack.Pop();
                 foreach (var (x, y) in Perimeter(n.X, n.Y, n.W, n.H))
                 {
-                    if (At(x, y) is { } next && next.Def.IsPower && joined.Add(next))
+                    if (At(x, y) is { } next && next.Def.IsPower && !(offFrame && next.Real is { } r && _g.HasFrame(r.X, r.Y)) && joined.Add(next))
                         stack.Push(next);
                 }
             }

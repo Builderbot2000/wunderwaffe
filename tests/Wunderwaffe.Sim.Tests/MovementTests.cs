@@ -165,7 +165,7 @@ public class MovementTests
         var (sim, land, deep) = WorldWithSea();
         var home = sim.Tiles[sim.StartTileId];
         foreach (var item in new[] { "copper_ore", "iron_ore", "copper_plate", "iron_plate", "steel" })
-            home.Inventory.Add(item, 10_000);
+            Fund(sim, home).Stock!.Add(item, 10_000);
         var unit = Scout(sim, home, land.X - home.OriginX, land.Y - home.OriginY);
         var deepTile = sim.TileAtCell(deep.X, deep.Y)!;
         var plan = UnitNav.Plan(sim, unit, deepTile.Id, deep.X - deepTile.OriginX, deep.Y - deepTile.OriginY);

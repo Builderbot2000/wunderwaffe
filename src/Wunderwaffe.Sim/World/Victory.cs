@@ -28,21 +28,11 @@ public static class Victory
     /// <summary>Ticks between checks; scanning for cores touches every building.</summary>
     public const int CheckEvery = Simulation.TicksPerSecond / 2;
 
-    /// <summary>True if the player owns a core anywhere. Losing the last one eliminates them (WM-016).</summary>
-    public static bool HasCore(Simulation sim, int player)
-    {
-        foreach (var t in sim.Tiles)
-        {
-            if (t.Grid.BuildingCount == 0)
-                continue;
-            foreach (var b in t.Grid.Buildings)
-            {
-                if (b.Kind == BuildingKind.Core && b.Owner == player)
-                    return true;
-            }
-        }
-        return false;
-    }
+    /// <summary>
+    /// True if the player has a core anywhere, standing on a tile or carried by a unit (every unit has one). Losing the
+    /// last one eliminates them (WM-016).
+    /// </summary>
+    public static bool HasCore(Simulation sim, int player) => sim.CoreCount(player) > 0;
 
     /// <summary>Tiles a player needs to own to win by domination, or 0 outside a set-up match.</summary>
     public static int TilesToWin(Simulation sim) =>

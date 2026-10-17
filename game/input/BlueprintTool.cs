@@ -144,10 +144,10 @@ public partial class BlueprintTool : Node2D
 
         if (e.IsActionPressed(InputActions.BlueprintRecord))
         {
-            if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.UnitCore })
+            if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core })
                 RecordUnitAt(cell.X, cell.Y);
             else
-                Notice?.Invoke("Hover a unit core to record its design (K)", false);
+                Notice?.Invoke("Hover a core on frame to record its design (K)", false);
             Handled();
             return;
         }
@@ -285,7 +285,7 @@ public partial class BlueprintTool : Node2D
         return check switch
         {
             BlueprintResult.Ok => ($"{head} · {GameText.Cost(_host.Content, p.Cost)} · click to place · R turn · F mirror", true),
-            BlueprintResult.CannotAfford => ($"{head} · needs {GameText.Cost(_host.Content, p.Cost.Where(kv => tile.Inventory.Get(kv.Key) < kv.Value).Select(kv => new KeyValuePair<string, int>(kv.Key, (int)(kv.Value - tile.Inventory.Get(kv.Key)))))} more", false),
+            BlueprintResult.CannotAfford => ($"{head} · needs {GameText.Cost(_host.Content, p.Cost.Select(kv => new KeyValuePair<string, int>(kv.Key, (int)(kv.Value - Funds.Available(tile, _host.LocalPlayer, kv.Key)))).Where(kv => kv.Value > 0))} more", false),
             _ => ($"{head} · {ProblemText(p)}", false),
         };
     }
@@ -317,7 +317,7 @@ public partial class BlueprintTool : Node2D
             DrawGhosts(_plan, px, bad: _plan.Problems.Count > 0 || !Status.Good);
         }
         else if (Mode == BlueprintMode.None && !BuildTool.HasTool && HoveredCell() is var cell
-                 && tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.UnitCore })
+                 && tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.HasFrame(core.X, core.Y))
         {
             // UD-003: point at the blocks that stop a lift-off.
             UnitAssembly.CheckActivate(_host.Sim, tile, _host.LocalPlayer, cell.X, cell.Y, UnitAssembly.MaxCells, out _, out var offending);

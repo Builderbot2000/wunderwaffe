@@ -146,7 +146,7 @@ public sealed class ContentDb
                 errors.Add($"building '{b.Id}': a conveyor needs a speed > 0");
             if (b.Kind == BuildingKind.Thruster && (b.Thrust <= 0 || b.Width != 1 || b.Height != 1))
                 errors.Add($"building '{b.Id}': a thruster must be 1x1 with thrust > 0");
-            if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort or BuildingKind.UnitCore && (b.Width != 1 || b.Height != 1))
+            if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort && (b.Width != 1 || b.Height != 1))
                 errors.Add($"building '{b.Id}': ports must be 1x1");
             if (b.Hp <= 0)
                 errors.Add($"building '{b.Id}': hp must be > 0");
@@ -165,7 +165,13 @@ public sealed class ContentDb
             if ((b.Kind == BuildingKind.Locomotor) != (b.Locomotion != null))
                 errors.Add($"building '{b.Id}': a locomotor needs a locomotion class, and only locomotors have one");
             ValidateFactory(b, errors);
+            if (b.Kind == BuildingKind.Core && (b.Capacity <= 0 || b.Cost.Count == 0))
+                errors.Add($"building '{b.Id}': a core needs a capacity > 0 and a cost (nothing is free, OQ-37)");
+            if (b.Kind != BuildingKind.Core && b.Capacity != 0)
+                errors.Add($"building '{b.Id}': only cores have a capacity");
         }
+        if (Buildings.TryGetValue(Simulation.CoreBuildingId, out var startCore) && startCore.Kind != BuildingKind.Core)
+            errors.Add($"buildings: '{Simulation.CoreBuildingId}' must be a core (the starting unit's)");
 
         // A recipe with no outputs only makes sense as fuel for a generator (FB-005).
         foreach (var r in Recipes.Values)
@@ -225,8 +231,8 @@ public sealed class ContentDb
         void Error(string message) => errors.Add($"building '{b.Id}': {message}");
         if (b.Power < 0 || b.PowerSupply < 0 || b.PowerCapacity < 0 || b.Discharge < 0 || b.Storage < 0 || b.Range < 0)
             Error("power, powerSupply, powerCapacity, discharge, storage and range must be >= 0");
-        if (b.PowerSupply > 0 && b.Kind is not (BuildingKind.Core or BuildingKind.Machine or BuildingKind.UnitCore))
-            Error("only cores, unit cores and machines (generators) supply power");
+        if (b.PowerSupply > 0 && b.Kind is not (BuildingKind.Core or BuildingKind.Machine))
+            Error("only cores and machines (generators) supply power");
         if (b.Kind == BuildingKind.Battery && (b.PowerCapacity <= 0 || b.Discharge <= 0))
             Error("a battery needs powerCapacity and discharge > 0");
         if (b.Kind == BuildingKind.Storage && b.Storage <= 0)

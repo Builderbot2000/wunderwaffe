@@ -15,7 +15,7 @@ public class EntityTests
         var tile = Tile(sim);
         Harness.Ore(tile, Iron, 10, 10);
         Place(sim, tile, "drill", 10, 10);
-        Place(sim, tile, "core", 12, 10);
+        Place(sim, tile, "core_large", 12, 10);
         long start = Items(tile, Iron);
 
         Run(sim, 59);
@@ -49,7 +49,7 @@ public class EntityTests
         Harness.Ore(tile, Iron, 2, 10);
         Place(sim, tile, "drill", 2, 10);
         Belt(sim, tile, 4, 10, 5);
-        Place(sim, tile, "core", 9, 10);
+        Place(sim, tile, "core_large", 9, 10);
         long start = Items(tile, Iron);
 
         // The item enters the first cell on tick 59 and moves that same tick, so each cell costs 32 ticks and the
@@ -74,7 +74,7 @@ public class EntityTests
             Place(sim, tile, "drill", x, 8);
         }
         Belt(sim, tile, 0, 10, 21);
-        Place(sim, tile, "core", 21, 10);
+        Place(sim, tile, "core_large", 21, 10);
         Run(sim, 1200); // Fill the belt.
 
         long before = Items(tile, Iron);
@@ -91,7 +91,7 @@ public class EntityTests
         Harness.Ore(tile, Iron, 2, 10);
         Place(sim, tile, "drill", 2, 10);
         Belt(sim, tile, 4, 10, 15);
-        Place(sim, tile, "core", 19, 10);
+        Place(sim, tile, "core_large", 19, 10);
         Run(sim, 15 * 32 + 200);
 
         long before = Items(tile, Iron);
@@ -108,7 +108,7 @@ public class EntityTests
         Place(sim, tile, "drill", 2, 10);
         Belt(sim, tile, 4, 10, 3);           // east: (4..6, 10)
         Belt(sim, tile, 7, 10, 3, rotation: 1); // south: (7, 10..12)
-        Place(sim, tile, "core", 6, 13);
+        Place(sim, tile, "core_large", 6, 13);
         long start = Items(tile, Iron);
         Run(sim, 59 + 6 * 32 + 5);
 
@@ -147,7 +147,7 @@ public class EntityTests
         Place(sim, tile, "conveyor", 7, 12, 3); // turns north
         Place(sim, tile, "conveyor", 7, 11, 3);
         Belt(sim, tile, 7, 10, 4);             // main belt (7..10, 10) east, fed at (7,10) from both sides
-        Place(sim, tile, "core", 11, 10);
+        Place(sim, tile, "core_large", 11, 10);
         Run(sim, 600);
         long before = Items(tile, Iron);
         Run(sim, 60 * Simulation.TicksPerSecond);
@@ -167,7 +167,7 @@ public class EntityTests
         Belt(sim, tile, 4, 10, 2);
         Place(sim, tile, "smelter", 6, 10, recipe: "smelt_iron");
         Belt(sim, tile, 8, 10, 2);
-        Place(sim, tile, "core", 10, 10);
+        Place(sim, tile, "core_large", 10, 10);
         Run(sim, 1000);
 
         long before = Items(tile, "iron_plate");
@@ -235,7 +235,7 @@ public class EntityTests
             Place(sim, tile, "drill", i * 2, 8);
         }
         Belt(sim, tile, 0, 10, 21);
-        Place(sim, tile, "core", 21, 10);
+        Place(sim, tile, "core_large", 21, 10);
 
         for (int t = 0; t < 1500; t++)
         {
@@ -284,7 +284,7 @@ public class EntityTests
                 Place(sim, tile, "drill", 2, 4 + i * 2);
             }
             Belt(sim, tile, 4, 10, 10);
-            Place(sim, tile, "core", 14, 10);
+            Place(sim, tile, "core_large", 14, 10);
             Run(sim, 400);
             return sim.StateHash();
         }

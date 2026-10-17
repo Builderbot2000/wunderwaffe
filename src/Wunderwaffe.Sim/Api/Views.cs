@@ -32,6 +32,7 @@ public sealed record TileSummary(
 /// <param name="MissingRegional">Regional items with no deposit here (RS-003).</param>
 /// <param name="Ports">Per neighbour with ports: (neighbour id, exports, imports).</param>
 /// <param name="CircleX">Local cell of the victory circle's centre (WM-014); a building of yours in it claims the tile.</param>
+/// <param name="Inventory">The asking player's build funds here: what their cores on the tile hold (FB-019).</param>
 /// <param name="Presence">Whether the asking player may build or make frames here (WM-015).</param>
 /// <param name="ClaimTicks">The asking player's claim progress, 0 to <paramref name="CaptureTicks"/> (WM-006).</param>
 /// <param name="Contested">Whether more than one player has buildings or units here (WM-004).</param>
@@ -58,7 +59,7 @@ public sealed record CellView(int X, int Y, bool InTile, bool Buildable, string 
 /// <param name="Status">Machines and import ports only.</param>
 /// <param name="MissingInput">What a starved machine is waiting for.</param>
 /// <param name="Partner">Ports only: the neighbouring tile their zone links to.</param>
-/// <param name="Holding">Items in its buffers or on its belt.</param>
+/// <param name="Holding">Items in its buffers or on its belt, or a core's stock.</param>
 public sealed record BuildingView(
     int Id, string DefId, int Owner, int X, int Y, int Width, int Height, int Rotation, string? RecipeId, int Hp, int MaxHp,
     MachineStatus? Status, string? MissingInput, int Partner, IReadOnlyDictionary<string, int> Holding);

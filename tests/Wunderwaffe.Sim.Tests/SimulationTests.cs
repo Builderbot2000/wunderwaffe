@@ -1,6 +1,8 @@
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 
+using static Wunderwaffe.Sim.Tests.Harness;
+
 namespace Wunderwaffe.Sim.Tests;
 
 public class SimulationTests
@@ -41,7 +43,7 @@ public class SimulationTests
         var tile = sim.AddStartingTile(0, 0, Player, seed: 1);
 
         Assert.Single(tile.Grid.Buildings, b => b.DefId == Simulation.CoreBuildingId);
-        Assert.Equal(Balance.StartingItems["copper_ore"], tile.Inventory.Get("copper_ore"));
+        Assert.Equal(Balance.StartingItems["copper_ore"], Items(tile, "copper_ore"));
         var deposits = new HashSet<string?>();
         for (int y = 0; y < tile.Grid.Height; y++)
             for (int x = 0; x < tile.Grid.Width; x++)

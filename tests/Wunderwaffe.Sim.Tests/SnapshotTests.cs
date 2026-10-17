@@ -39,11 +39,11 @@ public class SnapshotTests(ITestOutputHelper output)
             // core of its own, iron through a smelter into another.
             var copper = Spot(_home, "copper_ore", 6);
             Place(Sim, _home, "drill", copper.X, copper.Y);
-            Place(Sim, _home, "core", copper.X + 2, copper.Y);
+            Place(Sim, _home, "core_large", copper.X + 2, copper.Y);
             var iron = Spot(_home, "iron_ore", 8);
             Place(Sim, _home, "drill", iron.X, iron.Y);
             Place(Sim, _home, "smelter", iron.X + 2, iron.Y, recipe: "smelt_iron");
-            Place(Sim, _home, "core", iron.X + 4, iron.Y);
+            Place(Sim, _home, "core_large", iron.X + 4, iron.Y);
             Sim.Step();
             Assert.Equal(before + 5, _home.Grid.BuildingCount);
 
@@ -240,7 +240,7 @@ public class SnapshotTests(ITestOutputHelper output)
         Touching("laser_turret");
         Touching("battery");
         Touching("fuel_generator", "burn_fuel");
-        Touching("core"); // Spare supply, so the battery charges.
+        Touching("core_large"); // Spare supply, so the battery charges.
         Put("supply_depot", 4, 0);
         // Belts with a junction, a router, a sorter and a bridge pair, fed by the depot.
         Put("conveyor", 6, 0);
@@ -254,7 +254,7 @@ public class SnapshotTests(ITestOutputHelper output)
         sim.Step();
 
         // The enemy's starting scout lifts off and flies over the turret.
-        var scoutCore = away.Grid.Buildings.First(b => b.DefId == "unit_core" && b.Owner == Them);
+        var scoutCore = away.Grid.Cores.First(b => b.Owner == Them);
         sim.Enqueue(new ActivateUnitCommand(Them, away.Id, scoutCore.X, scoutCore.Y));
         sim.Step();
         var scout = sim.Units.Last(u => u.Owner == Them);

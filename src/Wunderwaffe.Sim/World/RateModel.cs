@@ -84,7 +84,7 @@ public static class RateModel
 
         readonly long[] _cap, _inflow, _tight, _taken, _offer;
         readonly SortedDictionary<int, long[]> _linkCap = [], _supply = [], _remaining = [];
-        readonly long[] _core, _produced, _used, _draw;
+        readonly long[] _produced, _used, _draw;
         readonly SortedDictionary<int, long[]> _outTo = [], _capTo = [];
 
         public TileGraph(Simulation sim, TileState tile, string[] items)
@@ -213,7 +213,6 @@ public static class RateModel
             _tight = new long[n * _k];
             _taken = new long[n * _k];
             _offer = new long[n * _k];
-            _core = new long[_k];
             _produced = new long[_k];
             _used = new long[_k];
             _draw = new long[_k];
@@ -669,7 +668,6 @@ public static class RateModel
         /// <summary>Totals of the last forward pass.</summary>
         void Collect()
         {
-            Array.Clear(_core);
             Array.Clear(_draw);
             _outTo.Clear();
             _capTo.Clear();
@@ -680,9 +678,6 @@ public static class RateModel
                     long v = _taken[i * _k + k];
                     switch (_kind[i])
                     {
-                        case NodeKind.Core:
-                            _core[k] += v;
-                            break;
                         case NodeKind.Import:
                             _draw[k] += v;
                             Row(_capTo, _partner[i])[k] += _cap[i * _k + k];
@@ -706,14 +701,13 @@ public static class RateModel
                         flows.Add(new Flow(kind, port, _items[k], rates[offset + k]));
                 }
             }
-            Add(FlowKind.Core, 0, _core);
             Add(FlowKind.Produced, 0, _produced);
             Add(FlowKind.Draw, 0, _draw);
             Add(FlowKind.Used, 0, _used);
             for (int i = 0; i < _nodes.Length; i++)
             {
-                if (_kind[i] == NodeKind.Export)
-                    Add(FlowKind.Export, _nodes[i].Id, _taken, i * _k);
+                if (_kind[i] is NodeKind.Export or NodeKind.Core)
+                    Add(_kind[i] == NodeKind.Core ? FlowKind.Core : FlowKind.Export, _nodes[i].Id, _taken, i * _k);
             }
             flows.Sort();
             var rates = new TileRates { Flows = flows };

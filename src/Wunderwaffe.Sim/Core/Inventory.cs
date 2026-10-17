@@ -26,6 +26,14 @@ public sealed class Inventory
             Add(id, n);
     }
 
+    /// <summary>Moves everything <paramref name="from"/> holds into this one, leaving it empty.</summary>
+    public void TakeAll(Inventory from)
+    {
+        foreach (var (id, n) in from._counts)
+            Add(id, n);
+        from._counts.Clear();
+    }
+
     public bool Has(IReadOnlyDictionary<string, int> items) =>
         items.All(kv => Get(kv.Key) >= kv.Value);
 

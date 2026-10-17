@@ -28,8 +28,8 @@ public enum PlaceResult
     EnemyCircle,
 }
 
-/// <summary>A placement that passed every check, ready to apply. <paramref name="Payer"/> is the tile whose stock pays.</summary>
-public readonly record struct PlacementPlan(BuildingDef Def, int X, int Y, int Width, int Height, int Rotation, string? RecipeId, TileState Payer);
+/// <summary>A placement that passed every check, ready to apply. The player's cores on the tile pay (<see cref="Funds"/>).</summary>
+public readonly record struct PlacementPlan(BuildingDef Def, int X, int Y, int Width, int Height, int Rotation, string? RecipeId);
 
 /// <summary>
 /// Building placement rules (FB-002, FB-003). Read-only, so the UI can use the same check to preview
@@ -78,11 +78,10 @@ public static class Placement
         if (resolved.Error != PlaceResult.Ok)
             return resolved.Error;
 
-        // Filled in before the cost check too, so planners can lay out what they can't pay for yet. With the cost
-        // ignored (a blueprint pays its total at once), the plan's payer is just the tile.
-        var payer = ignoreCost ? tile : Territory.Payer(sim, tile, player, def.Cost);
-        plan = new PlacementPlan(def, x, y, w, h, rotation, resolved.RecipeId, payer ?? tile);
-        if (payer == null)
+        // Filled in before the cost check too, so planners can lay out what they can't pay for yet. The cost is
+        // ignored when a caller pays a total at once (a blueprint). Only the player's cores on this tile pay (FB-019).
+        plan = new PlacementPlan(def, x, y, w, h, rotation, resolved.RecipeId);
+        if (!ignoreCost && !Funds.CanPay(tile, player, def.Cost))
             return PlaceResult.CannotAfford;
         return PlaceResult.Ok;
     }

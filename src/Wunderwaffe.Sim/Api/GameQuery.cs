@@ -129,7 +129,7 @@ public sealed partial class GameQuery(Simulation sim, int player)
         }
         return new TileInfo(
             t.Id, t.Name, t.Owner, t.Biome, t.OriginX, t.OriginY, grid.Width, grid.Height, grid.Area, grid.BuildableCount,
-            t.Neighbors, terrain, deposits, missing, InventoryOf(t), grid.BuildingCount, ports,
+            t.Neighbors, terrain, deposits, missing, Funds.Total(t, Player), grid.BuildingCount, ports,
             t.CircleX, t.CircleY, Territory.HasPresence(sim, Player, t), Expansion.Progress(t, Player), Expansion.CaptureTicks(sim),
             Territory.IsContested(sim, t));
     }
@@ -140,22 +140,22 @@ public sealed partial class GameQuery(Simulation sim, int player)
     /// </summary>
     public int Revision(int tileId) => sim.TryGetTile(tileId)?.Grid.Revision ?? -1;
 
-    /// <summary>A tile's stock of items, by id.</summary>
+    /// <summary>
+    /// <see cref="Player"/>'s build funds on a tile, by item: what their cores standing there hold together (FB-019).
+    /// </summary>
     public IReadOnlyDictionary<string, long> Inventory(int tileId) =>
-        sim.TryGetTile(tileId) is { } t ? InventoryOf(t) : new Dictionary<string, long>();
+        sim.TryGetTile(tileId) is { } t ? Funds.Total(t, Player) : new Dictionary<string, long>();
 
-    static SortedDictionary<string, long> InventoryOf(TileState t) =>
-        new(t.Inventory.Entries.ToDictionary(kv => kv.Key, kv => kv.Value), StringComparer.Ordinal);
-
-    /// <summary>Items summed over every tile <see cref="Player"/> owns: the world HUD's resource summary (UI-001).</summary>
+    /// <summary>
+    /// Items summed over every core <see cref="Player"/> has standing, on any tile: the world HUD's resource summary
+    /// (UI-001, FB-019). Cores on units don't count.
+    /// </summary>
     public IReadOnlyDictionary<string, long> ResourceTotals()
     {
         var totals = new SortedDictionary<string, long>(StringComparer.Ordinal);
         foreach (var t in sim.Tiles)
         {
-            if (t.Owner != Player)
-                continue;
-            foreach (var (id, n) in t.Inventory.Entries)
+            foreach (var (id, n) in Funds.Total(t, Player))
                 totals[id] = totals.GetValueOrDefault(id) + n;
         }
         return totals;
@@ -225,6 +225,8 @@ public sealed partial class GameQuery(Simulation sim, int player)
             for (int i = 0; i < belt.Count; i++)
                 holding[belt.Items[i]!] = holding.GetValueOrDefault(belt.Items[i]!) + 1;
         }
+        foreach (var (id, n) in b.Stock?.Entries ?? [])
+            holding[id] = (int)Math.Min(int.MaxValue, n);
         bool port = b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort;
         return new BuildingView(
             b.Id, b.DefId, b.Owner, b.X, b.Y, b.Width, b.Height, b.Rotation, b.RecipeId, b.Hp, sim.Content.Buildings[b.DefId].Hp,
@@ -286,8 +288,9 @@ public sealed partial class GameQuery(Simulation sim, int player)
 
     public DeployResult CheckDeploy(int unitId) => UnitAssembly.CheckDeploy(sim, Player, unitId, out _);
 
-    /// <summary>True if something costing <paramref name="cost"/> on the tile can be paid for: by the tile or an owned neighbour.</summary>
-    public bool CanAfford(int tileId, IReadOnlyDictionary<string, int> cost) => Payer(tileId, cost) >= 0;
+    /// <summary>True if <see cref="Player"/>'s cores standing on the tile can pay <paramref name="cost"/> (FB-019).</summary>
+    public bool CanAfford(int tileId, IReadOnlyDictionary<string, int> cost) =>
+        sim.TryGetTile(tileId) is { } t && Funds.CanPay(t, Player, cost);
 
     // ---- Planning helpers: read-only searches drivers would otherwise have to write themselves ----
 

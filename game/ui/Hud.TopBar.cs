@@ -63,20 +63,22 @@ public partial class Hud
         _title.TooltipText = tile ? GameText.Plural(viewed.Grid.BuildingCount, "building", "buildings") : "";
         _scope.Visible = !tile;
 
-        var items = tile ? viewed.Inventory.Entries.ToList() : Query.ResourceTotals().ToList();
+        // FB-019: what the local player's cores standing on the viewed tile hold (world map: all their landed cores).
+        var items = tile ? Funds.Total(viewed, Me).ToList() : Query.ResourceTotals().ToList();
         string key = tile + string.Join(",", items.Select(kv => $"{kv.Key}{kv.Value}"));
         if (key != _resourceKey)
         {
             _resourceKey = key;
             Ui.Clear(_resources);
             if (items.Count == 0)
-                _resources.AddChild(Ui.Label("No stock yet: belt items into the core.", Ui.SmallFont, Ui.Muted));
+                _resources.AddChild(Ui.Label(tile ? "No funds here: belt items into a core of yours, or land a unit." : "No stock yet: belt items into a core.",
+                    Ui.SmallFont, Ui.Muted));
             foreach (var (id, n) in items)
             {
                 var item = Ui.Row(4);
                 item.AddChild(Ui.Icon(id, 22));
                 item.AddChild(Ui.Label(Short(n)));
-                item.TooltipText = $"{GameText.ItemName(Content, id)}: {n:N0}" + (tile ? $" on {viewed.Name}" : " over all your tiles");
+                item.TooltipText = $"{GameText.ItemName(Content, id)}: {n:N0}" + (tile ? $" in your cores on {viewed.Name}" : " in all your landed cores");
                 item.MouseFilter = MouseFilterEnum.Pass;
                 _resources.AddChild(item);
             }

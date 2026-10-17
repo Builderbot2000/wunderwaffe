@@ -56,7 +56,11 @@ public partial class Hud
         switch (b.Kind)
         {
             case BuildingKind.Core:
-                Line("The tile's core. Anything delivered here goes into the tile inventory, which pays for building.");
+                Line($"A core. Belts deliver into its stock, up to {def.Capacity:N0} of each item; its owner's cores on this tile pay for building here. " +
+                     "On frame it lifts off as a unit with G, taking its stock as cargo; K records the design.");
+                Line(b.Stock!.Entries.Any()
+                    ? "Holds " + string.Join(", ", b.Stock.Entries.Select(kv => $"{kv.Value:N0} {GameText.ItemName(Content, kv.Key)}"))
+                    : "Empty.", Ui.Text);
                 break;
             case BuildingKind.Conveyor:
                 Line($"Carrying {b.Belt!.Count} of {BeltState.Capacity} items, heading {Directions.FromRotation(b.Rotation)}.");
@@ -72,12 +76,9 @@ public partial class Hud
                 Line(from == null ? "Not in an I/O zone: nothing can arrive." : $"Receives from {from.Name}.");
                 Line($"Holding {b.Machine!.OutputCount} items for the belt next to it.");
                 break;
-            case BuildingKind.UnitCore:
             case BuildingKind.Thruster:
             case BuildingKind.Locomotor:
-                Line("A unit part. Lay frame under it, then hover the unit core with no building picked and press G to lift off.");
-                if (b.Kind == BuildingKind.UnitCore)
-                    Line("K records the design on its frame to the blueprint library.");
+                Line("A unit part. Lay frame under it and a core, then hover the core with no building picked and press G to lift off.");
                 break;
             case BuildingKind.UnitFactory when b.Factory is { } f:
                 Line($"Builds a library blueprint within {UnitFactory.Radius(Sim, tile, b)} cells, up to {UnitFactory.BlockCap(Sim, tile, b)} blocks, " +

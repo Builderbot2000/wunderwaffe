@@ -1,12 +1,11 @@
 [
-  { "id": "core",        "name": "Core", "menu": "logistics",        "kind": "core",        "width": 3, "height": 3, "power": 0,  "powerSupply": 20, "hp": 1000, "cost": {} },
+  { "id": "core",        "name": "Core", "menu": "units",        "kind": "core",        "width": 2, "height": 2, "power": 0,  "powerSupply": 20, "capacity": 1000, "supplyRadius": 16, "hp": 400, "cost": { "copper_ore": 10, "iron_ore": 5 } },
   { "id": "drill",       "name": "Drill", "menu": "production",       "category": "drill",   "width": 2, "height": 2, "power": 2,  "hp": 200, "cost": { "copper_ore": 10 } },
   { "id": "conveyor",    "name": "Conveyor", "menu": "logistics",    "kind": "conveyor",    "speed": 4, "width": 1, "height": 1, "power": 0,  "hp": 20, "cost": { "copper_ore": 1 } },
   { "id": "smelter",     "name": "Smelter", "menu": "production",     "category": "crafter", "width": 2, "height": 2, "power": 3,  "hp": 250, "cost": { "copper_ore": 20, "iron_ore": 10 } },
   { "id": "steel_mill",  "name": "Steel Mill", "menu": "production",  "category": "crafter", "width": 3, "height": 3, "power": 20, "hp": 600, "cost": { "iron_plate": 40, "copper_plate": 20 } },
   { "id": "export_port", "name": "Export Port", "menu": "logistics", "kind": "export_port", "width": 1, "height": 1, "power": 0,  "hp": 80, "cost": { "copper_ore": 5 } },
   { "id": "import_port", "name": "Import Port", "menu": "logistics", "kind": "import_port", "width": 1, "height": 1, "power": 0,  "hp": 80, "cost": { "copper_ore": 5 } },
-  { "id": "unit_core", "name": "Unit Core", "menu": "units", "kind": "unit_core", "width": 1, "height": 1, "power": 0, "powerSupply": 10, "hp": 300, "cost": { "copper_plate": 10, "steel": 5 } },
   { "id": "thruster", "name": "Thruster", "menu": "units", "kind": "thruster", "thrust": 60, "width": 1, "height": 1, "power": 5, "hp": 120, "cost": { "iron_plate": 10, "steel": 5 } },
   { "id": "munitions_works", "name": "Munitions Works", "menu": "production", "width": 2, "height": 2, "power": 0, "hp": 250, "cost": { "iron_plate": 10, "copper_plate": 10 } },
   { "id": "gun_turret", "name": "Gun Turret", "menu": "combat", "kind": "weapon", "width": 1, "height": 1, "power": 0, "hp": 250, "cost": { "iron_plate": 10, "copper_plate": 5 }, "resist": { "kinetic": 25 }, "weapon": { "range": 10, "damage": 12, "cooldown": 20, "type": "kinetic", "speed": 30, "ammo": "shell", "magazine": 20 } },
@@ -49,5 +48,6 @@
   { "id": "coolant_tower",  "name": "Coolant Tower", "menu": "boosters",  "kind": "booster", "width": 2, "height": 2, "power": 0, "hp": 150, "cost": { "iron_plate": 15, "copper_plate": 15 },
     "booster": { "hosts": ["servo"], "effects": { "cooling": 1 }, "maxHosts": 2 } },
   { "id": "precision_jig",  "name": "Precision Jig", "menu": "boosters",  "kind": "booster", "width": 2, "height": 2, "power": 0, "hp": 150, "cost": { "steel": 20 },
-    "booster": { "hosts": ["factory"], "effects": { "precision": 1 }, "maxPerHost": 1 } }
+    "booster": { "hosts": ["factory"], "effects": { "precision": 1 }, "maxPerHost": 1 } },
+  { "id": "core_large", "name": "Large Core", "menu": "logistics", "kind": "core", "width": 3, "height": 3, "power": 0, "powerSupply": 20, "capacity": 5000, "supplyRadius": 16, "hp": 1000, "cost": { "iron_plate": 60, "copper_plate": 40 } }
 ]

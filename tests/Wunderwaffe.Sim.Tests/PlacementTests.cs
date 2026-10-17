@@ -1,6 +1,8 @@
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 
+using static Wunderwaffe.Sim.Tests.Harness;
+
 namespace Wunderwaffe.Sim.Tests;
 
 public class PlacementTests
@@ -12,8 +14,8 @@ public class PlacementTests
         var sim = new Simulation(TestContent.Load());
         var tile = sim.AddTile(0, 0, Player, size: 10);
         tile.Grid.SetDeposit(0, 0, "iron_ore");
-        tile.Inventory.Add("copper_ore", 1000);
-        tile.Inventory.Add("iron_ore", 1000);
+        Fund(sim, tile).Stock!.Add("copper_ore", 1000);
+        Fund(sim, tile).Stock!.Add("iron_ore", 1000);
         return (sim, tile);
     }
 
@@ -87,13 +89,13 @@ public class PlacementTests
         var (sim, tile) = NewSim();
         sim.Enqueue(new PlaceBuildingCommand(Player, 0, "smelter", 4, 4, RecipeId: "smelt_iron"));
         sim.Step();
-        Assert.Equal(1000 - 20, tile.Inventory.Get("copper_ore"));
+        Assert.Equal(1000 - 20, Items(tile, "copper_ore"));
         Assert.Equal("smelt_iron", tile.Grid.BuildingAt(5, 5)!.RecipeId);
 
         sim.Enqueue(new RemoveBuildingCommand(Player, 0, 5, 5));
         sim.Step();
-        Assert.Equal(1000, tile.Inventory.Get("copper_ore"));
-        Assert.Equal(0, tile.Grid.BuildingCount);
+        Assert.Equal(1000, Items(tile, "copper_ore"));
+        Assert.Null(tile.Grid.BuildingAt(5, 5));
     }
 
     [Fact]
@@ -124,8 +126,8 @@ public class PlacementTests
         foreach (var tile in sim.Tiles)
             tile.Owner = Player;
         var coast = sim.Tiles.First(t => t.Grid.BuildableCount > 0 && t.Grid.BuildableCount < t.Grid.Area);
-        coast.Inventory.Add("copper_ore", 1000);
-        coast.Inventory.Add("iron_ore", 1000);
+        Fund(sim, coast).Stock!.Add("copper_ore", 1000);
+        Fund(sim, coast).Stock!.Add("iron_ore", 1000);
 
         var cells = Enumerable.Range(0, coast.Grid.Width * coast.Grid.Height)
             .Select(i => (X: i % coast.Grid.Width, Y: i / coast.Grid.Width)).ToList();

@@ -135,7 +135,7 @@ public class LogisticsTests
         // Container -> belt leading away -> core.
         Place(sim, tile, "container", 2, 10);
         Belt(sim, tile, 4, 10, 3);
-        Place(sim, tile, "core", 7, 9);
+        Place(sim, tile, "core_large", 7, 9);
         Run(sim, 1);
         long start = Items(tile, Iron);
         Run(sim, 30 * Simulation.TicksPerSecond);
@@ -150,7 +150,7 @@ public class LogisticsTests
         Harness.Ore(tile, Iron, 0, 0);
         Place(sim, tile, "drill", 0, 0);
         Place(sim, tile, "smelter", 2, 0, recipe: "smelt_iron"); // Drill feeds it directly: 1 ore/s in, 0.5 plate/s out.
-        Place(sim, tile, "core", 4, 0);
+        Place(sim, tile, "core_large", 4, 0);
         Run(sim, 2 * 60 * Simulation.TicksPerSecond + 1);
 
         var stats = tile.Stats;

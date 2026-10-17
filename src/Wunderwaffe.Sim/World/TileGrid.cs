@@ -10,8 +10,8 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     public BuildingKind Kind { get; } = def.Kind;
     public BuildingDef Def { get; } = def;
 
-    /// <summary>Resource radius in cells (FB-018): <see cref="BuildingDef.SupplyRadius"/>, or <see cref="Balance.CoreSupplyRadius"/> for a core.</summary>
-    public int SupplyRadius { get; } = def.Kind == BuildingKind.Core ? Balance.CoreSupplyRadius : def.SupplyRadius;
+    /// <summary>Resource radius in cells (FB-018): <see cref="BuildingDef.SupplyRadius"/> (cores set theirs in buildings.json).</summary>
+    public int SupplyRadius { get; } = def.SupplyRadius;
 
     /// <summary>Player who placed or landed it; a tile's core belongs to the tile's owner. Need not be the tile's owner.</summary>
     public int Owner { get; internal set; } = owner;
@@ -55,6 +55,9 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     };
     public SorterState? Sorter { get; } = def.Kind == BuildingKind.Sorter ? new SorterState() : null;
 
+    /// <summary>A core's own stock (FB-007, FB-019): build funds on its tile, up to <see cref="BuildingDef.Capacity"/> per item from deliveries.</summary>
+    public Core.Inventory? Stock { get; } = def.Kind == BuildingKind.Core ? new Core.Inventory() : null;
+
     /// <summary>Takes part in a power network (FB-005); see <see cref="BuildingDef.IsPower"/>.</summary>
     public bool IsPower { get; } = def.IsPower;
 }
@@ -87,6 +90,7 @@ public sealed class TileGrid
     readonly List<PlacedBuilding> _factories = [];
     readonly List<PlacedBuilding> _storages = [];
     readonly List<PlacedBuilding> _relays = [];
+    readonly List<PlacedBuilding> _cores = [];
     readonly bool[] _frames;
     readonly bool[] _platforms;
 
@@ -151,6 +155,9 @@ public sealed class TileGrid
     public IReadOnlyList<PlacedBuilding> ExportPorts => _exportPorts;
     public IReadOnlyList<PlacedBuilding> ImportPorts => _importPorts;
     public IReadOnlyList<PlacedBuilding> Storages => _storages;
+
+    /// <summary>Cores standing on the tile, every owner's, in id order (WM-016).</summary>
+    public IReadOnlyList<PlacedBuilding> Cores => _cores;
 
     /// <summary>Junctions, routers and bridges (FB-004).</summary>
     public IReadOnlyList<PlacedBuilding> Relays => _relays;
@@ -360,6 +367,7 @@ public sealed class TileGrid
         BuildingKind.UnitFactory => _factories,
         BuildingKind.Storage => _storages,
         BuildingKind.Junction or BuildingKind.Router or BuildingKind.Bridge => _relays,
+        BuildingKind.Core => _cores,
         _ => null,
     };
 
@@ -383,7 +391,7 @@ public sealed class TileGrid
         Array.Clear(_platforms);
         _buildings.Clear();
         _buildings.Add(null);
-        foreach (var list in new[] { _belts, _machines, _exportPorts, _importPorts, _combat, _suppliers, _factories, _storages, _relays })
+        foreach (var list in new[] { _belts, _machines, _exportPorts, _importPorts, _combat, _suppliers, _factories, _storages, _relays, _cores })
             list.Clear();
         _wrecks.Clear();
         _wrecks.Add(null);

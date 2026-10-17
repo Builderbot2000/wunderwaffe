@@ -13,8 +13,8 @@ public class CombatTests
         var sim = NewSim();
         var mine = Tile(sim, 0, 0, owner: Me);
         var theirs = Tile(sim, 1, 0, owner: Them);
-        mine.Inventory.Add("shell", 1000);
-        theirs.Inventory.Add("shell", 1000);
+        Fund(sim, mine).Stock!.Add("shell", 1000);
+        Fund(sim, theirs).Stock!.Add("shell", 1000);
         return (sim, mine, theirs);
     }
 
@@ -314,7 +314,7 @@ public class CombatTests
         Assert.Equal(20, near.BlockCombat[gun]!.Ammo);
         Assert.Equal(40, near.Cargo.Get("shell"));
         Assert.Equal(0, far.BlockCombat[gun]!.Ammo);
-        Assert.Same(mine.Inventory, ResourceRadius.SupplierFor(sim, near));
+        Assert.Same(Fund(sim, mine).Stock, ResourceRadius.SupplierFor(sim, near));
         Assert.Null(ResourceRadius.SupplierFor(sim, far));
         Assert.True(ResourceRadius.Covers(sim, Me, near.X, near.Y));
     }

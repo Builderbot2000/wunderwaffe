@@ -18,7 +18,7 @@ public class PowerTests
         var tile = Tile(sim);
         Harness.Ore(tile, Iron, 10, 10);
         Place(sim, tile, "drill", 10, 10);
-        Place(sim, tile, "core", 12, 10);
+        Place(sim, tile, "core_large", 12, 10);
         Run(sim, 61);
 
         Assert.Equal(1, Made(tile, Iron));
@@ -35,7 +35,7 @@ public class PowerTests
         var tile = Tile(sim);
         Harness.Ore(tile, Iron, 10, 10);
         Place(sim, tile, "drill", 10, 10);
-        Place(sim, tile, "core", 20, 10); // Not touching.
+        Place(sim, tile, "core_large", 20, 10); // Not touching.
         Run(sim, 600);
 
         Assert.Equal(0, Made(tile, Iron));
@@ -51,7 +51,7 @@ public class PowerTests
         var tile = Tile(sim);
         Harness.Ore(tile, Iron, 10, 10);
         Place(sim, tile, "drill", 10, 10);
-        Place(sim, tile, "core", 20, 10);
+        Place(sim, tile, "core_large", 20, 10);
         for (int x = 12; x < 20; x++)
             Place(sim, tile, "wire", x, 10);
         Run(sim, 61);
@@ -67,7 +67,7 @@ public class PowerTests
         // Twenty touching drills (40 power) on one core (20): each runs at half speed.
         var sim = PoweredSim();
         var tile = Tile(sim, size: 44);
-        Place(sim, tile, "core", 0, 1);
+        Place(sim, tile, "core_large", 0, 1);
         for (int i = 0; i < 20; i++)
         {
             Harness.Ore(tile, Iron, i * 2, 4);
@@ -87,7 +87,7 @@ public class PowerTests
         // Core -> fuel press (touching) -> generator (touching); a copper drill feeds the press.
         var sim = PoweredSim();
         var tile = Tile(sim);
-        Place(sim, tile, "core", 0, 0);
+        Place(sim, tile, "core_large", 0, 0);
         Harness.Ore(tile, Copper, 3, 2);
         Place(sim, tile, "drill", 3, 2);
         Place(sim, tile, "fuel_press", 3, 0, recipe: "press_fuel");
@@ -112,7 +112,7 @@ public class PowerTests
         // Core - wire - battery - drill, the drill emptying into a container.
         var sim = PoweredSim();
         var tile = Tile(sim);
-        Place(sim, tile, "core", 0, 0);
+        Place(sim, tile, "core_large", 0, 0);
         Place(sim, tile, "wire", 3, 0);
         Place(sim, tile, "battery", 4, 0);
         Harness.Ore(tile, Iron, 5, 0);

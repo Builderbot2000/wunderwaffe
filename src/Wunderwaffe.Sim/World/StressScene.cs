@@ -27,8 +27,9 @@ public static class StressScene
         for (int t = 0; t < FullTiles; t++)
         {
             var tile = sim.AddStartingTile(t, 0, owner: 0, seed: (ulong)t);
-            tile.Inventory.Add("copper_ore", 1_000_000);
-            tile.Inventory.Add("iron_ore", 1_000_000);
+            var core = tile.Grid.Cores[0].Stock!;
+            core.Add("copper_ore", 1_000_000);
+            core.Add("iron_ore", 1_000_000);
             full.Add(tile);
         }
         var rate = new List<TileState>();
@@ -38,8 +39,9 @@ public static class StressScene
             for (int c = 0; c < RateColumns; c++)
             {
                 var tile = sim.AddTile(c, top + r, owner: 0, size: SmallSize);
-                tile.Inventory.Add("copper_ore", 1_000);
-                tile.Inventory.Add("iron_ore", 1_000);
+                var core = sim.AddCore(tile, 0, 6, 6, "core_large").Stock!;
+                core.Add("copper_ore", 1_000);
+                core.Add("iron_ore", 1_000);
                 rate.Add(tile);
             }
         }
@@ -85,7 +87,6 @@ public static class StressScene
     {
         Ore(t, "copper_ore", 9, 6);
         Ore(t, "iron_ore", 6, 11);
-        Place(sim, t, "core", 6, 6);
         Place(sim, t, "drill", 9, 6);
         Place(sim, t, "smelter", 6, 9, "smelt_iron");
         Place(sim, t, "drill", 6, 11);
