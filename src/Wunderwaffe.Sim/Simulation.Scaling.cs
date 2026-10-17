@@ -27,6 +27,12 @@ public sealed partial class Simulation
 
     internal SortedDictionary<int, AbstractNode> AbstractNodes => _abstract;
 
+    /// <summary>
+    /// Units halted on their way to fight enemy units they met (UC-009), by id, with the order they will resume (a new
+    /// order ends the interruption). Hashed and snapshotted by id.
+    /// </summary>
+    internal SortedDictionary<int, UnitOrder?> InterruptedUnits { get; } = [];
+
     /// <summary>True while the unit is an abstract world-map node: not rendered on a tile, no physics (UC-009).</summary>
     public bool IsAbstract(Unit u) => _abstract.ContainsKey(u.Id);
 
@@ -56,6 +62,7 @@ public sealed partial class Simulation
         _units.Clear();
         _unitsById.Clear();
         _abstract.Clear();
+        InterruptedUnits.Clear();
         foreach (var u in units)
         {
             _units.Add(u);

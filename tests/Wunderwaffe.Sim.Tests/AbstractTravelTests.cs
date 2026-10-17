@@ -99,6 +99,138 @@ public class AbstractTravelTests
     }
 
     [Fact]
+    public void CrossingTheViewedTilesBorderMakesANodeThereWithoutStopping()
+    {
+        // UC-005: a unit flies physically across the viewed tile and goes abstract the tick it crosses, still moving.
+        var sim = NewSim();
+        sim.RateModeEnabled = true;
+        var a = Tile(sim, 0, 0);
+        Tile(sim, 1, 0);
+        var u = Scout(sim, a, 15, 15);
+        sim.Enqueue(new SetViewedTileCommand(Me, a.Id));
+        Run(sim, 2);
+        Assert.False(sim.IsAbstract(u));
+        sim.Enqueue(new MoveUnitsCommand(Me, [u.Id], a.Id + 1, 25, 15));
+        for (int i = 0; i < 5000 && u.TileId == a.Id; i++)
+        {
+            sim.Step();
+            Assert.Equal(u.TileId != a.Id, sim.IsAbstract(u));
+        }
+        Assert.True(sim.IsAbstract(u));
+        Assert.True(u.Moving);
+
+        // No wait at the border: from the first tick it covers its cruise speed (within rounding) every tick.
+        for (int i = 0; i < 10; i++)
+        {
+            int x = u.X;
+            sim.Step();
+            Assert.True(u.X - x >= AbstractTravel.Speed(u) * 9 / 10, $"tick {i}: moved {u.X - x}");
+        }
+    }
+
+    [Fact]
+    public void ANodeOrderedOffTheViewedTileIsANodeFromTheStart()
+    {
+        var (sim, u, _) = Trip(rateMode: true);
+        Assert.True(sim.IsAbstract(u));
+        Assert.True(u.Moving);
+    }
+
+    [Fact]
+    public void ANodePassingThroughTheViewedTileMaterialisesThereAndGoesAbstractAgainAfter()
+    {
+        var sim = NewSim();
+        sim.RateModeEnabled = true;
+        var a = Tile(sim, 0, 0);
+        var mid = Tile(sim, 1, 0);
+        var far = Tile(sim, 2, 0);
+        var u = Scout(sim, a, 4, 15);
+        sim.Enqueue(new SetViewedTileCommand(Me, mid.Id));
+        sim.Enqueue(new MoveUnitsCommand(Me, [u.Id], far.Id, 25, 15));
+        sim.Step();
+        Assert.True(sim.IsAbstract(u));
+        var order = u.Order;
+
+        bool sawPhysical = false;
+        for (int i = 0; i < 20_000 && u.Moving; i++)
+        {
+            sim.Step();
+            Assert.Equal(u.TileId != mid.Id, sim.IsAbstract(u));
+            sawPhysical |= u.TileId == mid.Id;
+            if (u.Moving)
+                Assert.Same(order, u.Order);
+        }
+        Assert.True(sawPhysical);
+        Assert.False(u.Moving);
+        Assert.Equal(far.Id, u.TileId);
+
+        // A stopped node stays one, exactly where it is, until its tile is opened.
+        var (x, y) = (u.X, u.Y);
+        Run(sim, 300);
+        Assert.True(sim.IsAbstract(u));
+        Assert.Equal((x, y), (u.X, u.Y));
+        sim.Enqueue(new SetViewedTileCommand(Me, far.Id));
+        sim.Step();
+        Assert.False(sim.IsAbstract(u));
+        Assert.Equal((x, y), (u.X, u.Y));
+    }
+
+    /// <summary>My scout travels from tile 0 to tile 2 through tile 1, where an enemy scout is parked; nobody views anything.</summary>
+    static (Simulation Sim, Unit Mine, Unit Enemy, TileState Mid, TileState Far) Ambush(Stance stance)
+    {
+        var sim = NewSim();
+        sim.RateModeEnabled = true;
+        var a = Tile(sim, 0, 0);
+        var mid = Tile(sim, 1, 0, owner: Them);
+        var far = Tile(sim, 2, 0);
+        var mine = Scout(sim, a, 4, 15);
+        var enemy = Scout(sim, mid, 15, 25, Them);
+        sim.Enqueue(new SetStanceCommand(Me, [mine.Id], stance));
+        sim.Enqueue(new MoveUnitsCommand(Me, [mine.Id], far.Id, 25, 15));
+        sim.Step();
+        Assert.True(sim.IsAbstract(mine));
+        for (int i = 0; i < 20_000 && mine.TileId != mid.Id; i++)
+            sim.Step();
+        return (sim, mine, enemy, mid, far);
+    }
+
+    [Fact]
+    public void AnAggressiveNodeThatMeetsEnemiesStopsToFightThenResumesItsOrder()
+    {
+        var (sim, u, enemy, mid, far) = Ambush(Stance.Aggressive);
+        var order = u.Order;
+        Assert.True(RateMode.IsFullSim(sim, mid));
+        Assert.False(sim.IsAbstract(u));
+        Assert.True(AbstractTravel.IsInterrupted(sim, u));
+
+        Run(sim, 600);
+        Assert.Equal(mid.Id, u.TileId);
+        Assert.Same(order, u.Order);
+        Assert.False(sim.IsAbstract(u));
+
+        Combat.DestroyUnit(sim, enemy);
+        for (int i = 0; i < 20_000 && (u.TileId != far.Id || u.Moving); i++)
+            sim.Step();
+        Assert.False(AbstractTravel.IsInterrupted(sim, u));
+        Assert.Equal(far.Id, u.TileId);
+        Assert.False(u.Moving);
+        Assert.True(sim.IsAbstract(u));
+    }
+
+    [Fact]
+    public void APassiveNodeThatMeetsEnemiesKeepsItsCourse()
+    {
+        var (sim, u, _, mid, far) = Ambush(Stance.Passive);
+        Assert.True(RateMode.IsFullSim(sim, mid));
+        Assert.False(sim.IsAbstract(u));
+        Assert.False(AbstractTravel.IsInterrupted(sim, u));
+        Assert.True(u.Moving);
+        Arrive(sim, u);
+        Assert.Equal(far.Id, u.TileId);
+        Assert.True(sim.IsAbstract(u));
+    }
+
+    [Fact]
     public void TurretsCanNotSeeAnAbstractUnitUntilItMaterialises()
     {
         // A laser by the border of my viewed tile, an enemy scout parked just across it on their own unviewed tile.

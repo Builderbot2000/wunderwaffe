@@ -387,5 +387,7 @@ internal sealed class StateHash
                 Mix(y);
             }
         }
+        foreach (int id in sim.InterruptedUnits.Keys)
+            Mix(id);
     }
 }
