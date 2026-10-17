@@ -319,6 +319,7 @@ public sealed partial class Simulation
         // Hand-built tiles keep their circle in the middle; generation moves it onto the deposits (WM-014).
         (tile.CircleX, tile.CircleY) = (tile.CenterX - ox, tile.CenterY - oy);
         _tiles.Add(tile);
+        tile.Grid.Power.Join(Power, id);
         return tile;
     }
 

@@ -22,7 +22,7 @@ internal static class TileEntities
         if (grid.BuildingCount == 0)
             return;
 
-        PowerNet.Step(grid);
+        PowerNet.Step(sim, tile);
 
         foreach (var b in grid.Machines)
         {

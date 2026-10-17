@@ -63,6 +63,9 @@ public static class Palette
     /// <summary>Floating platform deck (FB-017).</summary>
     public static readonly Color Platform = new(0.55f, 0.42f, 0.28f);
 
+    /// <summary>Power cables (FB-020) and a power node's reach while placing it.</summary>
+    public static readonly Color Cable = new(0.95f, 0.7f, 0.25f);
+
     /// <summary>A tile's victory circle on the tile view (WM-014).</summary>
     public static readonly Color Circle = new(1f, 0.9f, 0.4f, 0.55f);
 

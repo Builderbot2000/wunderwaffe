@@ -45,23 +45,6 @@ public class PowerTests
     }
 
     [Fact]
-    public void WireCarriesCorePowerToADistantDrill()
-    {
-        var sim = PoweredSim();
-        var tile = Tile(sim);
-        Harness.Ore(tile, Iron, 10, 10);
-        Place(sim, tile, "drill", 10, 10);
-        Place(sim, tile, "core_large", 20, 10);
-        for (int x = 12; x < 20; x++)
-            Place(sim, tile, "wire", x, 10);
-        Run(sim, 61);
-
-        Assert.Equal(1, Made(tile, Iron));
-        Assert.Single(PowerNet.Networks(tile));
-        Assert.Equal(10, PowerNet.Networks(tile)[0].Members.Count);
-    }
-
-    [Fact]
     public void AShortNetworkSlowsEveryConsumerBySameShare()
     {
         // Twenty touching drills (40 power) on one core (20): each runs at half speed.

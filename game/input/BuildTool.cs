@@ -208,6 +208,8 @@ public partial class BuildTool : Node2D
             DrawPortZone(px);
         var (x, y, w, h) = Footprint(HoveredCell());
         var tint = _preview == PlaceResult.Ok ? Palette.GhostOk : Palette.GhostBad;
+        if (Selected is { IsFrame: false } picked && _host.Sim.Content.Buildings[picked.BuildingId] is { Kind: BuildingKind.PowerNode } node)
+            DrawNodeRadius(px, x, y, w, h, node.PowerRadius);
         if (Sprites.Get(_tools[_selected].BuildingId) is { } tex)
         {
             // Same transform as the placed building, drawn as a tinted ghost.
@@ -220,6 +222,31 @@ public partial class BuildTool : Node2D
             return;
         }
         DrawRect(new Rect2(x * px, y * px, w * px, h * px), tint);
+    }
+
+    /// <summary>
+    /// A power node's reach while placing it (FB-020): every cell within its radius, shaded, and a line to each
+    /// generator, battery and node it would join (<see cref="TilePower.InRadius(TileGrid, int, int, int, int, int, PlacedBuilding?)"/>).
+    /// </summary>
+    void DrawNodeRadius(float px, int x, int y, int w, int h, int r)
+    {
+        var grid = _host.ViewedTile.Grid;
+        var shade = Palette.Cable with { A = 0.12f };
+        for (int cy = y - r; cy < y + h + r; cy++)
+        {
+            for (int cx = x - r; cx < x + w + r; cx++)
+            {
+                int dx = Mathf.Max(0, Mathf.Max(cx - (x + w - 1), x - cx)), dy = Mathf.Max(0, Mathf.Max(cy - (y + h - 1), y - cy));
+                if (dx * dx + dy * dy <= r * r && grid.InBounds(cx, cy))
+                    DrawRect(new Rect2(cx * px, cy * px, px, px), shade);
+            }
+        }
+        var from = new Vector2(x + w * 0.5f, y + h * 0.5f) * px;
+        foreach (var b in TilePower.InRadius(grid, x, y, w, h, r))
+        {
+            DrawLine(from, new Vector2(b.X + b.Width * 0.5f, b.Y + b.Height * 0.5f) * px, Palette.Cable, 2);
+            DrawRect(new Rect2(b.X * px, b.Y * px, b.Width * px, b.Height * px), Palette.Cable, false, 2);
+        }
     }
 
     /// <summary>True if the picked tool is an import or export port, which go in an I/O zone.</summary>

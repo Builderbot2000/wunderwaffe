@@ -104,7 +104,9 @@ public sealed record StageProgressView(BuildStage Stage, int Done, int Total);
 
 /// <summary>A power network's balance this tick (FB-005).</summary>
 /// <param name="Satisfaction">Permille of demand met.</param>
-public sealed record PowerView(int Id, IReadOnlyList<int> Members, long Supply, long Demand, long Stored, long Capacity, int Satisfaction);
+/// <param name="Tiles">Every tile the network spans (FB-020), ascending.</param>
+public sealed record PowerView(int Id, IReadOnlyList<int> Members, long Supply, long Demand, long Stored, long Capacity, int Satisfaction,
+    IReadOnlyList<int>? Tiles = null);
 
 /// <summary>A tile's production over the last minute (FB-011).</summary>
 public sealed record ProductionView(IReadOnlyList<ItemRate> Items, IReadOnlyList<PartnerRate> Sent);
