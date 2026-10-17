@@ -7,9 +7,9 @@ rules on top. Branch from the Wave 0 (foundation) commit.
 
 - **No tech tree (TT-001).** Every building and recipe is available from the start. `Progression` is only the goal
   chain (`goals.json`, `UnlockCondition` types `produce`/`claim`/`ship`/`launch`, counters on `PlayerState`).
-- **Building owner.** `PlacedBuilding.Owner` is the player who placed it (`PlaceBuildingCommand.Player`), the tile's
-  owner for a tile core (`Simulation.PlaceCore`), or the unit's owner for blocks put back by landing
-  (`UnitAssembly.Deploy`). It need not equal `TileState.Owner`; placement needs presence, not ownership (see Territory rules
+- **Building owner.** `PlacedBuilding.Owner` is the player who placed it (`PlaceBuildingCommand.Player`), the starting
+  player for the starting unit's blocks (`Simulation.PlaceStartingUnit`), or the unit's owner for blocks put back by
+  landing (`UnitAssembly.Deploy`). It need not equal `TileState.Owner`; placement needs presence, not ownership (see Territory rules
   below). Frame cells have no owner: they belong to whoever owns the tile.
 - **Hit points.** `BuildingDef.Hp` (`hp` in `buildings.json`, validated > 0) is one block's full HP.
   `PlacedBuilding.Hp` and `UnitBlock.Hp` are the current value (both `internal set`), carried across lift-off
@@ -19,6 +19,20 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   `Simulation.ChooseStarts` is a placeholder farthest-point spread over tile-graph steps (A replaces it, OQ-22). The
   local player is still `SimHost.LocalPlayer` = 0, and the new-game menu has no player count yet (G).
 - **Saves** are not backward compatible (greenfield). Bump `SaveFile.CurrentVersion` when replay results change.
+- **One core kind (WM-016, OQ-37).** `BuildingKind.Core` only (no unit core): variants `core` (2x2, the starting
+  unit's) and `core_large` (3x3) in buildings.json, each with `cost` (never empty), `hp`, `powerSupply`,
+  `supplyRadius` and `capacity` (per item, validated > 0, cores only). Runtime stock is `PlacedBuilding.Stock`
+  (hashed in `MixEntity`, in `BuildingSnap.Stock`); `TileGrid.Cores` lists them in id order. There is no
+  `TileState.Inventory`. Every unit has exactly one core; on a unit its stock is `Unit.Cargo`.
+- **Start (WM-005).** No free core: `Simulation.SettleStartingTile` places a landed starting unit (thruster, 2x2 core,
+  thruster on a 4x2 frame) nearest the circle centre, its core holding `Balance.StartingItems`. In code until prefabs.
+- **Lift-off and landing (UD-010).** `UnitAssembly.Launch` drains the core's stock and every lifted building's items
+  (`TileEntities.Drain(b, into)`) into `Unit.Cargo`; `Deploy` puts the whole cargo back into the landed core.
+- **Elimination.** `Simulation.CoreCount` / `Victory.HasCore` count cores on tiles and units (every unit has one).
+- **Rate mode** books `FlowKind.Core` per core (`Flow.PortId` = the core's id), held to its capacity.
+- **Tests:** hand-built tiles get funds from a test-only `bank` core (1x1, no power, huge capacity) via
+  `Harness.Tile`/`Bank`/`Fund`; test content also adds a 1x1 `unit_core` core variant so unit tests keep one-row
+  designs. `Simulation.AddCore` puts a core down unpaid for tests and scenes.
 
 ## Combat conventions (silo F)
 
@@ -38,12 +52,16 @@ rules on top. Branch from the Wave 0 (foundation) commit.
 - **Presence, not ownership, gates acting on a tile** (WM-015): `Territory.HasPresence(sim, player, tile)` (owns it, or
   has a building or unit there). Nobody builds or lands with a cell in an enemy-owned circle while a building not of
   theirs stands there (`Territory.EnemyCircleBlocks`). New placement-like checks should use these, not `tile.Owner`.
-- **Who pays:** `Territory.Payer(sim, tile, player, cost)`: the tile if owned and affordable, else the first owned
-  neighbour that can. Nobody spends a stock that isn't theirs.
+- **Who pays (FB-019, OQ-38, OQ-39):** `World/Funds.cs`. Paying on tile T (buildings, frames, blueprints, repairs) comes
+  only from the player's cores standing on T, in id order, all or nothing: `Funds.CanPay` (read-only, for UI, AI,
+  `GameQuery.CanAfford`) and `Funds.TryPay`. Never from neighbours, cores on units or other players. Refunds and drained
+  items go to `Funds.Refund` (the player's core on T nearest the building; none → lost; not held to capacity). Belts
+  respect capacity through `Funds.Accepts`. HUD stock is `Funds.Total` (world map: `GameQuery.ResourceTotals`).
 - **Claims** have no command: `Expansion.Step` (phase 2) runs per-tile circle timers (`TileState.ClaimTicks`) and
   `Expansion.Claim` destroys rivals' buildings in the circle through `Territory.DestroyBuilding`.
-- **Expansion path:** each start has a landed scout (thruster, unit core, thruster on frame); lift it off, move it to
-  `(tile.CircleX, tile.CircleY)`, land it, wait the capture time.
+- **Expansion path:** each start is a landed scout (thruster, core, thruster on frame) in its circle; build a second
+  core at home first (else home has no funds once it leaves), lift it off with stock in its core, move it to
+  `(tile.CircleX, tile.CircleY)`, land it, wait the capture time; its cargo is the new tile's funds.
 - **Contested:** `Territory.IsContested` / `ContestedTiles`, computed live from unit positions.
 
 ## Tick order inside `Simulation.Step`
