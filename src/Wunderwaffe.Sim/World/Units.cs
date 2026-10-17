@@ -25,17 +25,17 @@ public readonly record struct Thruster(int Thrust, int Dir);
 /// </summary>
 public enum Stance
 {
-    /// <summary>Fires at and chases anything it finds.</summary>
+    /// <summary>With no order, seeks out and attacks the nearest enemy anywhere on its tile; stops to fight when travelling.</summary>
     Aggressive,
 
-    /// <summary>Fires and chases, but only within <see cref="UnitSim.LeashCells"/> of its anchor, then goes back to it.</summary>
+    /// <summary>Fires and chases, but at most <see cref="UnitSim.LeashCells"/> from its anchor or course, then goes back and resumes.</summary>
     Defensive,
 
-    /// <summary>Never fires on its own.</summary>
-    HoldFire,
+    /// <summary>Keeps its course and speed; fires only at enemies in weapon range and never chases.</summary>
+    Passive,
 
-    /// <summary>Follows <see cref="Unit.EscortId"/> and only fights near it.</summary>
-    Escort,
+    /// <summary>Never fires or moves on its own; only carries out orders.</summary>
+    HoldFire,
 }
 
 /// <summary>
@@ -251,9 +251,6 @@ public sealed class Unit
     /// <summary>Where a defensive unit returns to, in world sub-cells: where it last stopped or was given its stance.</summary>
     public int AnchorX { get; internal set; }
     public int AnchorY { get; internal set; }
-
-    /// <summary>The unit an escort follows, or -1.</summary>
-    public int EscortId { get; internal set; } = -1;
 
     /// <summary>The squad it belongs to (UC-002), or 0 for none.</summary>
     public int SquadId { get; internal set; }

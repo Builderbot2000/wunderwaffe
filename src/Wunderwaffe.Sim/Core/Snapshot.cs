@@ -242,7 +242,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
     int[]? Route, int[]? RouteRegions, int RouteIndex, int DestTileId, int DestX, int DestY,
     List<Point>? Path, int PathIndex, PathKeySnap? PathKey, PortalSnap? Portal,
     UnitOrder? Order, int SlotX, int SlotY, bool PatrolReturning, bool Chasing, Stance Stance, int AnchorX, int AnchorY,
-    int EscortId, int SquadId, List<CombatSnap?> BlockCombat, Dictionary<string, long> Cargo, long UpkeepDue, bool Unsupplied)
+    int SquadId, List<CombatSnap?> BlockCombat, Dictionary<string, long> Cargo, long UpkeepDue, bool Unsupplied)
 {
     internal static UnitSnap Of(Unit u) => new(u.Id, u.Owner, u.TileId, u.X, u.Y, u.VX, u.VY, u.Angle, u.AngVel,
         u.Blocks.Select(b => b with { }).ToList(), u.Cells.Select(c => new CellSnap(c.GX, c.GY, c.Mass)).ToList(), u.CoreGX, u.CoreGY,
@@ -250,7 +250,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
         u.Path?.Select(p => new Point(p.X, p.Y)).ToList(), u.PathIndex,
         u.PathKey is { } k ? new PathKeySnap(k.Tile, k.Next, k.Revision, k.GoalX, k.GoalY) : null,
         u.Portal is { } p ? new PortalSnap(p.Tile, p.Next, p.X, p.Y) : null,
-        u.Order, u.SlotX, u.SlotY, u.PatrolReturning, u.Chasing, u.Stance, u.AnchorX, u.AnchorY, u.EscortId, u.SquadId,
+        u.Order, u.SlotX, u.SlotY, u.PatrolReturning, u.Chasing, u.Stance, u.AnchorX, u.AnchorY, u.SquadId,
         u.BlockCombat.Select(CombatSnap.Of).ToList(), u.Cargo.Entries.ToDictionary(kv => kv.Key, kv => kv.Value), u.UpkeepDue, u.Unsupplied);
 
     internal Unit Restore(Simulation sim)
@@ -265,7 +265,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
             PathKey = PathKey is { } k ? (k.Tile, k.Next, k.Revision, k.GoalX, k.GoalY) : null,
             Portal = Portal is { } p ? (p.Tile, p.Next, p.X, p.Y) : null,
             Order = Order, SlotX = SlotX, SlotY = SlotY, PatrolReturning = PatrolReturning, Chasing = Chasing, Stance = Stance,
-            AnchorX = AnchorX, AnchorY = AnchorY, EscortId = EscortId, SquadId = SquadId,
+            AnchorX = AnchorX, AnchorY = AnchorY, SquadId = SquadId,
             UpkeepDue = UpkeepDue, Unsupplied = Unsupplied,
         };
         for (int i = 0; i < BlockCombat.Count; i++)

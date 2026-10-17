@@ -270,7 +270,6 @@ internal sealed class StateHash
         Mix((int)u.Stance);
         Mix(u.AnchorX);
         Mix(u.AnchorY);
-        Mix(u.EscortId);
         Mix(u.SquadId);
     }
 

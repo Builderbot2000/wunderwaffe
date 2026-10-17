@@ -29,9 +29,9 @@ public sealed partial class GameQuery
 
     public SquadResult CheckSquad(int squadId) => UnitSim.CheckSquad(Sim, Player, squadId);
 
-    /// <summary>A unit's command state: current order, stance, squad, escort, locomotion and upkeep (UD-013), or null.</summary>
+    /// <summary>A unit's command state: current order, stance, squad, locomotion and upkeep (UD-013), or null.</summary>
     public UnitOrderView? UnitOrders(int unitId) =>
         Sim.UnitById(unitId) is { } u
-            ? new UnitOrderView(u.Id, u.Order?.Kind, u.Stance, u.SquadId, u.EscortId, u.Locomotion, u.Unsupplied)
+            ? new UnitOrderView(u.Id, u.Order?.Kind, u.Stance, u.SquadId, u.Locomotion, u.Unsupplied)
             : null;
 }

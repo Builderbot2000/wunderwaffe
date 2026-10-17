@@ -162,8 +162,6 @@ public partial class UnitTool : Node2D
             else
                 _host.Send(new SetStanceCommand(me, ids, Stances[next]));
         }
-        else if (e.IsActionPressed(InputActions.UnitEscort) && _host.View == ViewMode.Tile && UnitUnderCursor() is { } charge)
-            _host.Send(new SetStanceCommand(me, [.. ids.Where(id => id != charge.Id)], Stance.Escort, charge.Id));
         else
             return false;
         GetViewport().SetInputAsHandled();

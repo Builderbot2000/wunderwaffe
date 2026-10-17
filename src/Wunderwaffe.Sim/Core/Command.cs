@@ -242,10 +242,10 @@ public sealed record RetreatUnitsCommand(int Player, int[] UnitIds) : Command(Pl
     internal override void Apply(Simulation sim) => UnitSim.Issue(sim, Player, UnitIds, OrderKind.Retreat, -1, 0, 0);
 }
 
-/// <summary>Sets units' stance (UC-004); an escort follows unit <paramref name="EscortId"/>.</summary>
-public sealed record SetStanceCommand(int Player, int[] UnitIds, Stance Stance, int EscortId = -1) : Command(Player)
+/// <summary>Sets units' stance (UC-004).</summary>
+public sealed record SetStanceCommand(int Player, int[] UnitIds, Stance Stance) : Command(Player)
 {
-    internal override void Apply(Simulation sim) => UnitSim.SetStance(sim, Player, UnitIds, Stance, EscortId);
+    internal override void Apply(Simulation sim) => UnitSim.SetStance(sim, Player, UnitIds, Stance);
 }
 
 /// <summary>Makes a named squad of units, taking them out of any other (UC-002).</summary>

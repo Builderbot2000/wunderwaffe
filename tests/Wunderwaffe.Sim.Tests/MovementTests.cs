@@ -364,22 +364,6 @@ public class MovementTests
         Assert.False(UnitSim.MayChase(sim, unit, unit.X + S, unit.Y));
     }
 
-    [Fact]
-    public void AnEscortFollowsItsCharge()
-    {
-        var sim = NewSim();
-        var tile = Tile(sim, size: 60);
-        var lead = Scout(sim, tile, 10, 10);
-        var escort = Scout(sim, tile, 10, 14);
-        sim.Enqueue(new SetStanceCommand(Me, [escort.Id], Stance.Escort, lead.Id));
-        sim.Enqueue(new MoveUnitsCommand(Me, [lead.Id], tile.Id, 45, 45));
-        sim.Step();
-        Assert.Equal(Stance.Escort, escort.Stance);
-        Assert.True(RunUntil(sim, () => !lead.Moving, 4000));
-        Run(sim, 1500);
-        Assert.True(Dist(escort.X, escort.Y, lead.X, lead.Y) < 10, $"escort {Dist(escort.X, escort.Y, lead.X, lead.Y):F1} cells away");
-    }
-
     // --- factory rally (UC-006) ---
 
     [Fact]
