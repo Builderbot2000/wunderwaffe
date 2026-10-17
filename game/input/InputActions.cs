@@ -43,10 +43,10 @@ public static class InputActions
     public const string UnitSquad = "unit_squad";
     /// <summary>Cycles the selected squad's formation.</summary>
     public const string UnitFormation = "unit_formation";
-    /// <summary>Cycles the selection's stance: aggressive, defensive, hold fire.</summary>
+    /// <summary>Cycles the selection's stance: aggressive, defensive, passive, hold fire (UC-004).</summary>
     public const string UnitStance = "unit_stance";
-    /// <summary>The selection escorts the unit under the cursor.</summary>
-    public const string UnitEscort = "unit_escort";
+    /// <summary>Cycles the selection's targeting mode: nearest, most blocks, most weapons (CB-007).</summary>
+    public const string UnitTargeting = "unit_targeting";
     /// <summary>Over a unit core or factory: arms its rally point, set by the next right-click.</summary>
     public const string UnitRally = "unit_rally";
     /// <summary>I: steps the hovered sorter's filter to the next item (FB-004).</summary>
@@ -89,7 +89,7 @@ public static class InputActions
         Add(UnitSquad, Key.Q);
         Add(UnitFormation, Key.T);
         Add(UnitStance, Key.V);
-        Add(UnitEscort, Key.E);
+        Add(UnitTargeting, Key.E);
         Add(UnitRally, Key.Y);
         Add(CycleFilter, Key.I);
         Add(StatsToggle, Key.O);
@@ -112,7 +112,7 @@ public static class InputActions
         [WorldClaim] = "Send units to circle", [UnitToggle] = "Lift off / land", [AttackMove] = "Attack-move",
         [BlueprintLibrary] = "Blueprint library", [BlueprintFlip] = "Mirror blueprint", [BlueprintRecord] = "Record unit design",
         [UnitHold] = "Hold position", [UnitPatrol] = "Patrol", [UnitRetreat] = "Retreat", [UnitSquad] = "Make squad",
-        [UnitFormation] = "Next formation", [UnitStance] = "Next stance", [UnitEscort] = "Escort", [UnitRally] = "Set rally point",
+        [UnitFormation] = "Next formation", [UnitStance] = "Next stance", [UnitTargeting] = "Next targeting mode", [UnitRally] = "Set rally point",
         [CycleFilter] = "Sorter filter", [StatsToggle] = "Production stats", [LogisticsToggle] = "Logistics overlay",
     };
 

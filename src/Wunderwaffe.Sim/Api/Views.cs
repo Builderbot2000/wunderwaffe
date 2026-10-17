@@ -92,7 +92,8 @@ public sealed record TravelView(IReadOnlyList<int> Tiles, long Length, long Tick
 
 /// <summary>A squad (UC-002); <paramref name="Members"/> in slot order.</summary>
 public sealed record SquadView(
-    int Id, int Owner, string Name, IReadOnlyList<int> Members, Formation Formation, Stance Stance, OrderKind? Order, int TargetId);
+    int Id, int Owner, string Name, IReadOnlyList<int> Members, Formation Formation, Stance Stance, OrderKind? Order, int TargetId,
+    TargetMode Targeting);
 
 /// <summary>A unit factory's progress (UD-006).</summary>
 /// <param name="Next">Index of the step being built, of <paramref name="Steps"/>.</param>
@@ -115,7 +116,8 @@ public sealed record PartnerRate(int Partner, long SentPerMinute);
 
 /// <summary>A unit's command state (silo E): <paramref name="Order"/> null when idle; <paramref name="SquadId"/> 0 when none.</summary>
 public sealed record UnitOrderView(
-    int Id, OrderKind? Order, Stance Stance, int SquadId, LocomotionClass Locomotion, bool Unsupplied);
+    int Id, OrderKind? Order, Stance Stance, int SquadId, LocomotionClass Locomotion, bool Unsupplied,
+    TargetMode Targeting);
 
 /// <summary>A design's locomotion (UD-004): <paramref name="Class"/> means something only when <paramref name="Result"/> is Ok.</summary>
 public sealed record LocomotionView(LocomotionResult Result, LocomotionClass Class);

@@ -76,12 +76,17 @@ internal static class UnitPhysics
             else if (dist > 0)
             {
                 long want = crossing || through ? u.MaxSpeed : Math.Min(u.MaxSpeed, dist / BrakeDiv);
-                long ex = dx * want / dist - u.VX, ey = dy * want / dist - u.VY;
+                // Aim for the velocity that is still `want` after this tick's drag, so a cruising unit keeps its engines
+                // on instead of sagging below top speed until the error clears the dead band.
+                long hold = want * Unit.DragDiv / (Unit.DragDiv - 1);
+                long ex = dx * hold / dist - u.VX, ey = dy * hold / dist - u.VY;
                 long emag = ISqrt(ex * ex + ey * ey);
                 if (emag > DeadBand)
                 {
                     steering = true;
-                    TurnToward(u, Trig.Atan2(ey, ex) - u.MainDir);
+                    // Point the main engine between the wanted velocity and the error. Along the error alone, a unit
+                    // whose engines push one way swings about its course as small sideways errors swing that direction.
+                    TurnToward(u, Trig.Atan2(dy * hold / dist + ey, dx * hold / dist + ex) - u.MainDir);
                     (ax, ay) = Thrust(u, ex, ey, emag);
                 }
             }
@@ -266,11 +271,12 @@ internal static class UnitPhysics
         bool stranded = !Locomotion.CanCross(sim, u.Locomotion, (int)FloorDiv(u.X, S), (int)FloorDiv(u.Y, S));
         foreach (var cell in u.Cells)
         {
+            // Only the cells this cell's circle reaches (at most 2x2: the radius is under half a cell).
             var (cx0, cy0) = u.CellWorld(cell);
-            long gx = FloorDiv(cx0, S), gy = FloorDiv(cy0, S);
-            for (long ny = gy - 1; ny <= gy + 1; ny++)
+            long x1 = FloorDiv(cx0 + CellRadius, S), y1 = FloorDiv(cy0 + CellRadius, S);
+            for (long ny = FloorDiv(cy0 - CellRadius, S); ny <= y1; ny++)
             {
-                for (long nx = gx - 1; nx <= gx + 1; nx++)
+                for (long nx = FloorDiv(cx0 - CellRadius, S); nx <= x1; nx++)
                 {
                     bool solid = sim.TileAtCell((int)nx, (int)ny) is { } t
                         && t.Grid.BuildingAt((int)nx - t.OriginX, (int)ny - t.OriginY) is { Kind: not BuildingKind.Conveyor };
@@ -323,31 +329,49 @@ internal static class UnitPhysics
     static void CollideUnits(Simulation sim)
     {
         var units = sim.Units;
+        // Cell offsets from each unit's centre, turned by its heading: headings don't change here, positions do.
+        var offsets = new (long X, long Y)[units.Count][];
+        var live = new bool[units.Count];
         for (int i = 0; i < units.Count; i++)
         {
+            live[i] = !sim.IsAbstract(units[i]);
+            if (live[i])
+                offsets[i] = [.. units[i].Cells.Select(c => Trig.Rotate(c.OffX, c.OffY, units[i].Angle))];
+        }
+
+        const long Reach = 2 * CellRadius;
+        for (int i = 0; i < units.Count; i++)
+        {
+            if (!live[i])
+                continue;
             for (int j = i + 1; j < units.Count; j++)
             {
                 Unit a = units[i], b = units[j];
-                if (sim.IsAbstract(a) || sim.IsAbstract(b))
+                if (!live[j])
                     continue;
                 long far = (long)a.Radius + b.Radius;
                 long ddx = a.X - (long)b.X, ddy = a.Y - (long)b.Y;
                 if (ddx * ddx + ddy * ddy >= far * far)
                     continue;
 
-                foreach (var ca in a.Cells)
+                long nearB = b.Radius + Reach;
+                foreach (var oa in offsets[i])
                 {
-                    foreach (var cb in b.Cells)
-                        Separate(a, ca, b, cb);
+                    // Skip a's cells too far from b's centre to touch any of b's.
+                    long ex = a.X + oa.X - (long)b.X, ey = a.Y + oa.Y - (long)b.Y;
+                    if (ex * ex + ey * ey >= nearB * nearB)
+                        continue;
+                    foreach (var ob in offsets[j])
+                        Separate(a, oa, b, ob);
                 }
             }
         }
     }
 
-    static void Separate(Unit a, UnitCell ca, Unit b, UnitCell cb)
+    static void Separate(Unit a, (long X, long Y) oa, Unit b, (long X, long Y) ob)
     {
-        var (ax, ay) = a.CellWorld(ca);
-        var (bx, by) = b.CellWorld(cb);
+        long ax = a.X + oa.X, ay = a.Y + oa.Y;
+        long bx = b.X + ob.X, by = b.Y + ob.Y;
         long dx = bx - ax, dy = by - ay;
         long d2 = dx * dx + dy * dy, reach = 2 * CellRadius;
         if (d2 >= reach * reach)

@@ -242,7 +242,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
     int[]? Route, int[]? RouteRegions, int RouteIndex, int DestTileId, int DestX, int DestY,
     List<Point>? Path, int PathIndex, PathKeySnap? PathKey, PortalSnap? Portal,
     UnitOrder? Order, int SlotX, int SlotY, bool PatrolReturning, bool Chasing, Stance Stance, int AnchorX, int AnchorY,
-    int SquadId, List<CombatSnap?> BlockCombat, Dictionary<string, long> Cargo, long UpkeepDue, bool Unsupplied)
+    int SquadId, List<CombatSnap?> BlockCombat, Dictionary<string, long> Cargo, long UpkeepDue, bool Unsupplied, TargetMode Targeting)
 {
     internal static UnitSnap Of(Unit u) => new(u.Id, u.Owner, u.TileId, u.X, u.Y, u.VX, u.VY, u.Angle, u.AngVel,
         u.Blocks.Select(b => b with { }).ToList(), u.Cells.Select(c => new CellSnap(c.GX, c.GY, c.Mass)).ToList(), u.CoreGX, u.CoreGY,
@@ -251,7 +251,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
         u.PathKey is { } k ? new PathKeySnap(k.Tile, k.Next, k.Revision, k.GoalX, k.GoalY) : null,
         u.Portal is { } p ? new PortalSnap(p.Tile, p.Next, p.X, p.Y) : null,
         u.Order, u.SlotX, u.SlotY, u.PatrolReturning, u.Chasing, u.Stance, u.AnchorX, u.AnchorY, u.SquadId,
-        u.BlockCombat.Select(CombatSnap.Of).ToList(), u.Cargo.Entries.ToDictionary(kv => kv.Key, kv => kv.Value), u.UpkeepDue, u.Unsupplied);
+        u.BlockCombat.Select(CombatSnap.Of).ToList(), u.Cargo.Entries.ToDictionary(kv => kv.Key, kv => kv.Value), u.UpkeepDue, u.Unsupplied, u.Targeting);
 
     internal Unit Restore(Simulation sim)
     {
@@ -266,7 +266,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
             Portal = Portal is { } p ? (p.Tile, p.Next, p.X, p.Y) : null,
             Order = Order, SlotX = SlotX, SlotY = SlotY, PatrolReturning = PatrolReturning, Chasing = Chasing, Stance = Stance,
             AnchorX = AnchorX, AnchorY = AnchorY, SquadId = SquadId,
-            UpkeepDue = UpkeepDue, Unsupplied = Unsupplied,
+            UpkeepDue = UpkeepDue, Unsupplied = Unsupplied, Targeting = Targeting,
         };
         for (int i = 0; i < BlockCombat.Count; i++)
         {
@@ -284,13 +284,13 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
 public sealed record AbstractSnap(int UnitId, List<LongPoint> Waypoints, int Next);
 
 public sealed record SquadSnap(int Id, int Owner, string Name, List<int> Members, Formation Formation, List<Point> Custom, Stance Stance,
-    UnitOrder? Order, int TargetId);
+    UnitOrder? Order, int TargetId, TargetMode Targeting, int FocusId);
 
 public sealed record SquadsSnap(int NextId, List<SquadSnap> Squads, List<Rally> Rallies)
 {
     internal static SquadsSnap Of(Squads squads) => new(squads.NextId,
         squads.All.Select(s => new SquadSnap(s.Id, s.Owner, s.Name, [.. s.Members], s.Formation,
-            s.Custom.Select(c => new Point(c.X, c.Y)).ToList(), s.Stance, s.Order, s.TargetId)).ToList(),
+            s.Custom.Select(c => new Point(c.X, c.Y)).ToList(), s.Stance, s.Order, s.TargetId, s.Targeting, s.FocusId)).ToList(),
         [.. squads.Rallies]);
 
     /// <summary>Fills an empty registry.</summary>
@@ -302,6 +302,7 @@ public sealed record SquadsSnap(int NextId, List<SquadSnap> Squads, List<Rally> 
             squad.MemberList.AddRange(s.Members);
             (squad.Formation, squad.Stance, squad.Order, squad.TargetId) = (s.Formation, s.Stance, s.Order, s.TargetId);
             squad.Custom = s.Custom.Select(c => (c.X, c.Y)).ToArray();
+            (squad.Targeting, squad.FocusId) = (s.Targeting, s.FocusId);
         }
         foreach (var r in Rallies)
             into.SetRally(r);

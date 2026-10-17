@@ -271,6 +271,7 @@ internal sealed class StateHash
         Mix(u.AnchorX);
         Mix(u.AnchorY);
         Mix(u.SquadId);
+        Mix((int)u.Targeting);
     }
 
     void MixOrder(UnitOrder? o)
@@ -301,6 +302,8 @@ internal sealed class StateHash
             Mix((int)s.Formation);
             Mix((int)s.Stance);
             Mix(s.TargetId);
+            Mix((int)s.Targeting);
+            Mix(s.FocusId);
             MixOrder(s.Order);
             Mix(s.Members.Count);
             foreach (int id in s.Members)

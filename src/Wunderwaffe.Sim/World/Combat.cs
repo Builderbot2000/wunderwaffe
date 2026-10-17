@@ -216,6 +216,7 @@ public static class Combat
             UpdateOrder(sim, u);
 
         var targets = new TargetIndex(sim);
+        FocusSquads(sim, targets);
         foreach (var tile in sim.Tiles)
         {
             if (tile.Grid.CombatBuildings.Count == 0)
@@ -225,7 +226,7 @@ public static class Combat
                 if (b.Kind == BuildingKind.Weapon)
                 {
                     var (x, y) = ResourceRadius.Centre(tile, b);
-                    Fire(sim, targets, b.Combat!, sim.Content.Buildings[b.DefId], b.Owner, x, y, b.Id, null, Target.None, CombatPower.Has(tile, b));
+                    Fire(sim, targets, b.Combat!, sim.Content.Buildings[b.DefId], b.Owner, x, y, b.Id, null, Target.None, CombatPower.Has(tile, b), TargetMode.Nearest);
                 }
             }
         }
@@ -333,12 +334,50 @@ public static class Combat
         return best < 0 ? Target.None : new Target(t.Id, best, -1, 0);
     }
 
-    /// <summary>What the unit fires at first when in range: its attack order's target, else its squad's focus (UC-002).</summary>
+    /// <summary>
+    /// What the unit fires at first when in range: its attack order's target, else its squad's focus (UC-002): the
+    /// squad's attack target, or the one it picked by its targeting mode (CB-007).
+    /// </summary>
     static Target Preferred(Simulation sim, Unit u)
     {
         if (u.Order is { Kind: OrderKind.Attack } o)
             return OrderTarget(sim, u, o);
-        return sim.Squads.Of(u) is { TargetId: > 0 } squad ? UnitTarget(sim, u, squad.TargetId) : Target.None;
+        return sim.Squads.Of(u) switch
+        {
+            { TargetId: > 0 } squad => UnitTarget(sim, u, squad.TargetId),
+            { FocusId: > 0 } squad => UnitTarget(sim, u, squad.FocusId),
+            _ => Target.None,
+        };
+    }
+
+    /// <summary>
+    /// Every <see cref="RetargetTicks"/> (staggered by squad id), or as soon as its focus is gone or out of every
+    /// member's reach, each squad without an attack target picks a focus by its targeting mode among the enemy units
+    /// its members have in weapon range: best score, then nearest the squad's centre, then lowest id (CB-007).
+    /// </summary>
+    static void FocusSquads(Simulation sim, TargetIndex targets)
+    {
+        foreach (var squad in sim.Squads.All)
+        {
+            var members = squad.Members.Select(sim.UnitById).Where(m => m != null && !sim.IsAbstract(m)).Select(m => m!).ToList();
+            if (squad.TargetId > 0 || members.Count == 0)
+            {
+                squad.FocusId = -1;
+                continue;
+            }
+            var reachable = new SortedDictionary<int, Unit>();
+            foreach (var m in members)
+            {
+                long range = (long)WeaponRange(sim, m) * S;
+                if (range > 0)
+                    targets.EnemiesNear(m.Owner, m.X, m.Y, range, reachable);
+            }
+            bool keep = squad.FocusId > 0 && reachable.ContainsKey(squad.FocusId);
+            if (keep && (sim.Tick + squad.Id) % RetargetTicks != 0)
+                continue;
+            long cx = members.Sum(m => (long)m.X) / members.Count, cy = members.Sum(m => (long)m.Y) / members.Count;
+            squad.FocusId = targets.Best(reachable.Values, squad.Targeting, cx, cy)?.Id ?? -1;
+        }
     }
 
     // ---- Firing ----
@@ -348,8 +387,8 @@ public static class Combat
         if (sim.IsAbstract(u))
             return;
         var preferred = Preferred(sim, u);
-        // An explicit attack order fires even on hold-fire stance; otherwise the stance decides (UC-004).
-        bool canFire = UnitSim.CanFire(u) || u.Order?.Kind == OrderKind.Attack;
+        // The stance decides, but an attack order fires whatever it is (UC-004).
+        bool canFire = UnitSim.CanFire(u);
         for (int i = 0; i < u.Blocks.Count; i++)
         {
             var blk = u.Blocks[i];
@@ -365,7 +404,7 @@ public static class Combat
             if (def.Weapon.Ammo is { } ammo && state.Ammo == 0)
                 state.Ammo += ResourceRadius.Take(u.Cargo, ammo, def.Weapon.Magazine);
             var (x, y) = BlockWorld(u, blk);
-            Fire(sim, targets, state, def, u.Owner, x, y, u.Id * 64 + i, u, preferred, powered: true);
+            Fire(sim, targets, state, def, u.Owner, x, y, u.Id * 64 + i, u, preferred, powered: true, u.Targeting);
         }
     }
 
@@ -374,7 +413,7 @@ public static class Combat
     /// <paramref name="stagger"/> spreads target searches over ticks. Units carry their own power for now.
     /// </summary>
     static void Fire(Simulation sim, TargetIndex targets, CombatState state, BuildingDef def, int owner, long x, long y,
-        int stagger, Unit? shooter, Target preferred, bool powered)
+        int stagger, Unit? shooter, Target preferred, bool powered, TargetMode mode)
     {
         var w = def.Weapon!;
         if (state.Cooldown > 0)
@@ -393,7 +432,7 @@ public static class Combat
         }
         else if (search)
         {
-            state.Target = targets.Nearest(owner, x, y, range);
+            state.Target = targets.Pick(owner, x, y, range, mode);
             aim = Resolve(sim, state.Target);
         }
         if (aim is not { } at)
@@ -745,14 +784,70 @@ public static class Combat
 
         public List<Unit> UnitsNear(long x, long y) => _buckets.GetValueOrDefault((FloorDiv(x, Bucket), FloorDiv(y, Bucket))) ?? Empty;
 
+        readonly Dictionary<Unit, (int Blocks, int Weapons)> _counts = [];
+
+        /// <summary>Live blocks and live weapon blocks of a unit, counted once per step.</summary>
+        (int Blocks, int Weapons) Counts(Unit u)
+        {
+            if (_counts.TryGetValue(u, out var c))
+                return c;
+            for (int i = 0; i < u.Blocks.Count; i++)
+            {
+                if (u.Blocks[i].Hp > 0)
+                    c = (c.Blocks + 1, c.Weapons + (_sim.Content.Buildings[u.Blocks[i].DefId].Weapon != null ? 1 : 0));
+            }
+            return _counts[u] = c;
+        }
+
+        int Score(Unit u, TargetMode mode) => mode switch
+        {
+            TargetMode.MostBlocks => Counts(u).Blocks,
+            TargetMode.MostWeapons => Counts(u).Weapons,
+            _ => 0,
+        };
+
+        /// <summary>Adds the enemies of <paramref name="owner"/> with a live block within <paramref name="range"/> of (x, y), by id.</summary>
+        public void EnemiesNear(int owner, long x, long y, long range, SortedDictionary<int, Unit> into)
+        {
+            for (long by = FloorDiv(y - range, Bucket); by <= FloorDiv(y + range, Bucket); by++)
+            {
+                for (long bx = FloorDiv(x - range, Bucket); bx <= FloorDiv(x + range, Bucket); bx++)
+                {
+                    foreach (var u in _buckets.GetValueOrDefault((bx, by)) ?? Empty)
+                    {
+                        if (u.Owner != owner && !into.ContainsKey(u.Id) && NearestBlock(u, x, y, out long d) >= 0 && d <= range * range)
+                            into.Add(u.Id, u);
+                    }
+                }
+            }
+        }
+
+        /// <summary>The unit with the best score by <paramref name="mode"/>, then the nearest (x, y), then the lowest id.</summary>
+        public Unit? Best(IEnumerable<Unit> units, TargetMode mode, long x, long y)
+        {
+            Unit? best = null;
+            int bestScore = -1;
+            long bestD = long.MaxValue;
+            foreach (var u in units)
+            {
+                int score = Score(u, mode);
+                long dx = u.X - x, dy = u.Y - y, d = dx * dx + dy * dy;
+                if (score > bestScore || (score == bestScore && (d < bestD || (d == bestD && u.Id < best!.Id))))
+                    (best, bestScore, bestD) = (u, score, d);
+            }
+            return best;
+        }
+
         /// <summary>
-        /// The nearest enemy in range of (x, y): a live unit block first (units are the threat), else the nearest enemy
-        /// building. Ties go to the lowest unit id, block index, or the first cell row by row.
+        /// What a weapon at (x, y) fires at among enemies in range: the live unit block of the unit with the best score by
+        /// <paramref name="mode"/> (CB-007; units are the threat), nearest block first, ties to the nearer unit then the
+        /// lowest id; else the nearest enemy building, the first cell row by row on ties.
         /// </summary>
-        public Target Nearest(int owner, long x, long y, long range)
+        public Target Pick(int owner, long x, long y, long range, TargetMode mode)
         {
             Target best = Target.None;
             long bestD = range * range + 1;
+            int bestScore = -1;
             var seen = new HashSet<Unit>();
             for (long by = FloorDiv(y - range, Bucket); by <= FloorDiv(y + range, Bucket); by++)
             {
@@ -763,8 +858,11 @@ public static class Combat
                         if (u.Owner == owner || !seen.Add(u))
                             continue;
                         int i = NearestBlock(u, x, y, out long d);
-                        if (i >= 0 && (d < bestD || (d == bestD && u.Id < best.Unit)))
-                            (best, bestD) = (new Target(u.Id, i, -1, 0), d);
+                        if (i < 0 || d > range * range)
+                            continue;
+                        int score = Score(u, mode);
+                        if (score > bestScore || (score == bestScore && (d < bestD || (d == bestD && u.Id < best.Unit))))
+                            (best, bestD, bestScore) = (new Target(u.Id, i, -1, 0), d, score);
                     }
                 }
             }

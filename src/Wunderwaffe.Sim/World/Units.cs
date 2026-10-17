@@ -39,6 +39,21 @@ public enum Stance
 }
 
 /// <summary>
+/// How a unit's or squad's weapons choose among enemy units in range (CB-007). Ties go to the nearest, then the lowest
+/// id. An attack order's target comes first; turrets always pick the nearest.
+/// </summary>
+public enum TargetMode
+{
+    Nearest,
+
+    /// <summary>The enemy unit with the most live blocks.</summary>
+    MostBlocks,
+
+    /// <summary>The enemy unit with the most live weapon blocks.</summary>
+    MostWeapons,
+}
+
+/// <summary>
 /// A mobile rigid body built from the blocks that stood on a tile's frame (see <see cref="UnitAssembly"/>). Position
 /// is the centre of mass in world sub-cells (<see cref="CellScale"/> to a cell; see <see cref="WorldMap"/>), velocity is
 /// sub-cells per tick and angle is a fraction of a turn (<see cref="Trig.Turn"/>). The tile it is on is the tile of the
@@ -247,6 +262,9 @@ public sealed class Unit
     public bool Chasing { get; internal set; }
 
     public Stance Stance { get; internal set; }
+
+    /// <summary>Which enemy its weapons pick among those in range (CB-007).</summary>
+    public TargetMode Targeting { get; internal set; }
 
     /// <summary>Where a defensive unit returns to, in world sub-cells: where it last stopped or was given its stance.</summary>
     public int AnchorX { get; internal set; }
