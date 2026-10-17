@@ -283,9 +283,14 @@ public partial class SimHost : Node
         HasGame = true;
         LocalPlayer = seat;
         Lockstep = lockstep;
-        _ai = sim.Setup is { AiPlayers: > 0 } setup && lockstep?.IsHost != false ? new AiDirector(setup) : null;
+        // The multiplayer host always has a director: a leaver's seat goes to an AI (OQ-46).
+        bool host = lockstep?.IsHost ?? true;
+        _ai = sim.Setup is { } setup && host && (setup.AiPlayers > 0 || lockstep != null) ? new AiDirector(setup) : null;
         if (lockstep != null && _ai is { } ai)
+        {
             lockstep.HostInputs = (s, ticks) => ai.Collect(s, ticks);
+            lockstep.SeatLeft += seat => ai.TakeOver(seat, sim);
+        }
         Selected.Clear();
         _accumulator = 0;
         StepMs = TotalStepMs = 0;

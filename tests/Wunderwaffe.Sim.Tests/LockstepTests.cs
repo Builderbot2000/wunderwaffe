@@ -26,6 +26,11 @@ public class LockstepTests
         public List<Lockstep> Peers { get; } = [];
         public List<Simulation> Sims { get; }
 
+        readonly HashSet<int> _cut = [];
+
+        /// <summary>Seat <paramref name="seat"/>'s machine drops off: it stops running, and nothing reaches it or comes from it.</summary>
+        public void Cut(int seat) => _cut.Add(seat);
+
         /// <summary>One frame: every peer runs 0 to 2 ticks, messages arrive 1 to 6 frames after they were sent.</summary>
         public void Frame()
         {
@@ -33,9 +38,10 @@ public class LockstepTests
             foreach (var (at, from, to, json) in _wire.Where(m => m.At <= _frame).ToList())
             {
                 _wire.Remove((at, from, to, json));
-                Peers[to].Receive(from, NetMsg.FromJson(json)!);
+                if (!_cut.Contains(from) && !_cut.Contains(to))
+                    Peers[to].Receive(from, NetMsg.FromJson(json)!);
             }
-            foreach (var peer in Peers)
+            foreach (var peer in Peers.Where(p => !_cut.Contains(p.Seat)))
             {
                 peer.Advance(_rng.Range(0, 3));
                 foreach (var o in peer.TakeOutbox())
@@ -79,6 +85,53 @@ public class LockstepTests
         while (client.Tick < host.Tick)
             net.Frame();
         Assert.Null(net.Peers[0].Desync);
+    }
+
+    [Fact]
+    public void FiveSeatsStayInSyncAndAnAiTakesOverALeaver()
+    {
+        // MP-003 with 5 seats: the host, three clients and an AI; client seat 2 leaves mid-match and the host's AI
+        // takes over its side (OQ-46) from wherever it stands.
+        var setup = new GameSetup(5, 5, 21, Players: 5, AiPlayers: 1);
+        var net = new Net(setup, 3);
+        var host = net.Peers[0];
+        var ai = new AiDirector(setup);
+        host.HostInputs = (sim, ticks) => ai.Collect(sim, ticks);
+        host.SeatLeft += seat => ai.TakeOver(seat, host.Sim);
+
+        long leftAt = -1;
+        for (int f = 0; f < 2400; f++)
+        {
+            if (f == 50)
+            {
+                foreach (var (peer, sim) in net.Peers.Zip(net.Sims))
+                    peer.Submit(new SetViewedTileCommand(peer.Seat, sim.StartTileIds[peer.Seat]));
+            }
+            if (f == 600)
+            {
+                net.Cut(2);
+                host.Drop(2);
+                leftAt = host.Sim.Tick;
+            }
+            net.Frame();
+        }
+
+        Assert.Equal([2], host.Left);
+        Assert.NotNull(ai.For(2));
+        var hostSim = net.Sims[0];
+        Assert.Contains(hostSim.CommandLog, c => c.Command.Player == 2 && c.Tick > leftAt && c.Command is not SetViewedTileCommand);
+        Assert.Contains(hostSim.CommandLog, c => c.Command.Player == 4);
+        // The clients still in agree with the host, command for command, the AI's moves for seat 2 included.
+        foreach (int seat in new[] { 1, 3 })
+        {
+            var client = net.Sims[seat];
+            long tick = Math.Min(hostSim.Tick, client.Tick);
+            Assert.True(client.Tick > 1500, $"seat {seat} reached tick {client.Tick}");
+            Assert.Equal(hostSim.CommandLog.Where(c => c.Tick < tick).Select(c => $"{c.Tick} {c.Command}"),
+                client.CommandLog.Where(c => c.Tick < tick).Select(c => $"{c.Tick} {c.Command}"));
+            Assert.Null(net.Peers[seat].Desync);
+        }
+        Assert.Null(host.Desync);
     }
 
     [Fact]

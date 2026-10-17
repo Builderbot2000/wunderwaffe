@@ -35,7 +35,8 @@ public sealed record LobbyInfo(GameSetup Setup, List<string> Names)
 /// <summary>
 /// Online multiplayer over Godot's ENet (MP-003): the host/join lobby, then the transport for <see cref="Lockstep"/>.
 /// The host is ENet peer 1 and seat 0; clients take seats 1, 2, ... in the order they joined, and the AI seats come
-/// last. Lockstep messages travel as JSON through one reliable RPC (<see cref="Deliver"/>), so the sim decides
+/// last. A client who leaves mid-match is dropped from lockstep, and the host's AI takes over the seat (OQ-46,
+/// <see cref="Lockstep.SeatLeft"/>). Lockstep messages travel as JSON through one reliable RPC (<see cref="Deliver"/>), so the sim decides
 /// everything and this node only moves text. A child of <see cref="SimHost"/>, so it outlives scene changes.
 /// </summary>
 public partial class NetSession : Node
@@ -209,7 +210,7 @@ public partial class NetSession : Node
         {
             _peerOfSeat.Remove(seat);
             SimHost.Instance.Lockstep?.Drop(seat);
-            Notice = $"{who} left the match. Their side stays where it is.";
+            Notice = $"{who} left the match. The AI plays their side now.";
             Changed?.Invoke();
         }
     }

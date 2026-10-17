@@ -80,6 +80,7 @@ public sealed class Lockstep
     readonly Dictionary<long, List<Command>> _bundles = [];
     readonly List<Command> _incoming = [];
     readonly List<Outgoing> _outbox = [];
+    readonly List<int> _left = [];
 
     /// <summary>Host only: last turn each client seat has run, -1 before the first.</summary>
     readonly SortedDictionary<int, long> _acked = [];
@@ -140,8 +141,8 @@ public sealed class Lockstep
         switch (msg)
         {
             case InputMsg input when IsHost:
-                // A client can only speak for its own seat.
-                if (input.Command.Player == from && input.Command is not DebugGrantCommand)
+                // A client can only speak for its own seat, and not once it has left (an AI plays it then).
+                if (input.Command.Player == from && input.Command is not DebugGrantCommand && !_left.Contains(from))
                     _incoming.Add(input.Command);
                 break;
             case TurnMsg turn when !IsHost:
@@ -165,8 +166,23 @@ public sealed class Lockstep
         }
     }
 
-    /// <summary>Host: a client left. It no longer holds the match back.</summary>
-    public void Drop(int seat) => _acked.Remove(seat);
+    /// <summary>
+    /// Host: a client left. It no longer holds the match back, nothing more is taken from it, and
+    /// <see cref="SeatLeft"/> fires so the host can hand the seat to an AI (OQ-46).
+    /// </summary>
+    public void Drop(int seat)
+    {
+        if (!_acked.Remove(seat))
+            return;
+        _left.Add(seat);
+        SeatLeft?.Invoke(seat);
+    }
+
+    /// <summary>Host: raised once per client seat that leaves, from <see cref="Drop"/>.</summary>
+    public event Action<int>? SeatLeft;
+
+    /// <summary>Host: the client seats that have left, in the order they left.</summary>
+    public IReadOnlyList<int> Left => _left;
 
     /// <summary>Messages to send since the last call.</summary>
     public IReadOnlyList<Outgoing> TakeOutbox()
