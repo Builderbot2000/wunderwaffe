@@ -13,11 +13,17 @@ public sealed class AbstractNode((long X, long Y)[] waypoints, int[]? route)
 }
 
 /// <summary>
-/// Abstract travel (UC-009, OQ-15): a unit on a tile running in rate mode is a world-map node with no physics. It
-/// follows its order's route as a line of waypoints (border crossing points, then the destination) at its cruise speed,
-/// keeping <see cref="Unit.X"/>, <see cref="Unit.Y"/> and <see cref="Unit.TileId"/> exact, and materialises at that
-/// position, with that velocity, as soon as its tile runs the full sim again (viewed or Contested).
-/// Waypoints and speed come from movement (<see cref="UnitSim.AbstractWaypoints"/>, <see cref="UnitSim.CruiseSpeed"/>).
+/// Abstract travel (UC-005, UC-009, OQ-15, OQ-36): only viewed and Contested tiles are rendered (full sim); a unit
+/// anywhere else is a world-map node with no physics. A unit flying physically turns into a node the moment it
+/// crosses the rendered tile's border (<see cref="Crossed"/>, called from unit physics), with no stop or wait; a unit
+/// ordered on a tile that isn't rendered is a node from the start. A node follows its order's route as a line of
+/// waypoints (border crossing points, then the destination) at its cruise speed, keeping <see cref="Unit.X"/>,
+/// <see cref="Unit.Y"/> and <see cref="Unit.TileId"/> exact, and materialises at that position, keeping its order, as
+/// soon as it is on a rendered tile: one its route passes through, or one turned Contested by enemy units. Meeting enemy
+/// units interrupts travel: by its stance (<see cref="UnitSim.StopsToFight"/>) the unit keeps its course or halts to
+/// fight, and resumes its order once no enemy unit is left on its tile. A node that has stopped stays one, exactly
+/// where it is, until its tile is opened. Waypoints and speed come from movement
+/// (<see cref="UnitSim.AbstractWaypoints"/>, <see cref="UnitSim.CruiseSpeed"/>).
 /// </summary>
 public static class AbstractTravel
 {
@@ -29,8 +35,16 @@ public static class AbstractTravel
     /// <summary>Cruise speed of an abstract unit, sub-cells per tick: what the flight controller flies at.</summary>
     public static int Speed(Unit u) => UnitSim.CruiseSpeed(u);
 
-    /// <summary>Terrain-legal waypoints from the unit's position to its order's destination (movement's route).</summary>
-    public static (long X, long Y)[] Plan(Simulation sim, Unit u) => UnitSim.AbstractWaypoints(sim, u);
+    /// <summary>
+    /// Terrain-legal waypoints from the unit's position to its order's destination (movement's route). If movement finds
+    /// none from here (a start cell outside every region at the unit's clearance, say), the straight line to the
+    /// destination, so a node never stops at the border it has just crossed.
+    /// </summary>
+    public static (long X, long Y)[] Plan(Simulation sim, Unit u)
+    {
+        var points = UnitSim.AbstractWaypoints(sim, u);
+        return points.Length > 0 || u.Route == null ? points : [(u.DestX, u.DestY)];
+    }
 
     /// <summary>Ticks an abstract unit takes to finish its order from where it is; -1 if it can't move or has no order.</summary>
     public static long Eta(Simulation sim, Unit u)
@@ -45,6 +59,9 @@ public static class AbstractTravel
         }
         return (length + Speed(u) - 1) / Speed(u);
     }
+
+    /// <summary>True while the unit is halted on its way, fighting the enemy units it met (UC-009).</summary>
+    public static bool IsInterrupted(Simulation sim, Unit u) => sim.InterruptedUnits.ContainsKey(u.Id);
 
     static long Dist(long ax, long ay, long bx, long by) => ISqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
 
@@ -110,26 +127,93 @@ public static class AbstractTravel
         node.PlannedFor = u.Route;
     }
 
-    /// <summary>Turns units on rate-mode tiles into nodes and materialises those on full-sim tiles.</summary>
-    internal static void Update(Simulation sim, bool[] full)
+    /// <summary>
+    /// Border hook from unit physics, after it moved the unit onto another tile: if that tile isn't rendered, the unit
+    /// becomes a node there and then, mid-flight. Returns true if it did.
+    /// </summary>
+    internal static bool Crossed(Simulation sim, Unit u)
+    {
+        if (!sim.RateModeEnabled || RateMode.IsFullSim(sim, sim.Tiles[u.TileId]))
+            return false;
+        Enter(sim, u);
+        return true;
+    }
+
+    static void Enter(Simulation sim, Unit u)
+    {
+        sim.AbstractNodes[u.Id] = new AbstractNode(Plan(sim, u), u.Route);
+        (u.VX, u.VY, u.AngVel) = (0, 0, 0);
+    }
+
+    /// <summary>
+    /// End of tick, once the tile modes for the next one are chosen: resumes interrupted units whose fight is over, turns
+    /// units on tiles that aren't rendered into nodes and materialises nodes on rendered ones. A travelling node that
+    /// materialises among enemy units on a Contested tile is interrupted if its stance stops to fight.
+    /// </summary>
+    internal static void Update(Simulation sim, bool[] full, bool[] contested)
     {
         var nodes = sim.AbstractNodes;
         foreach (int id in nodes.Keys.Where(id => sim.UnitById(id) == null).ToList())
             nodes.Remove(id);
+        UpdateInterrupted(sim);
         foreach (var u in sim.Units)
         {
             bool isNode = nodes.TryGetValue(u.Id, out var node);
             if (!full[u.TileId] && !isNode)
             {
-                nodes[u.Id] = new AbstractNode(Plan(sim, u), u.Route);
-                (u.VX, u.VY, u.AngVel) = (0, 0, 0);
+                Enter(sim, u);
             }
             else if (full[u.TileId] && isNode)
             {
                 nodes.Remove(u.Id);
                 Materialise(u, node!);
+                if (contested[u.TileId] && u.Route != null && EnemyUnitOn(sim, u) && UnitSim.StopsToFight(u))
+                    Interrupt(sim, u);
             }
         }
+    }
+
+    /// <summary>Halts a travelling unit where it is to fight; its order stays, to be resumed by <see cref="UpdateInterrupted"/>.</summary>
+    static void Interrupt(Simulation sim, Unit u)
+    {
+        UnitSim.Halt(u);
+        (u.VX, u.VY) = (0, 0);
+        sim.InterruptedUnits[u.Id] = u.Order;
+    }
+
+    /// <summary>
+    /// Interrupted units carry on with their order once no enemy unit is left on their tile. A new order from the
+    /// player, or anything else that has already set them on their way again, ends the interruption.
+    /// </summary>
+    static void UpdateInterrupted(Simulation sim)
+    {
+        var interrupted = sim.InterruptedUnits;
+        if (interrupted.Count == 0)
+            return;
+        foreach (var (id, order) in interrupted.ToList())
+        {
+            if (sim.UnitById(id) is not { } u || !ReferenceEquals(u.Order, order) || (u.Route != null && !u.Chasing))
+            {
+                interrupted.Remove(id);
+            }
+            else if (!EnemyUnitOn(sim, u))
+            {
+                interrupted.Remove(id);
+                if (u.Route == null)
+                    UnitSim.Resume(sim, u);
+            }
+        }
+    }
+
+    /// <summary>Whether another player's unit is on the unit's tile.</summary>
+    static bool EnemyUnitOn(Simulation sim, Unit u)
+    {
+        foreach (var o in sim.Units)
+        {
+            if (o.TileId == u.TileId && o.Owner != u.Owner)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>Back to physics, at the node's position, flying toward its next waypoint at cruise speed.</summary>

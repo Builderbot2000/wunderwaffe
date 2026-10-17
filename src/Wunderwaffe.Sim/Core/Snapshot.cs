@@ -11,7 +11,7 @@ namespace Wunderwaffe.Sim.Core;
 /// hashed in <see cref="StateHash"/>; <c>SnapshotTests</c> check the two agree.
 /// </summary>
 public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, List<PlayerSnap> Players, List<UnitSnap> Units,
-    List<AbstractSnap> Abstract, SquadsSnap Squads, int NextProjectileId, List<ProjectileSnap> Projectiles)
+    List<AbstractSnap> Abstract, SquadsSnap Squads, int NextProjectileId, List<ProjectileSnap> Projectiles, List<int> Interrupted)
 {
     public static Snapshot Capture(Simulation sim) => new(
         sim.Tick,
@@ -22,7 +22,8 @@ public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, L
         sim.Abstract.Select(kv => new AbstractSnap(kv.Key, kv.Value.Waypoints.Select(p => new LongPoint(p.X, p.Y)).ToList(), kv.Value.Next)).ToList(),
         SquadsSnap.Of(sim.Squads),
         sim.NextProjectileId,
-        sim.Projectiles.Select(ProjectileSnap.Of).ToList());
+        sim.Projectiles.Select(ProjectileSnap.Of).ToList(),
+        [.. sim.InterruptedUnits.Keys]);
 
     /// <summary>
     /// A match in the snapshot's state: the world rebuilt from <paramref name="setup"/>, then everything that changes
@@ -39,6 +40,8 @@ public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, L
         foreach (var a in Abstract)
             sim.AbstractNodes[a.UnitId] = new AbstractNode(a.Waypoints.Select(p => (p.X, p.Y)).ToArray(), sim.UnitById(a.UnitId)!.Route) { Next = a.Next };
         Squads.Restore(sim.Squads);
+        foreach (int id in Interrupted)
+            sim.InterruptedUnits[id] = sim.UnitById(id)!.Order;
         sim.RestoreProjectiles(Projectiles.Select(p => p.Restore()), NextProjectileId);
         sim.RestoreClock(Tick, NextUnitId, log);
         sim.LatestSnapshot = this;

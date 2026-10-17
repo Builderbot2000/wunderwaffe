@@ -65,18 +65,18 @@ See also the [glossary](glossary.md).
 | [Resources & Tech](resources-tech.md) | 7 | 1 | 2 | 0 | 10 | 4 | 0 | 40% | 0 | 1 |
 | [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
 | [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 12 | 1 | 63% | 0 | 2 |
-| [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 6 | 3 | 67% | 0 | 0 |
+| [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 7 | 2 | 78% | 0 | 0 |
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 6 | 0 | 46% | 0 | 0 |
 | [Multiplayer & Victory](multiplayer-victory.md) | 3 | 2 | 1 | 0 | 6 | 3 | 2 | 50% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 12 | 2 | 80% | 0 | 2 |
-| **Total** | 74 | 29 | 11 | 1 | 115 | 78 | 8 | 68% | 0 | 9 |
+| **Total** | 74 | 29 | 11 | 1 | 115 | 79 | 7 | 69% | 0 | 9 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 78 | 68% |
-| In Progress | 8 | 7% |
+| Done | 79 | 69% |
+| In Progress | 7 | 6% |
 | Approved | 4 | 3% |
 | Proposed | 10 | 9% |
 | Deferred | 2 | 2% |
@@ -99,7 +99,7 @@ See also the [glossary](glossary.md).
 | P2 | Tile = RTS factory map | 21 | 17 | 17 |
 | P3 | Inter-tile I/O | 10 | 5 | 6 |
 | P4 | Block-by-block unit design | 15 | 10 | 11 |
-| P5 | Squad command | 10 | 5 | 7 |
+| P5 | Squad command | 10 | 5 | 8 |
 | P6 | No Rush | 6 | 4 | 0 |
 | P7 | Resource-gated tech | 8 | 6 | 3 |
 | P8 | World domination | 16 | 9 | 11 |
