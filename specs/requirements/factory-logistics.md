@@ -223,7 +223,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [OQ-25](#oq-25-what-are-the-first-boosters-and-what-are-their-rules) | What are the first boosters, and what are their rules? | FB-016, UD-006 | Provisional | Proposal; confirm | 2026-10-10 |
 | [OQ-26](#oq-26-is-a-loaded-blueprint-only-a-ghost-guide-for-building-by-hand-or-can-it-be-placed-in-one-action-paying-the-whole-cost) | Is a loaded blueprint only a ghost guide for building by hand, or can it be placed in one action, paying the whole cost? | FB-009 | Decided | Owner | 2026-10-10 |
 | [OQ-38](#oq-38-with-several-cores-on-a-tile-which-pays-and-how-much-can-a-core-hold) | With several cores on a tile, which pays, and how much can a core hold? | FB-019, WM-016, FB-007 | Decided | Owner | 2026-10-17 |
-| [OQ-39](#oq-39-where-do-refunds-go-and-what-happens-to-a-lost-cores-items) | Where do refunds go, and what happens to a lost core's items? | FB-019, WM-016, FB-002 | Provisional | Proposal; confirm | 2026-10-17 |
+| [OQ-39](#oq-39-where-do-refunds-go-and-what-happens-to-a-lost-cores-items) | Where do refunds go, and what happens to a lost core's items? | FB-019, WM-016, FB-002 | Decided | Owner | 2026-10-17 |
 
 ### OQ-11 Are unvisited tiles fully simulated or abstracted to rates?
 
@@ -271,4 +271,4 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Options / notes:** Where refunds and items drained from removed buildings go; what happens to a destroyed core's items; what a full core does with deliveries; whether capacity is per item or in total; whether storage next to a core adds to it (Mindustry links adjacent vaults to the core).
 
-**Decision:** Proposal: refunds and drained items go to the player's core on that tile nearest the building; with no core there, removal still works and the items are lost; a destroyed core's items are lost (salvage later, RS-005); capacity is per item, as in Mindustry, and a full core refuses deliveries so belts back up; storage linking to cores deferred.
+**Decision:** Refunds and drained items go to the player's core on that tile nearest the building; with no core there, removal still works and the items are lost; a destroyed core's items are lost (salvage later, RS-005); capacity is per item, as in Mindustry, and a full core refuses deliveries so belts back up; storage linking to cores deferred.

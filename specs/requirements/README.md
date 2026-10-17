@@ -2,7 +2,7 @@
 
 Factory-builder × RTS × world domination. Build megafactories on world-map tiles, design mega units block by block, conquer the map.
 
-Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built column). Owner decisions on OQ-2..34 recorded the same day (OQ-25 is a proposal awaiting confirmation). Revised after playtesting on 2026-10-17 (OQ-35..38 decided the same day; OQ-39 is a proposal awaiting confirmation).
+Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built column). Owner decisions on OQ-2..34 recorded the same day (OQ-25 is a proposal awaiting confirmation). Revised after playtesting on 2026-10-17 (OQ-35..39 decided the same day).
 
 ## How to use
 
@@ -26,7 +26,7 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 ## Playtest revisions (2026-10-17)
 
 - Continuous zoom: the tile view pulls back smoothly into the world map past a zoom threshold instead of switching instantly (WM-007; OQ-36).
-- World-map orders: selected units are pointed at any spot on the world map; they switch to abstract travel by themselves on crossing the border and keep it until they stop, then render again when their tile is opened (UC-005, UC-009).
+- World-map orders: selected units are pointed at any spot on the world map; they switch to abstract travel by themselves on crossing the border and keep it until they stop, then render again when their tile is opened. Passing through the rendered tile renders them without changing course; meeting enemies interrupts travel for a skirmish, and the stance decides whether they keep course or stop (UC-005, UC-009, UC-004).
 - Bigger tiles: nominal tile 256x256 instead of 96x96, on the scale of Mindustry maps (WM-001, FB-001; OQ-35). Only the tile the player looks at runs the full sim (OQ-36).
 - One core: the tile core and the unit core become one building with several variants, none free; players start with a deployed starting unit; cores on units count against elimination (WM-005, WM-016, UD-010, MP-001; OQ-37).
 - Core-held funds: building on a tile spends only what the player's landed cores on that tile hold, paid in core order, up to each variant's capacity; no paying from a neighbour (FB-019, FB-007; OQ-38, OQ-39).

@@ -50,6 +50,8 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 
 **As built:** Aggressive, defensive (returns to its anchor past the leash), hold fire and escort (E) stances; V cycles (UnitSim).
 
+**Notes:** 2026-10-17: the stance also decides what a travelling unit does when it meets enemies (UC-009): keep its course through the fight or stop to fight. Which stance does which is still to set.
+
 ### UC-005 World-map level orders
 
 **Requirement:** Units and squads shall be orderable to any point on the world map; the order takes them straight there, switching to abstract travel (UC-009) by themselves, with no separate trip to a border first.
@@ -90,13 +92,13 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 
 ### UC-009 Abstract travel
 
-**Requirement:** A unit ordered to a destination on another tile shall fly physically across its rendered tile and, on crossing the border, become an abstract node: an icon on the world map following a terrain-legal route at a speed from its stats, without physics. It stays abstract until it stops at its destination; the player then opens that tile to render it again.
+**Requirement:** A unit ordered to a destination on another tile shall fly physically across its rendered tile and, on crossing the border, become an abstract node: an icon on the world map following a terrain-legal route at a speed from its stats, without physics. It stays abstract until it stops at its destination, except while it passes through the rendered tile or meets enemies; the player opens the destination tile to render it again.
 
-**Acceptance criteria:** Crossing the rendered tile's border turns the unit into a node with no stop or wait; it stays a node for the rest of the trip, across any tiles; when it stops it stays a node at its exact world position until its tile is opened, which spawns it there with its state (Contested tiles: FB-013); a unit ordered on a tile that isn't rendered is a node from the start; travel time matches the full sim within a set tolerance.
+**Acceptance criteria:** Crossing the rendered tile's border turns the unit into a node with no stop or wait; a unit ordered on a tile that isn't rendered is a node from the start. A node whose route enters the rendered tile materialises there and keeps its order, flying physically to the destination and turning back into a node when it leaves that tile. A node that meets enemy units interrupts its travel: the tile turns Contested and runs the full sim (FB-013), the unit materialises, and the skirmish plays out; by its stance (UC-004) it either keeps its course through the fight or stops to fight, and a unit that survives resumes its order, going abstract again once the tile is no longer Contested. When it stops it stays a node at its exact world position until its tile is opened, which spawns it there with its state. Travel time matches the full sim within a set tolerance.
 
-**As built:** World/AbstractTravel.cs: a unit on a rate-mode tile is a node moving along planned waypoints at cruise speed with no physics; it materialises where it is when its tile is viewed or Contested; travel time within the set tolerance (tested); turrets can't see nodes. A node passing into a viewed tile materialises there rather than staying abstract.
+**As built:** World/AbstractTravel.cs: a unit on a rate-mode tile is a node moving along planned waypoints at cruise speed with no physics; it materialises where it is, keeping its order, when its tile is viewed or Contested, and goes abstract again on a rate-mode tile (tested); travel time within the set tolerance; turrets can't see nodes. Units go abstract by tile mode, not by crossing a border, and no stance decides between keeping course and stopping to fight.
 
-**Notes:** Was: 'A unit outside every rendered tile shall travel as an abstract node ... It materialises at its exact world position when its tile is opened or becomes Contested.' OQ-15 decided 2026-10-10. Unwatched skirmishes run on automatic control, so stances (UC-004) matter. Rewritten after playtesting 2026-10-17: units switch at the border, keep travelling abstractly until they stop, and waiting at borders is gone (UC-005, OQ-36).
+**Notes:** Was: 'A unit outside every rendered tile shall travel as an abstract node ... It materialises at its exact world position when its tile is opened or becomes Contested.' OQ-15 decided 2026-10-10. Unwatched skirmishes run on automatic control, so stances (UC-004) matter. Rewritten after playtesting 2026-10-17: units switch at the border, keep travelling abstractly until they stop, and waiting at borders is gone (UC-005, OQ-36). Owner, same day: passing through the rendered tile renders the unit but keeps its course; meeting enemies interrupts travel for a skirmish, with the stance deciding course or standstill.
 
 ## Decisions & open questions
 
