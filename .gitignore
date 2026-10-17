@@ -22,3 +22,6 @@ TestResults/
 
 # Python
 __pycache__/
+
+# Packaged builds (game/export_presets.cfg)
+/build/

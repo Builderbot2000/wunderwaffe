@@ -102,6 +102,36 @@ public partial class SimHost : Node
     /// </summary>
     public Vector2I? FocusCell { get; set; }
 
+    /// <summary>
+    /// A zoom the camera should animate next frame (Tab, Enter, Open tile): a tile id to zoom into, -1 for the world
+    /// map, or null. The camera clears it and switches the view when the zoom crosses the threshold (WM-007).
+    /// </summary>
+    public int? ZoomTarget { get; set; }
+
+    /// <summary>
+    /// How opaque the tile rendering is over the world map, 0..1, set by the camera every frame: 1 well inside a tile,
+    /// 0 well out on the world map, in between around the threshold (the cross-fade, OQ-36).
+    /// </summary>
+    public float TileOpacity { get; set; } = 1;
+
+    /// <summary>On the world map near the threshold, the tile the tile view fades in for (the one a zoom would open).</summary>
+    public TileState? FadeTile { get; set; }
+
+    /// <summary>Whether the local player may open <paramref name="tile"/>: presence (WM-015), owned or holding something of theirs.</summary>
+    public bool CanEnter(TileState tile) => Territory.HasPresence(Sim, LocalPlayer, tile);
+
+    /// <summary>Animates the zoom into a tile the player may open. Returns false for the others.</summary>
+    public bool ZoomInto(int tileId)
+    {
+        if (Sim.TryGetTile(tileId) is not { } tile || !CanEnter(tile))
+            return false;
+        ZoomTarget = tile.Id;
+        return true;
+    }
+
+    /// <summary>Animates the zoom out to the world map.</summary>
+    public void ZoomOut() => ZoomTarget = -1;
+
     /// <summary>Raised after <see cref="View"/> or <see cref="ViewedTile"/> changes. Prefer <see cref="WatchView"/>.</summary>
     public event Action? ViewChanged;
 
@@ -132,15 +162,26 @@ public partial class SimHost : Node
 
     /// <summary>
     /// Shows <paramref name="node"/>, and lets it process, only while <paramref name="mode"/> is the view. Runs
-    /// <paramref name="onChange"/>, if given, after each view change.
+    /// <paramref name="onChange"/>, if given, after each view change. Tile-layer nodes also fade with
+    /// <see cref="TileOpacity"/> near the threshold.
     /// </summary>
-    public void ShowOnlyIn(CanvasItem node, ViewMode mode, Action? onChange = null) => WatchView(node, () =>
+    public void ShowOnlyIn(CanvasItem node, ViewMode mode, Action? onChange = null)
     {
-        bool shown = View == mode;
-        node.Visible = shown;
-        node.ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
-        onChange?.Invoke();
-    });
+        if (mode == ViewMode.Tile)
+        {
+            _tileLayers.Add(node);
+            node.TreeExiting += () => _tileLayers.Remove(node);
+        }
+        WatchView(node, () =>
+        {
+            bool shown = View == mode;
+            node.Visible = shown;
+            node.ProcessMode = shown ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+            onChange?.Invoke();
+        });
+    }
+
+    readonly List<CanvasItem> _tileLayers = [];
 
     public void ShowWorld()
     {
@@ -162,11 +203,13 @@ public partial class SimHost : Node
             Send(new SetViewedTileCommand(LocalPlayer, viewed));
     }
 
-    /// <summary>Opens one of the local player's tiles. Returns false for tiles they don't own.</summary>
+    /// <summary>
+    /// Opens a tile the player may enter at once (the camera calls it at the threshold; debug and HUD jumps directly).
+    /// Returns false for the others.
+    /// </summary>
     public bool EnterTile(int tileId)
     {
-        // Any tile the player has presence on (WM-015): owned, or holding a building or unit of theirs.
-        if (Sim.TryGetTile(tileId) is not { } tile || !Territory.HasPresence(Sim, LocalPlayer, tile))
+        if (Sim.TryGetTile(tileId) is not { } tile || !CanEnter(tile))
             return false;
         _viewedTileId = tile.Id;
         if (View != ViewMode.Tile)
@@ -287,6 +330,9 @@ public partial class SimHost : Node
         if (lockstep != null && _ai is { } ai)
             lockstep.HostInputs = (s, ticks) => ai.Collect(s, ticks);
         Selected.Clear();
+        ZoomTarget = null;
+        FadeTile = null;
+        TileOpacity = view == ViewMode.Tile ? 1 : 0;
         _accumulator = 0;
         StepMs = TotalStepMs = 0;
         var home = sim.Tiles.FirstOrDefault(t => t.Owner == LocalPlayer) ?? sim.Tiles[0];
@@ -336,10 +382,11 @@ public partial class SimHost : Node
             DebugTools.StressFill(this);
         else if (e.IsActionPressed(InputActions.WorldToggle))
         {
+            // Animated, as the wheel would do it (WM-007).
             if (View == ViewMode.Tile)
-                ShowWorld();
+                ZoomOut();
             else
-                EnterTile(_viewedTileId);
+                ZoomInto(_viewedTileId);
         }
     }
 
@@ -352,6 +399,8 @@ public partial class SimHost : Node
         }
         if (!HasGame)
             return;
+        foreach (var layer in _tileLayers)
+            layer.Modulate = Colors.White with { A = TileOpacity };
 
         _accumulator += delta;
         int steps = 0;
