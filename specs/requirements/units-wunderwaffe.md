@@ -2,7 +2,7 @@
 
 P4 · Units, up to mega 'Wunderwaffe' units, are built block by block.
 
-Where it stands (2026-10-17): Units are built on frame by hand or by boosted factories from library blueprints, validated at lift-off, with derived stats, locomotion classes, per-block damage, upkeep and a Wunderwaffe class. A unit lifts off on the one core kind (WM-016), taking the core's stock as cargo. No test range or design sharing.
+Where it stands (2026-10-17): Units are built on frame by hand or by boosted factories from library blueprints, validated at lift-off, with derived stats, locomotion classes, per-block damage, upkeep and a Wunderwaffe class. A unit lifts off on the one core kind (WM-016), taking the core's stock as cargo. Factories run manual or continuous and stop on a failed lift-off; blueprints share as text codes. No test range.
 
 ## Requirements
 
@@ -13,10 +13,10 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 | [UD-003](#ud-003-design-validation) | Design validation | Must | Done | Yes | MVP | Functional | P4 | UD-002 | Updated |  |
 | [UD-004](#ud-004-locomotion-types) | Locomotion types | Must | Done | Yes | MVP | Functional | P4 | UD-001 | Updated |  |
 | [UD-005](#ud-005-design-library) | Design library | Must | Rejected | No | MVP | Functional | P4 | UD-003 |  |  |
-| [UD-006](#ud-006-unit-factory) | Unit factory | Must | In Progress | Partial | MVP | Functional | P4 | FB-009, FB-016, UD-010 | Updated |  |
+| [UD-006](#ud-006-unit-factory) | Unit factory | Must | Done | Yes | MVP | Functional | P4 | FB-009, FB-016, UD-010 | Updated |  |
 | [UD-007](#ud-007-block-damage-model) | Block damage model | Must | Done | Yes | MVP | Functional | P4 | UD-002, CB-001 |  |  |
 | [UD-008](#ud-008-test-range--simulator) | Test range / simulator | Could | Proposed | No | Beta | Functional | P4 | UD-003 |  |  |
-| [UD-009](#ud-009-design-sharing) | Design sharing | Could | Proposed | No | Beta | Functional | P4 | UD-005 |  |  |
+| [UD-009](#ud-009-design-sharing) | Design sharing | Could | Done | Yes | Beta | Functional | P4 | UD-005 |  |  |
 | [WW-001](#ww-001-mega-unit-class) | Mega unit class | Must | Done | Yes | MVP | Functional | P4 | UD-001 | Updated |  |
 | [WW-002](#ww-002-megafactory-requirement) | Megafactory requirement | Must | Done | Yes | MVP | Functional | P2 | UD-006, FB-016 | Updated |  |
 | [WW-003](#ww-003-multi-tile-supply-chain) | Multi-tile supply chain | Should | Proposed | No | Alpha | Functional | P3 | WW-002, IO-002, RS-003 |  |  |
@@ -84,7 +84,7 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 
 **Acceptance criteria:** The factory refuses blueprints over its block cap or outside its radius; it shows required inputs, buffer and progress; each block appears as it is paid for; completion lifts the unit off automatically. Building blueprints are allowed but the result stays in place and blocks the factory until removed. The production setting is switchable at any time, is sim state set by a command, and shows on the factory panel; in manual mode a finished factory waits idle for the next trigger. When a finished unit can't lift off (blocked, over the cap, no power), the factory stops with the reason shown, a factory alert is raised (UI-003), and it takes no more items until the player resumes it.
 
-**As built:** World/UnitFactory.cs: projects a library blueprint within its radius, takes items from belts and builds frame, systems, then armament block by block, lifting off when done; refuses over-cap or out-of-radius blueprints; a building blueprint stays and blocks it until removed; the factory panel shows status, stage progress, buffer and missing items (tested). There is no production setting: it always starts the next copy after a lift-off. A failed lift-off sets LiftOffFailed and retries every tick, with no alert and no resume.
+**As built:** World/UnitFactory.cs: projects a library blueprint within its radius, takes items from belts and builds frame, systems, then armament block by block, lifting off when done; refuses over-cap or out-of-radius blueprints; a building blueprint stays and blocks it until removed; the factory panel shows status, stage progress, buffer and missing items (tested). Production setting FactoryState.Mode (FactoryMode Continuous/Manual) set by set_factory_mode at any time; manual builds one copy per trigger_factory (projecting counts as the first) and takes no belt items while AwaitingTrigger. A failed lift-off sets Status Stopped with the AssembleResult in LiftOff, raises GameEventKind.FactoryStopped (UI-003, Units alert group), and takes nothing until resume_factory retries it. The factory panel shows the setting, the stop reason and Build one / Resume buttons (FactoryTests).
 
 **Notes:** Was: 'A unit factory builds a selected design by consuming the summed block costs delivered via logistics'. Built production is in-world assembly, not a factory consuming summed block costs; see OQ-16. OQ-9 and OQ-16 decided 2026-10-10. Proposed boosters: OQ-25. Owner, 2026-10-17: manual or continuous production per factory (OQ-43); a failed lift-off stops, alerts and waits for a manual resume; lift-off stays instant (OQ-44).
 
@@ -114,7 +114,7 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 
 **Acceptance criteria:** Exported code reimports to an identical design.
 
-**As built:** Not built.
+**As built:** Content/Prefabs.cs ToCode/FromCode: "WW1:" + the prefab JSON (name, tags, blocks, frames), deflated and base64url; import validates it like a prefab and refuses damaged codes or unknown blocks. The library has Copy code per entry and Import code from the clipboard (PrefabTests).
 
 **Notes:** The library is already shared across games (FB-009); this covers sharing between players.
 

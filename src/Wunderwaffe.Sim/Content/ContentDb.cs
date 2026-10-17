@@ -48,6 +48,12 @@ public sealed class ContentDb
     /// <summary>Recipes each building can run, sorted by recipe id.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<RecipeDef>> RecipesByBuilding { get; }
 
+    /// <summary>Prefab blueprints by id (FB-021).</summary>
+    public IReadOnlyDictionary<string, PrefabDef> Prefabs { get; private set; } = new SortedDictionary<string, PrefabDef>(StringComparer.Ordinal);
+
+    /// <summary>Prefab blueprints sorted by id, the order the library and <c>GameQuery.Prefabs</c> list them in.</summary>
+    public IReadOnlyList<PrefabDef> PrefabList { get; private set; } = [];
+
     ContentDb(
         Dictionary<string, ItemDef> items,
         Dictionary<string, RecipeDef> recipes,
@@ -75,7 +81,9 @@ public sealed class ContentDb
 
     /// <param name="goals">The objective chain; null for none.</param>
     /// <param name="terrain">Terrain kinds for world generation; null for a single buildable terrain.</param>
-    public static ContentDb FromJson(string items, string recipes, string buildings, string? goals = null, string? terrain = null)
+    /// <param name="prefabs">Prefab blueprints (FB-021), one JSON object per text (one file each); null for none.</param>
+    public static ContentDb FromJson(
+        string items, string recipes, string buildings, string? goals = null, string? terrain = null, IEnumerable<string>? prefabs = null)
     {
         var errors = new List<string>();
         var buildingList = Parse<BuildingDef>(buildings, "buildings");
@@ -91,9 +99,31 @@ public sealed class ContentDb
             goalList,
             terrainList);
         db.Validate(errors);
+        db.LoadPrefabs(prefabs ?? [], errors);
         if (errors.Count > 0)
             throw new ContentException(errors);
         return db;
+    }
+
+    void LoadPrefabs(IEnumerable<string> texts, List<string> errors)
+    {
+        var list = new List<PrefabDef>();
+        foreach (var text in texts)
+        {
+            try
+            {
+                list.Add(Content.Prefabs.Parse(text));
+            }
+            catch (JsonException e)
+            {
+                errors.Add($"prefab: {e.Message}");
+            }
+        }
+        var map = Index(list, x => x.Id ?? "", "prefab", errors);
+        foreach (var p in list)
+            Content.Prefabs.Validate(this, p, errors);
+        Prefabs = new SortedDictionary<string, PrefabDef>(map, StringComparer.Ordinal);
+        PrefabList = [.. Prefabs.Values];
     }
 
     static List<T> Parse<T>(string json, string file) =>

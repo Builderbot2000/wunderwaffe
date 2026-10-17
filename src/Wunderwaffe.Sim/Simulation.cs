@@ -69,7 +69,7 @@ public sealed partial class Simulation(ContentDb content)
     /// </summary>
     public static Simulation NewGame(ContentDb content, GameSetup setup)
     {
-        if (setup.Problem() is { } problem)
+        if (setup.Problem(content) is { } problem)
             throw new ArgumentOutOfRangeException(nameof(setup), problem);
         var sim = new Simulation(content) { Setup = setup, RateModeEnabled = true };
         sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, setup.Players, richnessPercent: setup.RichnessPercent);

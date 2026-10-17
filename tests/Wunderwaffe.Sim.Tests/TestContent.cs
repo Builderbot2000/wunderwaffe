@@ -28,8 +28,17 @@ static class TestContent
             buildings.Add(JsonNode.Parse(Bank));
         foreach (var json in extraBuildings)
             buildings.Add(JsonNode.Parse(json));
-        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), buildings.ToJsonString(), Read("goals.json"), Read("terrain.json"));
+        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), buildings.ToJsonString(), Read("goals.json"), Read("terrain.json"), Prefabs());
     }
+
+    /// <summary>The real content as shipped (no test bank) with <paramref name="extra"/> prefab JSON objects added.</summary>
+    public static ContentDb WithPrefabs(params string[] extra) =>
+        ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"),
+            [.. Prefabs(), .. extra]);
+
+    /// <summary>The texts of every shipped prefab (FB-021).</summary>
+    public static IEnumerable<string> Prefabs() =>
+        Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data", "prefabs"), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText);
 
     /// <summary>A plain 3x3 host in the <c>factory</c> category, standing in for the unit factory in booster tests.</summary>
     public const string TestFactory =
