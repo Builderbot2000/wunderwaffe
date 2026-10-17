@@ -2,24 +2,24 @@
 
 P8 / P6 · Real-time combat for tiles; No Rush comes from defence/offence balance, not a mechanic.
 
-Where it stands (2026-10-10): Not started: no weapons, health, defences or capture. The protection rules depend on them.
+Where it stands (2026-10-17): Real-time combat with turrets, unit weapons, damage types and resistances, ammo supply, shields, repair, wrecks and circle captures. No Rush relies on defence balance (NR-006), which has no balance test yet.
 
 ## Requirements
 
-| ID | Feature | Priority | Status | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
-|---|---|---|---|---|---|---|---|---|---|
-| [CB-001](#cb-001-real-time-combat) | Real-time combat | Must | Proposed | MVP | Functional | P8 | FB-001 |  |  |
-| [CB-002](#cb-002-damage-types--armour) | Damage types & armour | Should | Proposed | Alpha | Functional | P8 | CB-001 |  |  |
-| [CB-003](#cb-003-tile-capture) | Tile capture | Must | Proposed | MVP | Functional | P8 | CB-001, WM-006 | Updated |  |
-| [CB-004](#cb-004-ammunition-supply) | Ammunition supply | Should | Proposed | Alpha | Functional | P8 | FB-010 | Updated |  |
-| [CB-005](#cb-005-repair) | Repair | Should | Proposed | Alpha | Functional | P8 | CB-001 |  |  |
-| [NR-001](#nr-001-protection-period) | Protection period | Must | Rejected | MVP | Functional | P6 | CB-003 |  |  |
-| [NR-002](#nr-002-buffed-starting-defences) | Buffed starting defences | Must | Rejected | MVP | Functional | P6 | FB-010 |  |  |
-| [NR-003](#nr-003-buff-decay) | Buff decay | Must | Rejected | MVP | Functional | P6 | NR-002 |  |  |
-| [NR-004](#nr-004-protection-forfeit-on-aggression) | Protection forfeit on aggression | Should | Rejected | Alpha | Functional | P6 | NR-001 |  |  |
-| [NR-005](#nr-005-expansion-tile-protection) | Expansion tile protection | Could | Rejected | Beta | Functional | P6 | WM-006 |  |  |
-| [NR-006](#nr-006-defenceoffence-balance) | Defence/offence balance | Must | Proposed | MVP | Non-Functional | P6 | FB-010, CB-001 | New |  |
-| [CB-006](#cb-006-wrecks) | Wrecks | Must | Proposed | MVP | Functional | P8 | CB-001 | New |  |
+| ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [CB-001](#cb-001-real-time-combat) | Real-time combat | Must | Done | Yes | MVP | Functional | P8 | FB-001 |  |  |
+| [CB-002](#cb-002-damage-types--armour) | Damage types & armour | Should | Done | Yes | Alpha | Functional | P8 | CB-001 |  |  |
+| [CB-003](#cb-003-tile-capture) | Tile capture | Must | Done | Yes | MVP | Functional | P8 | CB-001, WM-006 | Updated |  |
+| [CB-004](#cb-004-ammunition-supply) | Ammunition supply | Should | Done | Yes | Alpha | Functional | P8 | FB-010 | Updated |  |
+| [CB-005](#cb-005-repair) | Repair | Should | Done | Yes | Alpha | Functional | P8 | CB-001 |  |  |
+| [NR-001](#nr-001-protection-period) | Protection period | Must | Rejected | No | MVP | Functional | P6 | CB-003 |  |  |
+| [NR-002](#nr-002-buffed-starting-defences) | Buffed starting defences | Must | Rejected | No | MVP | Functional | P6 | FB-010 |  |  |
+| [NR-003](#nr-003-buff-decay) | Buff decay | Must | Rejected | No | MVP | Functional | P6 | NR-002 |  |  |
+| [NR-004](#nr-004-protection-forfeit-on-aggression) | Protection forfeit on aggression | Should | Rejected | No | Alpha | Functional | P6 | NR-001 |  |  |
+| [NR-005](#nr-005-expansion-tile-protection) | Expansion tile protection | Could | Rejected | No | Beta | Functional | P6 | WM-006 |  |  |
+| [NR-006](#nr-006-defenceoffence-balance) | Defence/offence balance | Must | Proposed | No | MVP | Non-Functional | P6 | FB-010, CB-001 | New |  |
+| [CB-006](#cb-006-wrecks) | Wrecks | Must | Done | Yes | MVP | Functional | P8 | CB-001 | New |  |
 
 ### CB-001 Real-time combat
 
@@ -27,7 +27,7 @@ Where it stands (2026-10-10): Not started: no weapons, health, defences or captu
 
 **Acceptance criteria:** Projectiles/beams resolve hits against block hitboxes; destroyed entities removed.
 
-**As built:** Not built.
+**As built:** World/Combat.cs (tick phase 4): turrets and unit weapons fire projectiles and beams that hit per-block hitboxes; destroyed blocks and buildings are removed and leave wrecks (tested, incl. a ~280-unit firefight within budget).
 
 **Notes:** Per-block damage (OQ-27); full visibility, no fog of war (OQ-29); destroyed blocks leave wrecks (CB-006).
 
@@ -37,7 +37,7 @@ Where it stands (2026-10-10): Not started: no weapons, health, defences or captu
 
 **Acceptance criteria:** Damage table data-driven; damage dealt = base × resistance modifier.
 
-**As built:** Not built.
+**As built:** Weapons have a damage type; blocks have per-type resistances in buildings.json; damage = base x (100 - resist) / 100 (BuildingDef.DamageTaken).
 
 ### CB-003 Tile capture
 
@@ -45,7 +45,7 @@ Where it stands (2026-10-10): Not started: no weapons, health, defences or captu
 
 **Acceptance criteria:** Only ownership changes; buildings elsewhere on the tile keep their owner; the world map redraws the control border.
 
-**As built:** Not built.
+**As built:** Capture is the circle claim (World/Expansion.cs): rivals' buildings in the circle are destroyed, the rest keep their owner, and the world map redraws the owner.
 
 **Notes:** Was: 'Captured when its core/HQ is destroyed or taken while the attacker holds presence'. Tiles have no Contested state yet (WM-004, OQ-20). OQ-3 decided 2026-10-10.
 
@@ -55,7 +55,7 @@ Where it stands (2026-10-10): Not started: no weapons, health, defences or captu
 
 **Acceptance criteria:** A turret or unit without ammo stops firing and shows a warning; a unit back inside a resource radius refills.
 
-**As built:** Not built.
+**As built:** Gun turrets and unit guns need shells (munitions works, belts, ammo racks); without ammo they stop firing and show '!'; units refill inside a friendly resource radius (FB-018).
 
 **Notes:** Was: 'Weapons and turrets shall consume ammo items supplied by logistics'. OQ-30 decided 2026-10-10.
 
@@ -65,7 +65,7 @@ Where it stands (2026-10-10): Not started: no weapons, health, defences or captu
 
 **Acceptance criteria:** Repair restores HP and rebuilds destroyed blocks at defined cost.
 
-**As built:** Not built.
+**As built:** Repair bay heals and rebuilds destroyed blocks in range for a cost (tested).
 
 ### NR-001 Protection period
 
@@ -133,7 +133,7 @@ Where it stands (2026-10-10): Not started: no weapons, health, defences or captu
 
 **Acceptance criteria:** A destroyed block leaves a wreck in its cells; units pass through it; placement on it is refused; deconstructing it returns a share of its cost.
 
-**As built:** Not built.
+**As built:** Wreck layer on TileGrid: destroyed blocks and buildings leave wrecks that block placement; units fly over them; deconstructing one returns 25% of its cost (Balance.WreckRefundPercent).
 
 **Notes:** OQ-28 decided 2026-10-10. Confirmed: for now the player deconstructs wrecks like removing a building (salvage units, RS-005, come later for the field); items a destroyed block held are lost.
 

@@ -2,38 +2,41 @@
 
 P2 · Each tile is a real-time factory map where you build.
 
-Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the tile core on terrain-aware tile maps. Machines push output into neighbours; belts carry 7.5 items/s. Every tile runs the full entity sim: rate mode is decided but not built. No power, fluids, storage, defences or builders yet.
+Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridges, storage, crafters, power networks, boosters, platforms on water, turrets and walls, blueprints, production stats and resource radii are built. Unviewed tiles run in rate mode. To do from playtesting: per-core stocks that fund building on their own tile, bigger tiles. Fluids deferred.
 
 ## Requirements
 
-| ID | Feature | Priority | Status | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
-|---|---|---|---|---|---|---|---|---|---|
-| [FB-001](#fb-001-tile-local-map) | Tile local map | Must | Done | MVP | Functional | P2 | WM-002 |  |  |
-| [FB-002](#fb-002-building-placement) | Building placement | Must | Done | MVP | Functional | P2 | FB-001 |  |  |
-| [FB-003](#fb-003-extractors) | Extractors | Must | Done | MVP | Functional | P2 | FB-002, RS-001 | Updated |  |
-| [FB-004](#fb-004-logistics-conveyors) | Logistics: conveyors | Must | In Progress | MVP | Functional | P2 | FB-002 |  |  |
-| [FB-005](#fb-005-power) | Power | Must | Proposed | MVP | Functional | P2 | FB-002 | Updated |  |
-| [FB-006](#fb-006-processing-buildings) | Processing buildings | Must | Done | MVP | Functional | P2 | RS-002 |  |  |
-| [FB-007](#fb-007-storage) | Storage | Must | In Progress | MVP | Functional | P2 | FB-002 |  |  |
-| [FB-008](#fb-008-construction-drones--builder) | Construction drones / builder | Should | Rejected | Alpha | Functional | P2 | FB-002 |  |  |
-| [FB-009](#fb-009-blueprint-library) | Blueprint library | Must | Proposed | MVP | Functional | P2 | FB-002 | Updated |  |
-| [FB-010](#fb-010-defensive-structures) | Defensive structures | Must | Proposed | MVP | Functional | P2 | FB-002, CB-001 |  |  |
-| [FB-011](#fb-011-production-statistics) | Production statistics | Should | Proposed | Alpha | Functional | P2 | FB-006 |  |  |
-| [FB-012](#fb-012-background-tile-simulation-rate-mode) | Background tile simulation (rate mode) | Must | Approved | MVP | Non-Functional | P2 | FB-001, NF-001 |  |  |
-| [FB-013](#fb-013-full-sim-promotion--demotion) | Full-sim promotion / demotion | Must | Approved | MVP | Non-Functional | P2 | FB-012, CB-001 | Updated |  |
-| [FB-014](#fb-014-rate-model-reacts-to-supply) | Rate model reacts to supply | Must | Approved | MVP | Functional | P2 | FB-012, IO-002 |  |  |
-| [FB-015](#fb-015-fluids--pumps) | Fluids & pumps | Could | Deferred | Alpha | Functional | P2 | FB-005 | New |  |
-| [FB-016](#fb-016-building-boosters) | Building boosters | Must | Proposed | MVP | Functional | P2 | FB-002 | New |  |
-| [FB-017](#fb-017-buildings-on-water) | Buildings on water | Must | Proposed | MVP | Functional | P1 | WM-014, WM-011 | New |  |
-| [FB-018](#fb-018-resource-radius) | Resource radius | Should | Proposed | Alpha | Functional | P3 | FB-007, CB-004 | New |  |
+| ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [FB-001](#fb-001-tile-local-map) | Tile local map | Must | In Progress | Partial | MVP | Functional | P2 | WM-002 | Updated |  |
+| [FB-002](#fb-002-building-placement) | Building placement | Must | Done | Yes | MVP | Functional | P2 | FB-001 |  |  |
+| [FB-003](#fb-003-extractors) | Extractors | Must | Done | Yes | MVP | Functional | P2 | FB-002, RS-001 | Updated |  |
+| [FB-004](#fb-004-logistics-conveyors) | Logistics: conveyors | Must | Done | Yes | MVP | Functional | P2 | FB-002 |  |  |
+| [FB-005](#fb-005-power) | Power | Must | Done | Yes | MVP | Functional | P2 | FB-002 | Updated |  |
+| [FB-006](#fb-006-processing-buildings) | Processing buildings | Must | Done | Yes | MVP | Functional | P2 | RS-002 |  |  |
+| [FB-007](#fb-007-storage) | Storage | Must | In Progress | Partial | MVP | Functional | P2 | FB-002 | Updated |  |
+| [FB-008](#fb-008-construction-drones--builder) | Construction drones / builder | Should | Rejected | No | Alpha | Functional | P2 | FB-002 |  |  |
+| [FB-009](#fb-009-blueprint-library) | Blueprint library | Must | Done | Yes | MVP | Functional | P2 | FB-002 | Updated |  |
+| [FB-010](#fb-010-defensive-structures) | Defensive structures | Must | Done | Yes | MVP | Functional | P2 | FB-002, CB-001 |  |  |
+| [FB-011](#fb-011-production-statistics) | Production statistics | Should | Done | Yes | Alpha | Functional | P2 | FB-006 |  |  |
+| [FB-012](#fb-012-background-tile-simulation-rate-mode) | Background tile simulation (rate mode) | Must | Done | Yes | MVP | Non-Functional | P2 | FB-001, NF-001 |  |  |
+| [FB-013](#fb-013-full-sim-promotion--demotion) | Full-sim promotion / demotion | Must | Done | Yes | MVP | Non-Functional | P2 | FB-012, CB-001 | Updated |  |
+| [FB-014](#fb-014-rate-model-reacts-to-supply) | Rate model reacts to supply | Must | Done | Yes | MVP | Functional | P2 | FB-012, IO-002 |  |  |
+| [FB-015](#fb-015-fluids--pumps) | Fluids & pumps | Could | Deferred | No | Alpha | Functional | P2 | FB-005 | New |  |
+| [FB-016](#fb-016-building-boosters) | Building boosters | Must | Done | Yes | MVP | Functional | P2 | FB-002 | New |  |
+| [FB-017](#fb-017-buildings-on-water) | Buildings on water | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-011 | New |  |
+| [FB-018](#fb-018-resource-radius) | Resource radius | Should | Done | Yes | Alpha | Functional | P3 | FB-007, CB-004 | New |  |
+| [FB-019](#fb-019-build-funds-from-cores) | Build funds from cores | Must | Approved | No | MVP | Functional | P2 | WM-016, FB-007 | New |  |
 
 ### FB-001 Tile local map
 
 **Requirement:** Each tile shall contain its own real-time local map (grid-based, Mindustry-like) where buildings are placed.
 
-**Acceptance criteria:** Entering a tile loads its local grid map with terrain and deposits matching the world tile.
+**Acceptance criteria:** Entering a tile loads its local grid map with terrain and deposits matching the world tile; a nominal tile is 256x256 cells (OQ-35), the scale of a mid-size Mindustry map.
 
-**As built:** A tile's local map is its bounding box in the world map; cells of neighbouring tiles show dimmed and can't be built on. Terrain and deposits match the world.
+**As built:** A tile's local map is its bounding box in the world map; cells of neighbouring tiles show dimmed and can't be built on. Terrain and deposits match the world. Nominal tile is 96x96 (Simulation.DefaultTileSize).
+
+**Notes:** Size raised from a 96x96 nominal tile after playtesting 2026-10-17 (OQ-35).
 
 ### FB-002 Building placement
 
@@ -59,7 +62,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Items travel on belts at defined speed; sorters filter by item type.
 
-**As built:** Conveyors only: up to 4 items per cell, 7.5 items/s, side-loading, never feeds back into the cell it faces. No junctions, routers, sorters or bridges.
+**As built:** Conveyors (4 items per cell, 7.5 items/s, side-loading, never feed the cell they face), junction, router, sorter (filter set by command, Logistics.CheckFilter) and bridge (Logistics.BridgeLink); stepping in TileEntities (tested).
 
 ### FB-005 Power
 
@@ -67,7 +70,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** A new player can run their first drills, smelters and a fuel line on core power alone; generators turn fuel into power; buildings stop or slow when their network falls short; UI shows each network's balance; the power value in buildings.json is the draw.
 
-**As built:** Not built. buildings.json carries a 'power' value (steel mill 30) that nothing reads yet.
+**As built:** World/PowerNet.cs: cores (20) and landed unit cores (10) supply power; wire joins what it touches into networks; the fuel generator burns fuel from the fuel press; batteries store surplus; a short network slows every consumer by the same share; the top bar shows each network's balance. 'power' in buildings.json is the draw.
 
 **Notes:** Was: 'Pipes for fluids and a power network (generators, nodes, batteries)'. See OQ-21. OQ-21 decided 2026-10-10. Fluids split to FB-015. Long-range power nodes may come later as a separate building. Units carry their own power (UD-002). Core power and fuel generators decided 2026-10-10. Content needed (A silo): a fuel item and recipe, a fuel generator, and a battery block usable on tiles and on units (UD-003).
 
@@ -77,15 +80,17 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Each recipe has defined inputs, outputs and time; building idles with indicator when starved.
 
-**As built:** Smelter (recipe chosen per placement) and steel mill, from recipes.json. Machines buffer 2 batches and push output into any neighbour in turn. Amber/red dot after 1.5 s starved or blocked; hover panel says why.
+**As built:** Smelter (recipe chosen per placement), steel mill, munitions works and fuel press, from recipes.json. Machines buffer 2 batches and push output into any neighbour in turn. Amber/red dot after 1.5 s starved or blocked; the hover panel says why.
 
 ### FB-007 Storage
 
-**Requirement:** The game shall provide storage buildings and a tile core with a shared inventory.
+**Requirement:** The game shall provide storage buildings and cores; each core holds its own stock.
 
-**Acceptance criteria:** Items delivered to core are added to tile inventory and usable for construction.
+**Acceptance criteria:** Items delivered into a core are added to that core's stock, up to its variant's capacity (OQ-38), and count towards its owner's build funds on that tile (FB-019).
 
-**As built:** Tile core with a shared inventory that pays for building. No separate storage buildings.
+**As built:** Cores deliver into one shared tile inventory with no capacity, which pays for building. Storage buildings exist: container, supply depot and ammo rack (load from belts, unload onto belts, give items back when removed).
+
+**Notes:** Was: 'storage buildings and a tile core with a shared inventory' / 'Items delivered to core are added to tile inventory and usable for construction'. Per-core stock after playtesting 2026-10-17 (FB-019, WM-016).
 
 ### FB-008 Construction drones / builder
 
@@ -103,7 +108,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Save by area selection or from a unit core (UD-001); the library supports rename, duplicate, tag and delete, but not editing blocks; a loaded blueprint shows as rotatable, flippable ghosts and is placed in one action, paying its total cost (refused if any block can't be placed or afforded); the library lives in user data and persists across matches.
 
-**As built:** Not built.
+**As built:** ui/BlueprintLibrary.cs (user://blueprints.json: rename, tags, duplicate, delete); World/Blueprints.cs (record an area, or a valid unit core with K; flip then turn; all-or-nothing Check; one-action Place paying the total); input/BlueprintTool.cs (ghosts, R turns, F mirrors).
 
 **Notes:** Was: 'Save a selection of buildings as a blueprint and paste it on any owned tile (Should, Alpha)'. OQ-16 decided 2026-10-10; absorbs UD-005. Modelled on Mindustry schematics. Ghost guide vs one-click placement: OQ-26. OQ-26 decided 2026-10-10: one-action placement for now.
 
@@ -113,7 +118,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Turrets auto-target enemies in range and consume ammo/power.
 
-**As built:** Not built.
+**As built:** Gun turret (shells from the munitions works), laser turret (power, no ammo), wall and shield generator; turrets target enemies in range (World/Combat.cs).
 
 **Notes:** No Rush comes from defence being cost-effective early (NR-006).
 
@@ -123,7 +128,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Stats panel shows per-minute rates and a 10-minute history graph.
 
-**As built:** Not built.
+**As built:** World/ProductionStats.cs: 10 s buckets over 10 minutes per tile, rate mode included. O opens the production panel (Hud.Stats): made/used per minute per item and a 10-minute HistoryGraph.
 
 **Notes:** Rate-mode tiles report their aggregated rates into the same history (OQ-11).
 
@@ -133,7 +138,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Leaving a stable tile for 5 min yields the same net output (±5%) as watching it for 5 min.
 
-**As built:** Not built: every tile runs the full entity sim. Rates will be computed from the belt graph and checked against the full sim (OQ-14).
+**As built:** World/RateMode.cs + RateModel.cs: tiles nobody views and that aren't Contested step at per-item rates solved from the building/belt graph; tested within 5% of the full sim over 5 minutes.
 
 **Notes:** Updated 2026-10-05: decision OQ-11
 
@@ -143,7 +148,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Enemy units entering an unviewed tile trigger full sim before the first shot and materialise abstract units on it at their world positions (UC-009); leaving returns it to rate mode with no item loss/duplication.
 
-**As built:** Not built.
+**As built:** RateMode picks each tile's mode every tick: full when any player views it (view_tile) or it is Contested, else rate mode. Switching neither loses nor duplicates items (tested); abstract units materialise on promotion.
 
 **Notes:** Updated 2026-10-05: decision OQ-11 Contested defined by OQ-20 (2026-10-10).
 
@@ -153,7 +158,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Cutting an import link to a rate-mode tile reduces its outputs within 1 tick-batch; restoring it recovers them.
 
-**As built:** Not built.
+**As built:** RateModel iterates per group of port-linked tiles until imports and exports agree, so cutting an import reduces what depends on it along a chain and restoring it recovers; power shortfalls and boosters are modelled (tested).
 
 **Notes:** Updated 2026-10-05: decision OQ-11
 
@@ -173,7 +178,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** Boosters, their categories, adjacency rules, effects and stacking are data-driven and validated; the hover panel shows a building's boosted stats; removing a booster reverts its effect at once.
 
-**As built:** Not built.
+**As built:** World/Boosters.cs with the OQ-25 starter set in buildings.json (overdrive coil, yield sieve, heat exchanger, assembly arm, gantry rail, feeder hub, servo bank, coolant tower, precision jig): touch rule, per-type caps, straight gantry chains, removal reverts at once. The hover panel lists boosted stats and their boosters.
 
 **Notes:** OQ-9 decided 2026-10-10. Factories (UD-006) get their radius and block cap from boosters. First boosters and rules: OQ-25. Starter booster set proposed in OQ-25.
 
@@ -183,7 +188,7 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** At least one cheap building (e.g. a floating platform that other buildings can stand on) is placeable on deep and shallow water; terrain.json and building data say which buildings may stand on water.
 
-**As built:** Not built.
+**As built:** Platform (2 iron ore) goes only on water and is buildable floor for other buildings (TileGrid platforms, BuildingDef.OnWater); tested.
 
 **Notes:** Follows from OQ-24 (2026-10-10). The platform design is a proposal; confirm.
 
@@ -193,9 +198,19 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 
 **Acceptance criteria:** A unit inside a friendly radius receives the power, fuel and ammo it uses and pays its upkeep from that source, with no logistics needed; units supply each other the same way; the radius shows when a store or unit is selected; outside every radius a unit lives off its onboard batteries, generators and storage.
 
-**As built:** Not built.
+**As built:** World/ResourceRadius.cs: cores, storage buildings and units with storage supply power, fuel and ammo within their radius every 30 ticks; units supply each other; upkeep is paid from the supplier in reach. CombatView draws the radius of selected units and hovered suppliers.
 
 **Notes:** OQ-30 decided 2026-10-10. Radius sizes and sharing order to be set when built.
+
+### FB-019 Build funds from cores
+
+**Requirement:** What a player can spend on a tile shall be the sum of the items held by their cores standing on that tile as buildings. Cores on units don't count, and other tiles' stocks can't be spent there.
+
+**Acceptance criteria:** Placing buildings, frames and blueprints and lifting off on tile T are paid only from the player's landed cores on T (no paying from neighbouring tiles); with no core on T the player can't pay for anything there; the HUD stock shows that sum for the viewed tile (world map: all landed cores); landing a unit adds its core's cargo to the sum and lifting off takes it away; starting items go into the starting unit's core; payment order and capacity follow OQ-38, refunds and lost cores OQ-39.
+
+**As built:** Each tile has one shared inventory (TileState.Inventory), filled by belts into its core and by starting items. Territory.Payer pays from the tile if the player owns it, else from an owned neighbour; refunds go the same way (RefundTo). Unit cores hold no items; units carry Cargo.
+
+**Notes:** Added after playtesting 2026-10-17. Replaces paying from an owned neighbour: expanding means landing a unit, whose core brings its cargo as the new tile's funds. Rate mode books core deliveries per player per core (TileRates, FlowKind.Core).
 
 ## Decisions & open questions
 
@@ -207,6 +222,8 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 | [OQ-21](#oq-21-is-power-still-in-scope-for-mvp-and-does-the-power-value-in-buildingsjson-mean-draw-per-second) | Is power still in scope for MVP, and does the 'power' value in buildings.json mean draw per second? | FB-005 | Decided | Owner | 2026-10-10 |
 | [OQ-25](#oq-25-what-are-the-first-boosters-and-what-are-their-rules) | What are the first boosters, and what are their rules? | FB-016, UD-006 | Provisional | Proposal; confirm | 2026-10-10 |
 | [OQ-26](#oq-26-is-a-loaded-blueprint-only-a-ghost-guide-for-building-by-hand-or-can-it-be-placed-in-one-action-paying-the-whole-cost) | Is a loaded blueprint only a ghost guide for building by hand, or can it be placed in one action, paying the whole cost? | FB-009 | Decided | Owner | 2026-10-10 |
+| [OQ-38](#oq-38-with-several-cores-on-a-tile-which-pays-and-how-much-can-a-core-hold) | With several cores on a tile, which pays, and how much can a core hold? | FB-019, WM-016, FB-007 | Decided | Owner | 2026-10-17 |
+| [OQ-39](#oq-39-where-do-refunds-go-and-what-happens-to-a-lost-cores-items) | Where do refunds go, and what happens to a lost core's items? | FB-019, WM-016, FB-002 | Provisional | Proposal; confirm | 2026-10-17 |
 
 ### OQ-11 Are unvisited tiles fully simulated or abstracted to rates?
 
@@ -243,3 +260,15 @@ Where it stands (2026-10-10): Drills, conveyors, smelters, a steel mill and the 
 **Options / notes:** Mindustry pastes plans that builders fill in; here hand placement is instant, so one-click placement is possible.
 
 **Decision:** Placed in one action for now, paying the total cost (FB-009).
+
+### OQ-38 With several cores on a tile, which pays, and how much can a core hold?
+
+**Options / notes:** Pay in id order, nearest first, or largest first; unlimited stock or a capacity per core.
+
+**Decision:** Pay from the player's landed cores on the tile in id order, all or nothing; this may become more elaborate later. Each core has a storage capacity set by its variant (OQ-37).
+
+### OQ-39 Where do refunds go, and what happens to a lost core's items?
+
+**Options / notes:** Where refunds and items drained from removed buildings go; what happens to a destroyed core's items; what a full core does with deliveries; whether capacity is per item or in total; whether storage next to a core adds to it (Mindustry links adjacent vaults to the core).
+
+**Decision:** Proposal: refunds and drained items go to the player's core on that tile nearest the building; with no core there, removal still works and the items are lost; a destroyed core's items are lost (salvage later, RS-005); capacity is per item, as in Mindustry, and a full core refuses deliveries so belts back up; storage linking to cores deferred.

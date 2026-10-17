@@ -12,7 +12,7 @@ The strategic layer: a map of tiles that players claim, link and fight over.
 
 ### Tile
 
-One territory of the world map: an irregular region of world cells (about 96x96 on average) with its own real-time local map for building and combat.
+One territory of the world map: an irregular region of world cells (about 256x256 on average) with its own real-time local map for building and combat.
 
 ### Tile Local Map
 
@@ -48,7 +48,7 @@ Prioritisation scheme: Must have, Should have, Could have, Won't have (this rele
 
 ### Nominal Tile
 
-96x96 cells: the unit of map size. Generated tiles average about this area.
+256x256 cells (was 96x96; OQ-35): the unit of map size. Generated tiles average about this area.
 
 ### Regional Resource
 
@@ -58,9 +58,9 @@ An item whose deposits appear only on some tiles and never on a starting tile (c
 
 A floor laid under buildings to mark them as one unit. Costs 2 iron ore a cell.
 
-### Unit Core
+### Core
 
-The block that lifts the framed group around it off the tile as a unit (and, on landing, puts it back).
+The one core building (WM-016). It stores the items that pay for building on its tile (FB-019), supplies power and a resource radius, and lifts the framed group around it off as a unit (on landing, it puts it back). Every unit has exactly one; a player with no core left is eliminated. Replaces the separate tile core and unit core.
 
 ### Thruster
 

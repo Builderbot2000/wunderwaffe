@@ -2,22 +2,22 @@
 
 P7 · Progression is gated by producing higher-tier resources, not by research.
 
-Where it stands (2026-10-10): Six items over three tiers; coal is regional. Two tech nodes (Steelworks, Propulsion) unlock by production and apply empire-wide.
+Where it stands (2026-10-17): Eight items over three tiers; coal is regional. The tech tree is gone: everything is available from the start and costs higher-tier items.
 
 ## Requirements
 
-| ID | Feature | Priority | Status | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
-|---|---|---|---|---|---|---|---|---|---|
-| [RS-001](#rs-001-resource-tiers) | Resource tiers | Must | Done | MVP | Functional | P7 |  |  |  |
-| [RS-002](#rs-002-recipe-graph) | Recipe graph | Must | Done | MVP | Non-Functional | P7 | RS-001 |  |  |
-| [RS-003](#rs-003-regional-scarcity) | Regional scarcity | Must | Done | MVP | Functional | P1 | WM-002, RS-001 | Review |  |
-| [RS-004](#rs-004-deposit-depletion) | Deposit depletion | Could | Proposed | Beta | Functional | P2 | FB-003 |  |  |
-| [TT-001](#tt-001-resource-gated-progression) | Resource-gated progression | Must | In Progress | MVP | Functional | P7 | RS-001 | Updated |  |
-| [TT-002](#tt-002-unlock-conditions) | Unlock conditions | Must | Rejected | MVP | Functional | P7 | TT-001 |  |  |
-| [TT-003](#tt-003-tech-tree-viewer) | Tech tree viewer | Must | Rejected | MVP | Functional | P7 | TT-002 |  |  |
-| [TT-004](#tt-004-unlock-scope) | Unlock scope | Must | Rejected | MVP | Functional | P7 | TT-002 |  |  |
-| [TT-005](#tt-005-global-vs-per-tile-unlocks) | Global vs per-tile unlocks | Should | Rejected | Alpha | Functional | P7 | TT-001 |  |  |
-| [RS-005](#rs-005-salvage) | Salvage | Could | Deferred | Beta | Functional | P7 | CB-001 | New |  |
+| ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [RS-001](#rs-001-resource-tiers) | Resource tiers | Must | Done | Yes | MVP | Functional | P7 |  |  |  |
+| [RS-002](#rs-002-recipe-graph) | Recipe graph | Must | Done | Yes | MVP | Non-Functional | P7 | RS-001 |  |  |
+| [RS-003](#rs-003-regional-scarcity) | Regional scarcity | Must | Done | Yes | MVP | Functional | P1 | WM-002, RS-001 | Review |  |
+| [RS-004](#rs-004-deposit-depletion) | Deposit depletion | Could | Proposed | No | Beta | Functional | P2 | FB-003 |  |  |
+| [TT-001](#tt-001-resource-gated-progression) | Resource-gated progression | Must | Done | Yes | MVP | Functional | P7 | RS-001 | Updated |  |
+| [TT-002](#tt-002-unlock-conditions) | Unlock conditions | Must | Rejected | No | MVP | Functional | P7 | TT-001 |  |  |
+| [TT-003](#tt-003-tech-tree-viewer) | Tech tree viewer | Must | Rejected | No | MVP | Functional | P7 | TT-002 |  |  |
+| [TT-004](#tt-004-unlock-scope) | Unlock scope | Must | Rejected | No | MVP | Functional | P7 | TT-002 |  |  |
+| [TT-005](#tt-005-global-vs-per-tile-unlocks) | Global vs per-tile unlocks | Should | Rejected | No | Alpha | Functional | P7 | TT-001 |  |  |
+| [RS-005](#rs-005-salvage) | Salvage | Could | Deferred | No | Beta | Functional | P7 | CB-001 | New |  |
 
 ### RS-001 Resource tiers
 
@@ -25,7 +25,7 @@ Where it stands (2026-10-10): Six items over three tiers; coal is regional. Two 
 
 **Acceptance criteria:** Resource catalogue lists tier for each item; no tier N item is craftable without tier N-1 inputs.
 
-**As built:** Tier 1-4 per item in items.json. Content validation rejects a recipe whose output is more than one tier above its best input. Items: copper/iron ore, coal (1); copper/iron plate (2); steel (3).
+**As built:** Tier 1-4 per item in items.json; content validation rejects a recipe whose output is more than one tier above its best input. Items: copper/iron ore, coal (1); copper/iron plate, shell, fuel (2); steel (3). Nothing is tier 4 yet.
 
 ### RS-002 Recipe graph
 
@@ -59,7 +59,7 @@ Where it stands (2026-10-10): Six items over three tiers; coal is regional. Two 
 
 **Acceptance criteria:** Every building is available from the start; higher-tier buildings cost higher-tier items; no tech tree data or UI remains.
 
-**As built:** No research currency: a node completes the tick its condition is met.
+**As built:** No tech tree: tech.json, unlocks and the T overlay are gone, and every building and recipe is available from the start (tested). The goal chain (goals.json) stays as guidance.
 
 **Notes:** Was: 'Tech unlocks shall be triggered by acquiring/producing higher-level resources, not by spending science points'. Tech tree removed 2026-10-10 (OQ-7 answer). To do: remove tech.json, Progression unlocks and the T overlay; goals.json still uses the same condition types.
 
@@ -69,7 +69,7 @@ Where it stands (2026-10-10): Six items over three tiers; coal is regional. Two 
 
 **Acceptance criteria:** Data file defines conditions; meeting condition unlocks node immediately with notification.
 
-**As built:** tech.json conditions: produce N of an item, own N tiles, ship N items through ports, launch N units (cumulative per player). Toast on unlock. 'Hold a tile with deposit Y' isn't supported.
+**As built:** Built once (tech.json conditions), removed with the tech tree (TT-001). Goal conditions reuse the same types.
 
 **Notes:** 'Produce X' conditions must count rate-mode production too (OQ-11). Rejected 2026-10-10: no tech tree (TT-001).
 
@@ -79,7 +79,7 @@ Where it stands (2026-10-10): Six items over three tiers; coal is regional. Two 
 
 **Acceptance criteria:** Tree UI shows progress toward each condition (e.g. 34/100 Plasteel).
 
-**As built:** Tech tree overlay (T) with progress bars and what each node unlocks; the next unlock also shows under the objective.
+**As built:** Built once (T overlay), removed with the tech tree (TT-001).
 
 **Notes:** Rejected 2026-10-10: no tech tree (TT-001).
 
@@ -89,7 +89,7 @@ Where it stands (2026-10-10): Six items over three tiers; coal is regional. Two 
 
 **Acceptance criteria:** Every buildable content item references exactly one unlocking node (or is starter content).
 
-**As built:** Nodes unlock buildings and recipes; each id may be unlocked by one node only (validated). Unit blocks are ordinary buildings, so they're covered. Link types and Wunderwaffe parts don't exist yet.
+**As built:** Built once, removed with the tech tree (TT-001).
 
 **Notes:** Rejected 2026-10-10: no tech tree (TT-001).
 
@@ -99,7 +99,7 @@ Where it stands (2026-10-10): Six items over three tiers; coal is regional. Two 
 
 **Acceptance criteria:** Unlocking on tile A makes content available on tile B immediately.
 
-**As built:** Empire-wide (tested).
+**As built:** Built once (empire-wide), removed with the tech tree (TT-001).
 
 **Notes:** Decided OQ-6. Rejected 2026-10-10: no tech tree (TT-001).
 
@@ -109,7 +109,7 @@ Where it stands (2026-10-10): Six items over three tiers; coal is regional. Two 
 
 **Acceptance criteria:** A salvage unit next to a wreck turns it into items over time.
 
-**As built:** Not built.
+**As built:** Not built. Wrecks can be deconstructed for a share of their cost (CB-006), without a salvage unit.
 
 **Notes:** Planned later (OQ-7 answer, 2026-10-10).
 

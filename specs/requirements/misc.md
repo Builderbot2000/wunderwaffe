@@ -2,27 +2,27 @@
 
 Cross-cutting UI/UX and non-functional requirements, project-wide open questions, and the glossary.
 
-Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objectives; integer deterministic sim; saves as replayable command logs; JSON content; automated tests and scripted runs.
+Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HUD with alerts, armies and production panels; guided objectives; integer deterministic sim; saves as command logs with snapshots; JSON content; observation API, JSON driver and AI; automated tests and scripted runs. No packaged build or modding.
 
 ## Requirements
 
-| ID | Feature | Priority | Status | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
-|---|---|---|---|---|---|---|---|---|---|
-| [UI-001](#ui-001-world-map-hud) | World map HUD | Must | In Progress | MVP | Functional | P1 | WM-001 |  |  |
-| [UI-002](#ui-002-tile-hud) | Tile HUD | Must | In Progress | MVP | Functional | P2 | FB-001 |  |  |
-| [UI-003](#ui-003-cross-tile-alerts) | Cross-tile alerts | Must | Proposed | MVP | Functional | P5 | UI-001 |  |  |
-| [UI-004](#ui-004-tutorial--onboarding) | Tutorial / onboarding | Should | In Progress | Alpha | Functional |  |  |  |  |
-| [UI-005](#ui-005-key-rebinding--accessibility) | Key rebinding & accessibility | Should | In Progress | Alpha | Non-Functional |  |  |  |  |
-| [NF-001](#nf-001-simulation-performance) | Simulation performance | Must | In Progress | MVP | Non-Functional |  |  |  |  |
-| [NF-002](#nf-002-save--load) | Save / load | Must | Done | MVP | Non-Functional |  |  | Review |  |
-| [NF-003](#nf-003-data-driven-content) | Data-driven content | Should | Done | Alpha | Non-Functional |  | RS-002 |  |  |
-| [NF-004](#nf-004-deterministic-simulation) | Deterministic simulation | Must | In Progress | MVP | Non-Functional |  |  | Review |  |
-| [NF-005](#nf-005-target-platform) | Target platform | Must | In Progress | MVP | Non-Functional |  |  |  |  |
-| [NF-006](#nf-006-modding-support) | Modding support | Could | Proposed | Beta | Non-Functional |  | NF-003 |  |  |
-| [UI-006](#ui-006-title-pause--settings-menus) | Title, pause & settings menus | Must | Done | MVP | Functional |  |  | New |  |
-| [NF-007](#nf-007-automated-verification) | Automated verification | Should | Done | MVP | Non-Functional |  |  | New |  |
-| [NF-008](#nf-008-save-snapshots) | Save snapshots | Should | Approved | Alpha | Non-Functional |  | NF-002, NF-004 | New |  |
-| [NF-009](#nf-009-shared-command-interface) | Shared command interface | Must | In Progress | MVP | Non-Functional | P8 | NF-004 | New |  |
+| ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [UI-001](#ui-001-world-map-hud) | World map HUD | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
+| [UI-002](#ui-002-tile-hud) | Tile HUD | Must | Done | Yes | MVP | Functional | P2 | FB-001 |  |  |
+| [UI-003](#ui-003-cross-tile-alerts) | Cross-tile alerts | Must | Done | Yes | MVP | Functional | P5 | UI-001 |  |  |
+| [UI-004](#ui-004-tutorial--onboarding) | Tutorial / onboarding | Should | In Progress | Partial | Alpha | Functional |  |  |  |  |
+| [UI-005](#ui-005-key-rebinding--accessibility) | Key rebinding & accessibility | Should | Done | Yes | Alpha | Non-Functional |  |  |  |  |
+| [NF-001](#nf-001-simulation-performance) | Simulation performance | Must | Done | Yes | MVP | Non-Functional |  |  |  |  |
+| [NF-002](#nf-002-save--load) | Save / load | Must | Done | Yes | MVP | Non-Functional |  |  | Review |  |
+| [NF-003](#nf-003-data-driven-content) | Data-driven content | Should | Done | Yes | Alpha | Non-Functional |  | RS-002 |  |  |
+| [NF-004](#nf-004-deterministic-simulation) | Deterministic simulation | Must | Done | Yes | MVP | Non-Functional |  |  | Review |  |
+| [NF-005](#nf-005-target-platform) | Target platform | Must | In Progress | Partial | MVP | Non-Functional |  |  |  |  |
+| [NF-006](#nf-006-modding-support) | Modding support | Could | Proposed | No | Beta | Non-Functional |  | NF-003 |  |  |
+| [UI-006](#ui-006-title-pause--settings-menus) | Title, pause & settings menus | Must | Done | Yes | MVP | Functional |  |  | New |  |
+| [NF-007](#nf-007-automated-verification) | Automated verification | Should | Done | Yes | MVP | Non-Functional |  |  | New |  |
+| [NF-008](#nf-008-save-snapshots) | Save snapshots | Should | Done | Yes | Alpha | Non-Functional |  | NF-002, NF-004 | New |  |
+| [NF-009](#nf-009-shared-command-interface) | Shared command interface | Must | Done | Yes | MVP | Non-Functional | P8 | NF-004 | New |  |
 
 ### UI-001 World map HUD
 
@@ -30,7 +30,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** Clicking an alert jumps to the relevant tile/unit.
 
-**As built:** Selected-tile panel (profile, deposits, claim cost and payer, ports), objective panel, clock. No armies list, alerts or global resource summary.
+**As built:** World map: tile side panel, armies list (Hud.World), alert list with jump-to (Hud.Alerts), top bar totals over owned tiles.
 
 ### UI-002 Tile HUD
 
@@ -38,7 +38,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** All HUD elements update in real time.
 
-**As built:** Inventory, build bar (costs, locks, tooltips), placement line, hover info, objective panel. No power balance (no power yet).
+**As built:** Top bar stock and power balance, tabbed build bar (costs, tooltips, hotkeys), placement message, hover panel, objective panel.
 
 ### UI-003 Cross-tile alerts
 
@@ -46,7 +46,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** Alert appears within 1 s of event; configurable filter.
 
-**As built:** Not built. Toasts exist for tech unlocks and completed goals only.
+**As built:** Hud.Alerts.cs over GameEvents: alert list, filter toggles per group, combat toasts, click jumps to the tile or unit.
 
 ### UI-004 Tutorial / onboarding
 
@@ -54,7 +54,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** New player can complete tutorial in < 30 min.
 
-**As built:** A 6-step guided objective chain (goals.json) walks through the demo loop: mine, smelt, claim coal, ship, make steel, lift off. Not a full tutorial (no unit design or squads yet).
+**As built:** A 7-step guided chain (goals.json): mine, smelt, lift off the scout, claim the coal tile, link tiles, make steel, build a unit. Not a full tutorial: no factories, squads or combat.
 
 **Notes:** A campaign is planned as the tutorial, deferred until core mechanics settle (OQ-13).
 
@@ -64,7 +64,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** All actions rebindable; at least 2 colour-blind modes.
 
-**As built:** Every key is a named input action with defaults set in code, ready for rebinding. No rebinding UI, UI scale or colour-blind modes.
+**As built:** Rebinding screen for every action (KeyBindingsPanel), UI scale, red-green and blue-yellow colour modes (GameSettings, Palette.ColourMode).
 
 ### NF-001 Simulation performance
 
@@ -72,9 +72,9 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** ≥ 60 FPS / 60 UPS with 8 full-sim tiles × 2,000 buildings plus 200 rate-mode tiles on target hardware.
 
-**As built:** Every tile runs the full entity sim. Tests hold 8 tiles x 2,000 buildings under 1 ms/tick; the headless stress run measured ~0.07 ms/tick for ~1,000 buildings. Rate mode not built.
+**As built:** StressScene: 8 viewed full-sim tiles x 2,000 buildings plus 200 rate-mode factories hold 60 UPS, under 4 ms/tick (StressTests, --stress); a ~280-unit firefight stays within budget. Measured on the dev machine with 96-cell tiles; frame rate not measured.
 
-**Notes:** Updated 2026-10-05: decision OQ-11 No budget yet for units and projectiles in combat.
+**Notes:** Updated 2026-10-05: decision OQ-11 No budget yet for units and projectiles in combat. 2026-10-17: a 256x256 nominal tile (OQ-35) has about 7x the cells of a 96 one, and continuous zoom may view several tiles at once (OQ-36); re-measure the stress scene and world-gen time at that size.
 
 ### NF-002 Save / load
 
@@ -82,7 +82,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** Load restores identical state; save < 5 s for large world.
 
-**As built:** A save is the match setup plus the command log; loading replays it (~1.5 s per hour of play) and checks the state hash. Saving is instant.
+**As built:** A save is the match setup plus the command log and the latest snapshot; loading starts from the snapshot when it hash-checks (NF-008), else replays everything, and checks the state hash. Saving is instant.
 
 **Notes:** Load time grows with match length. Long matches will need periodic snapshots to keep loads short; see OQ-19. Snapshots approved 2026-10-10 (NF-008, OQ-19). No save compatibility across versions during greenfield development (OQ-34).
 
@@ -92,7 +92,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** Designers can add content without recompiling.
 
-**As built:** Items, recipes, buildings, tech, goals and terrain are JSON in game/data, validated at load. New building behaviours still need code.
+**As built:** Items, recipes, buildings, goals and terrain are JSON in game/data, validated at load. New building behaviours still need code.
 
 ### NF-004 Deterministic simulation
 
@@ -100,7 +100,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** Same inputs reproduce identical state hash after 30 min, including rate-mode tiles and full-sim promotion/demotion.
 
-**As built:** Integer-only sim, ordered iteration, seeded SplitMix64, integer CORDIC trig, FNV state hash; determinism and replay tests. Not yet checked across machines or over 30 min; rate mode doesn't exist.
+**As built:** Integer-only sim, ordered iteration, seeded SplitMix64, integer CORDIC trig, FNV state hash; a 30-minute determinism test with rate mode and switching, replay tests and lockstep hash checks. Not checked across different machines.
 
 **Notes:** Updated 2026-10-05: decision OQ-12; lockstep assumed.; Priority is Should, but lockstep (MP-003) and replay saves (NF-002) depend on it; see OQ-18. Raised to Must 2026-10-10 (OQ-18).
 
@@ -110,7 +110,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** Builds pass on Windows 10/11 64-bit.
 
-**As built:** Godot 4.7.2 .NET on Windows. No packaged builds yet.
+**As built:** Godot 4.7.2 .NET on Windows. No export presets or packaged builds yet.
 
 ### NF-006 Modding support
 
@@ -136,7 +136,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** xUnit suite on the real content, including a no-cheat run of the whole goal chain and tick-budget tests; headless --stress benchmark; --tour and --drive scripted runs with screenshots.
 
-**As built:** tests/Wunderwaffe.Sim.Tests (136 tests), game/debug/.
+**As built:** tests/Wunderwaffe.Sim.Tests (~258 tests incl. AI, JSON driver, lockstep, rate mode and snapshots); game/debug/ (--stress, --tour, --drive, --net-smoke).
 
 **Notes:** Added from what was built.
 
@@ -146,7 +146,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** Loading the latest snapshot plus the commands after it gives the same state hash as a full replay; load time stays under a set bound whatever the match length.
 
-**As built:** Not built.
+**As built:** Core/Snapshot.cs: snapshots every SnapshotIntervalTicks; a save carries the latest, loading restores it and replays the commands after it, falling back to a full replay if it doesn't hash-check (tested).
 
 **Notes:** OQ-19 decided 2026-10-10.
 
@@ -156,7 +156,7 @@ Where it stands (2026-10-10): Title, pause and settings menus; HUD; guided objec
 
 **Acceptance criteria:** Every action the GUI offers is a command; every preview or status the GUI shows comes from a public sim check or query; an AI player and a headless external driver can play the demo loop end to end using only the interface.
 
-**As built:** Every sim change is already a Command and the UI uses the sim's Check methods, but the GUI reads sim state directly, there's no formal query/observation API and no external driver.
+**As built:** Api/GameQuery.cs (read-only observation for one seat) serves the GUI, Ai/AiPlayer.cs and Api/JsonDriver.cs (JSON lines over stdin/stdout, src/Wunderwaffe.Cli); every action is a Command (tested end to end).
 
 **Notes:** OQ-33 decided 2026-10-10. MP-002 (AI) and automated play-testing build on it.
 

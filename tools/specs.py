@@ -16,6 +16,9 @@ Markdown layout of a mechanic file (specs/requirements/<slug>.md):
     <where it stands>                              paragraph
     ## Requirements
     | ID | Feature | Priority | ... |               short fields, one row per requirement
+                                                   Built (Yes/Partial/No) = what the code does as of the date in
+                                                   'where it stands'; must agree with Status (Done = Yes, In Progress
+                                                   = Partial, anything else = No)
     ### <ID> <Feature>                             long fields: **Requirement:** **Acceptance criteria:** **As built:** **Notes:**
     ## Decisions & open questions
     | # | Question | Related IDs | ... |            short fields; # is OQ-<n>
@@ -51,6 +54,8 @@ MILESTONE = ["MVP", "Alpha", "Beta", "Release", "Post-Launch"]
 TYPE = ["Functional", "Non-Functional"]
 FLAG = ["Conflict", "Review", "Updated", "New"]
 STATE = ["Open", "Provisional", "Decided"]
+BUILT = ["Yes", "Partial", "No"]
+BUILT_FOR_STATUS = {"Done": "Yes", "In Progress": "Partial"}  # every other status: "No"
 STATUS_ORDER = ["Done", "In Progress", "Approved", "Proposed", "Deferred", "Rejected"]  # Overview and summary order
 
 # (key, workbook header, Markdown table header or None for a section field, Markdown section label, allowed values)
@@ -60,6 +65,7 @@ REQ_FIELDS = [
     ("requirement", "Requirement", None, "Requirement", None),
     ("acceptance", "Acceptance Criteria", None, "Acceptance criteria", None),
     ("as_built", "As Built", None, "As built", None),
+    ("built", "Built", "Built", None, BUILT),
     ("flag", "Audit Flag", "Audit Flag", None, FLAG),
     ("notes", "Notes", None, "Notes", None),
     ("priority", "Priority", "Priority", None, PRIORITY),
@@ -70,7 +76,7 @@ REQ_FIELDS = [
     ("depends", "Depends On", "Depends On", None, None),
     ("owner", "Owner", "Owner", None, None),
 ]
-REQ_TABLE = ["id", "feature", "priority", "status", "milestone", "type", "pillar", "depends", "flag", "owner"]
+REQ_TABLE = ["id", "feature", "priority", "status", "built", "milestone", "type", "pillar", "depends", "flag", "owner"]
 Q_FIELDS = [
     ("num", "#", "#", None, None),
     ("related", "Related IDs", "Related IDs", None, None),
@@ -308,6 +314,9 @@ def validate(spec):
             for key, _, _, _, allowed in REQ_FIELDS:
                 if allowed and r[key] and r[key] not in allowed:
                     errors.append(f"{s.file} {r['id']}: {key} '{r[key]}' is not one of {', '.join(allowed)}")
+            want = BUILT_FOR_STATUS.get(r["status"], "No")
+            if r["built"] != want:
+                errors.append(f"{s.file} {r['id']}: status {r['status']} needs Built '{want}', not '{r['built']}'")
             for dep in filter(None, (d.strip() for d in r["depends"].split(","))):
                 if dep not in ids:
                     errors.append(f"{s.file} {r['id']}: depends on unknown {dep}")
@@ -394,8 +403,9 @@ def update_summary(spec):
 
 DARK, LINK, GREY, TOTAL = "1F2A36", "1F4E79", "667085", "F2F4F7"
 COLOURS = {"Must": "F4CCCC", "Should": "FCE5CD", "Could": "D9EAD3", "Won't": "E7E6E6", "Done": "B6D7A8",
-           "Conflict": "F4CCCC", "Review": "FCE5CD", "Updated": "CFE2F3", "New": "D9EAD3"}
-REQ_WIDTHS = [9, 24, 52, 44, 52, 11, 40, 10, 12, 11, 14, 7, 16, 12]
+           "Conflict": "F4CCCC", "Review": "FCE5CD", "Updated": "CFE2F3", "New": "D9EAD3",
+           "Yes": "B6D7A8", "Partial": "FFF2CC", "No": "EFEFEF"}
+REQ_WIDTHS = [9, 24, 52, 44, 52, 9, 11, 40, 10, 12, 11, 14, 7, 16, 12]
 OV_WIDTHS = [26, 22, 9, 9, 9, 11, 9, 11, 9, 9, 9]
 PERCENT = "0%;\\-0%;\\-"
 WRAP = Alignment(wrap_text=True, vertical="top")
@@ -520,14 +530,14 @@ def build_mechanic(s):
             _put(ws, r, c, req[f[0]])
     end = 5 + max(1, len(s.reqs))
     ws.freeze_panes = "C6"
-    ws.auto_filter.ref = f"A5:N{end}"
+    ws.auto_filter.ref = f"A5:{get_column_letter(len(REQ_FIELDS))}{end}"
     col = {f[0]: get_column_letter(i) for i, f in enumerate(REQ_FIELDS, 1)}
     for key, allowed in [("priority", PRIORITY), ("type", TYPE), ("status", STATUS), ("milestone", MILESTONE),
-                         ("flag", FLAG)]:
+                         ("flag", FLAG), ("built", BUILT)]:
         dv = DataValidation(type="list", formula1='"' + ",".join(allowed) + '"', allow_blank=True)
         dv.add(f"{col[key]}6:{col[key]}{end}")
         ws.add_data_validation(dv)
-    for key, values in [("priority", PRIORITY), ("status", ["Done"]), ("flag", FLAG)]:
+    for key, values in [("priority", PRIORITY), ("status", ["Done"]), ("flag", FLAG), ("built", BUILT)]:
         L = col[key]
         for v in values:
             ws.conditional_formatting.add(f"{L}6:{L}{end}", FormulaRule(

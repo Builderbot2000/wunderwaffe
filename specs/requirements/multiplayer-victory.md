@@ -2,17 +2,17 @@
 
 P8 · Players compete for domination of the world map.
 
-Where it stands (2026-10-10): Single player only. The sim is built for lockstep (commands, determinism, state hash), but there's no networking, AI or victory condition; the demo ends with the guided goal chain.
+Where it stands (2026-10-17): Victory by domination or elimination, AI opponents, ENet lockstep with a lobby and desync detection, match settings. Only two-peer online play is tested. No diplomacy.
 
 ## Requirements
 
-| ID | Feature | Priority | Status | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
-|---|---|---|---|---|---|---|---|---|---|
-| [MP-001](#mp-001-domination-victory) | Domination victory | Must | Proposed | MVP | Functional | P8 | WM-004, WM-016 | Updated |  |
-| [MP-002](#mp-002-ai-opponents) | AI opponents | Must | Proposed | MVP | Functional | P8 | UC-001, UD-001 |  |  |
-| [MP-003](#mp-003-online-multiplayer) | Online multiplayer | Should | In Progress | Alpha | Functional | P8 | NF-004 |  |  |
-| [MP-004](#mp-004-diplomacy) | Diplomacy | Could | Proposed | Beta | Functional | P8 | MP-003, IO-002 |  |  |
-| [MP-005](#mp-005-match-settings) | Match settings | Should | In Progress | Alpha | Functional | P8 | MP-001 | Updated |  |
+| ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [MP-001](#mp-001-domination-victory) | Domination victory | Must | Done | Yes | MVP | Functional | P8 | WM-004, WM-016 | Updated |  |
+| [MP-002](#mp-002-ai-opponents) | AI opponents | Must | Done | Yes | MVP | Functional | P8 | UC-001, UD-001 |  |  |
+| [MP-003](#mp-003-online-multiplayer) | Online multiplayer | Should | In Progress | Partial | Alpha | Functional | P8 | NF-004 |  |  |
+| [MP-004](#mp-004-diplomacy) | Diplomacy | Could | Proposed | No | Beta | Functional | P8 | MP-003, IO-002 |  |  |
+| [MP-005](#mp-005-match-settings) | Match settings | Should | Done | Yes | Alpha | Functional | P8 | MP-001 | Updated |  |
 
 ### MP-001 Domination victory
 
@@ -20,9 +20,9 @@ Where it stands (2026-10-10): Single player only. The sim is built for lockstep 
 
 **Acceptance criteria:** Victory triggers at threshold; end screen shows stats.
 
-**As built:** Not built. The demo ends with the guided goal chain instead (UI-004).
+**As built:** World/Victory.cs: a player with no landed core is eliminated; domination at the match's tile share; end screen with winner, reason and per-player stats (Hud.Match).
 
-**Notes:** Elimination decided 2026-10-10.
+**Notes:** Elimination decided 2026-10-10. 2026-10-17: cores on units count too (WM-016), so a player whose cores are all in flight is still in the match.
 
 ### MP-002 AI opponents
 
@@ -30,7 +30,7 @@ Where it stands (2026-10-10): Single player only. The sim is built for lockstep 
 
 **Acceptance criteria:** AI completes a full match on standard settings without stalling.
 
-**As built:** Not built.
+**As built:** Ai/AiPlayer.cs plays through ordinary commands and GameQuery (economy, steel, units, expansion, outposts, attack); tests play the whole goal chain, replay two AIs from the log and run a long match without stalling.
 
 ### MP-003 Online multiplayer
 
@@ -38,7 +38,7 @@ Where it stands (2026-10-10): Single player only. The sim is built for lockstep 
 
 **Acceptance criteria:** 2-8 players can complete a match; desync detected and reported.
 
-**As built:** Foundation only: every change is a serialisable command applied on a tick, the sim is integer and deterministic, and a state hash detects divergence. No networking.
+**As built:** Net/Lockstep.cs over ENet (net/NetSession.cs): lobby, host/join, AI seats on the host, periodic hash checks report desyncs to everyone, seat spoofing and cheats refused. Tested with in-memory peers and two headless instances (--net-smoke); no 3-8 player match tested.
 
 **Notes:** Updated 2026-10-05: decision OQ-12 No pause in multiplayer (OQ-32); a pause vote may come later.
 
@@ -56,7 +56,7 @@ Where it stands (2026-10-10): Single player only. The sim is built for lockstep 
 
 **Acceptance criteria:** Settings saved with match and shown in lobby.
 
-**As built:** New game sets seed and map size (Small 5x5, Medium 7x7, Large 9x9; 3-15 allowed). Saved with the match (GameSetup). No player count, protection, victory or richness settings; no lobby.
+**As built:** ui/MatchSettings.cs: seed, map size, AI count, capture time, victory share and richness go into GameSetup, saved with the match; the lobby shows them to clients.
 
 **Notes:** Was: '... protection duration ...'. No protection setting (OQ-4); capture time added (WM-006), 2026-10-10.
 

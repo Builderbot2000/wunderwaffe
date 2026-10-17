@@ -2,7 +2,7 @@
 
 Factory-builder × RTS × world domination. Build megafactories on world-map tiles, design mega units block by block, conquer the map.
 
-Audited against the codebase on 2026-10-10. Owner decisions on OQ-2..34 recorded the same day (OQ-25 is a proposal awaiting confirmation).
+Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built column). Owner decisions on OQ-2..34 recorded the same day (OQ-25 is a proposal awaiting confirmation). Revised after playtesting on 2026-10-17 (OQ-35..38 decided the same day; OQ-39 is a proposal awaiting confirmation).
 
 ## How to use
 
@@ -10,6 +10,7 @@ Audited against the codebase on 2026-10-10. Owner decisions on OQ-2..34 recorded
 - specs/xlsx has one workbook per Markdown file, generated for viewing (python tools/specs.py build): overview.xlsx for this page, one per mechanic, glossary.xlsx. Edits made in a workbook are not lost: the next build stops, and specs.py diff lists them so they can be copied into the Markdown.
 - IDs are two letters and three digits (WM-001); open questions are OQ-n. 'Depends On' lists IDs that must exist first. 'Pillar' links each row to the design pitch below. Priority uses MoSCoW.
 - Status: Done = built and meets its acceptance criteria; In Progress = partly built; Approved = decided, not built; Proposed = not decided or built.
+- Built: Yes / Partial / No, what the code does as of the date in each file's 'Where it stands' line (also on the As Built header in the workbooks). Build checks it agrees with Status (Done = Yes, In Progress = Partial, anything else = No), so re-audit both together.
 - Audit Flag: Conflict = what's built contradicts the requirement (needs a decision); Review = built differently or worth re-checking; Updated = text rewritten to match a decided build (old text in Notes); New = added from something already built.
 - The summary tables are generated from the requirement tables on every build, here and in overview.xlsx.
 
@@ -21,6 +22,21 @@ Audited against the codebase on 2026-10-10. Owner decisions on OQ-2..34 recorded
 - To review: regional scarcity is per tile, not per biome (RS-003); load time grows with match length (NF-002); determinism is only 'Should' though lockstep and saves depend on it (NF-004).
 - New rows for built features that had no requirement: WM-011..013, UD-010..012, UC-008, UI-006, NF-007. New open questions OQ-16..21.
 - Outside the sheet: goals.json's 'Link your tiles' step still says 'the same lane', which no longer applies now that ports pair by zone.
+
+## Playtest revisions (2026-10-17)
+
+- Continuous zoom: the tile view pulls back smoothly into the world map past a zoom threshold instead of switching instantly (WM-007; OQ-36).
+- World-map orders: selected units are pointed at any spot on the world map; they switch to abstract travel by themselves on crossing the border and keep it until they stop, then render again when their tile is opened (UC-005, UC-009).
+- Bigger tiles: nominal tile 256x256 instead of 96x96, on the scale of Mindustry maps (WM-001, FB-001; OQ-35). Only the tile the player looks at runs the full sim (OQ-36).
+- One core: the tile core and the unit core become one building with several variants, none free; players start with a deployed starting unit; cores on units count against elimination (WM-005, WM-016, UD-010, MP-001; OQ-37).
+- Core-held funds: building on a tile spends only what the player's landed cores on that tile hold, paid in core order, up to each variant's capacity; no paying from a neighbour (FB-019, FB-007; OQ-38, OQ-39).
+
+## Audit findings (2026-10-17)
+
+- Every row now has a Built value, checked against the code (sim, game, tests, data) on this date. Statuses and As Built were far behind: silos A-G built most of what was Proposed, so 49 rows moved to Done (24 to 73 of 111).
+- Still not built: WM-010 neutral tiles, RS-004 depletion, IO-004 long-range links, UD-008 test range, UD-009 design sharing, WW-003 multi-tile supply chain, WW-005 and NR-006 balance tests, MP-004 diplomacy, NF-006 modding; fluids and salvage deferred.
+- Partial: the five playtest changes, UI-004 tutorial, MP-003 (two-peer online only), NF-005 (no packaged build).
+- RS-003 keeps its Review flag: only coal is regional, so the 'one per tier' criterion isn't met above tier 1.
 
 ## Mechanics
 
@@ -44,25 +60,25 @@ See also the [glossary](glossary.md).
 
 | Mechanic | Must | Should | Could | Won't | Total | Done | In Progress | % Done | Conflict | Review |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [World Map](world-map.md) | 11 | 2 | 2 | 1 | 16 | 8 | 2 | 50% | 0 | 0 |
-| [Factory & Logistics](factory-logistics.md) | 14 | 3 | 1 | 0 | 18 | 4 | 2 | 22% | 0 | 0 |
-| [Resources & Tech](resources-tech.md) | 7 | 1 | 2 | 0 | 10 | 3 | 1 | 30% | 0 | 1 |
-| [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 1 | 3 | 17% | 0 | 0 |
-| [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 3 | 2 | 16% | 0 | 1 |
-| [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 1 | 3 | 11% | 0 | 0 |
-| [Combat & Protection](combat-protection.md) | 7 | 4 | 1 | 0 | 12 | 0 | 0 | 0% | 0 | 0 |
-| [Multiplayer & Victory](multiplayer-victory.md) | 2 | 2 | 1 | 0 | 5 | 0 | 2 | 0% | 0 | 0 |
-| [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 4 | 8 | 27% | 0 | 2 |
-| **Total** | 70 | 28 | 11 | 1 | 110 | 24 | 23 | 22% | 0 | 4 |
+| [World Map](world-map.md) | 11 | 2 | 2 | 1 | 16 | 10 | 3 | 62% | 0 | 0 |
+| [Factory & Logistics](factory-logistics.md) | 15 | 3 | 1 | 0 | 19 | 14 | 2 | 74% | 0 | 0 |
+| [Resources & Tech](resources-tech.md) | 7 | 1 | 2 | 0 | 10 | 4 | 0 | 40% | 0 | 1 |
+| [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
+| [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 12 | 1 | 63% | 0 | 1 |
+| [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 7 | 2 | 78% | 0 | 0 |
+| [Combat & Protection](combat-protection.md) | 7 | 4 | 1 | 0 | 12 | 6 | 0 | 50% | 0 | 0 |
+| [Multiplayer & Victory](multiplayer-victory.md) | 2 | 2 | 1 | 0 | 5 | 3 | 1 | 60% | 0 | 0 |
+| [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 12 | 2 | 80% | 0 | 2 |
+| **Total** | 71 | 28 | 11 | 1 | 111 | 73 | 11 | 66% | 0 | 4 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 24 | 22% |
-| In Progress | 23 | 21% |
-| Approved | 4 | 4% |
-| Proposed | 44 | 40% |
+| Done | 73 | 66% |
+| In Progress | 11 | 10% |
+| Approved | 2 | 2% |
+| Proposed | 10 | 9% |
 | Deferred | 2 | 2% |
 | Rejected | 13 | 12% |
 
@@ -72,21 +88,21 @@ See also the [glossary](glossary.md).
 |---|---|
 | Conflict | 0 |
 | Review | 4 |
-| Updated | 22 |
-| New | 22 |
+| Updated | 28 |
+| New | 20 |
 
 ### Design pillar coverage
 
 | Pillar | Name | Reqs | Must | Done |
 |---|---|---|---|---|
-| P1 | World map of tiles | 18 | 13 | 9 |
-| P2 | Tile = RTS factory map | 19 | 15 | 4 |
-| P3 | Inter-tile I/O | 9 | 4 | 1 |
-| P4 | Block-by-block unit design | 15 | 10 | 3 |
-| P5 | Squad command | 9 | 5 | 1 |
+| P1 | World map of tiles | 18 | 13 | 13 |
+| P2 | Tile = RTS factory map | 20 | 16 | 14 |
+| P3 | Inter-tile I/O | 9 | 4 | 6 |
+| P4 | Block-by-block unit design | 15 | 10 | 11 |
+| P5 | Squad command | 9 | 5 | 8 |
 | P6 | No Rush | 6 | 4 | 0 |
-| P7 | Resource-gated tech | 8 | 6 | 2 |
-| P8 | World domination | 15 | 8 | 0 |
+| P7 | Resource-gated tech | 8 | 6 | 3 |
+| P8 | World domination | 15 | 8 | 10 |
 
 <!-- END generated summary -->
 

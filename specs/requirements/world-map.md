@@ -2,38 +2,38 @@
 
 P1 · The world is split into tiles; you start on one and expand.
 
-Where it stands (2026-10-10): One seeded world (terrain with rivers and lakes) cut into irregular tiles. A single player starts on a central land tile and claims neighbours by paying ore. Tab switches between the world map and a tile.
+Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut into irregular 96-cell tiles, each with a victory circle. Any number of players get fair starts; tiles are claimed by holding a building in the circle, and you build wherever you have presence. Tab switches instantly between the world map and a tile. To do from playtesting: continuous zoom, 256-cell tiles, one unified core.
 
 ## Requirements
 
-| ID | Feature | Priority | Status | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
-|---|---|---|---|---|---|---|---|---|---|
-| [WM-001](#wm-001-tiled-world-map) | Tiled world map | Must | Done | MVP | Functional | P1 |  | Updated |  |
-| [WM-002](#wm-002-tile-attributes) | Tile attributes | Must | Done | MVP | Functional | P1 | WM-001 |  |  |
-| [WM-003](#wm-003-tile-adjacency) | Tile adjacency | Must | Done | MVP | Functional | P1 | WM-001 |  |  |
-| [WM-004](#wm-004-tile-ownership) | Tile ownership | Must | In Progress | MVP | Functional | P1 | WM-001 | Updated |  |
-| [WM-005](#wm-005-starting-tile) | Starting tile | Must | In Progress | MVP | Functional | P1 | WM-004 | Updated |  |
-| [WM-006](#wm-006-tile-claim-by-victory-circle) | Tile claim by victory circle | Must | Proposed | MVP | Functional | P1 | WM-014, WM-015 | Updated |  |
-| [WM-007](#wm-007-zoom-between-layers) | Zoom between layers | Must | Done | MVP | Functional | P1 | WM-001, FB-001 |  |  |
-| [WM-008](#wm-008-fog-of-war-world) | Fog of war (world) | Won't | Rejected | Alpha | Functional | P1 | WM-004 |  |  |
-| [WM-009](#wm-009-procedural-world-generation) | Procedural world generation | Should | Done | Alpha | Functional | P1 | WM-002 |  |  |
-| [WM-010](#wm-010-neutral--environmental-tiles) | Neutral / environmental tiles | Could | Proposed | Beta | Functional | P1 | WM-006 |  |  |
-| [WM-011](#wm-011-terrain--buildability) | Terrain & buildability | Must | Done | MVP | Functional | P1 | WM-002 | New |  |
-| [WM-012](#wm-012-tile-names) | Tile names | Could | Done | MVP | Functional | P1 | WM-009 | New |  |
-| [WM-013](#wm-013-world-map-overview) | World map overview | Should | Done | MVP | Functional | P1 | WM-007 | New |  |
-| [WM-014](#wm-014-victory-circles) | Victory circles | Must | Proposed | MVP | Functional | P1 | WM-009 | New |  |
-| [WM-015](#wm-015-building-presence) | Building presence | Must | Proposed | MVP | Functional | P1 | WM-014 | New |  |
-| [WM-016](#wm-016-tile-cores-and-elimination) | Tile cores and elimination | Must | Proposed | MVP | Functional | P8 | WM-005, CB-001 | New |  |
+| ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [WM-001](#wm-001-tiled-world-map) | Tiled world map | Must | In Progress | Partial | MVP | Functional | P1 |  | Updated |  |
+| [WM-002](#wm-002-tile-attributes) | Tile attributes | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
+| [WM-003](#wm-003-tile-adjacency) | Tile adjacency | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
+| [WM-004](#wm-004-tile-ownership) | Tile ownership | Must | Done | Yes | MVP | Functional | P1 | WM-001 | Updated |  |
+| [WM-005](#wm-005-starting-tile) | Starting tile | Must | In Progress | Partial | MVP | Functional | P1 | WM-004 | Updated |  |
+| [WM-006](#wm-006-tile-claim-by-victory-circle) | Tile claim by victory circle | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-015 | Updated |  |
+| [WM-007](#wm-007-zoom-between-layers) | Zoom between layers | Must | Approved | No | MVP | Functional | P1 | WM-001, FB-001, FB-013 | Updated |  |
+| [WM-008](#wm-008-fog-of-war-world) | Fog of war (world) | Won't | Rejected | No | Alpha | Functional | P1 | WM-004 |  |  |
+| [WM-009](#wm-009-procedural-world-generation) | Procedural world generation | Should | Done | Yes | Alpha | Functional | P1 | WM-002 |  |  |
+| [WM-010](#wm-010-neutral--environmental-tiles) | Neutral / environmental tiles | Could | Proposed | No | Beta | Functional | P1 | WM-006 |  |  |
+| [WM-011](#wm-011-terrain--buildability) | Terrain & buildability | Must | Done | Yes | MVP | Functional | P1 | WM-002 | New |  |
+| [WM-012](#wm-012-tile-names) | Tile names | Could | Done | Yes | MVP | Functional | P1 | WM-009 | New |  |
+| [WM-013](#wm-013-world-map-overview) | World map overview | Should | Done | Yes | MVP | Functional | P1 | WM-007 | New |  |
+| [WM-014](#wm-014-victory-circles) | Victory circles | Must | Done | Yes | MVP | Functional | P1 | WM-009 | New |  |
+| [WM-015](#wm-015-building-presence) | Building presence | Must | Done | Yes | MVP | Functional | P1 | WM-014 | New |  |
+| [WM-016](#wm-016-cores-and-elimination) | Cores and elimination | Must | In Progress | Partial | MVP | Functional | P8 | WM-005, CB-001, UD-010 | Updated |  |
 
 ### WM-001 Tiled world map
 
 **Requirement:** The world map shall be divided into discrete, irregular territories (tiles), each representing a self-contained playable area.
 
-**Acceptance criteria:** The world is one generated cell grid cut into tiles of varying shape and size (about one per nominal 96x96 cells, 2-9 neighbours each); each tile has a unique ID, a name and a bounding box.
+**Acceptance criteria:** The world is one generated cell grid cut into tiles of varying shape and size (about one per nominal 256x256 cells (OQ-35), 2-9 neighbours each); each tile has a unique ID, a name and a bounding box.
 
 **As built:** World/Gen/Partition.cs: RISK-like territories grown from seeds; borders follow ridges, coasts and rivers; ocean tiles are ordinary tiles. ~1 tile per nominal 96x96 cells, 2-9 neighbours.
 
-**Notes:** Was: 'World map renders a grid (square or hex) of tiles'. Irregular tiles were built and documented in README (OQ-1).
+**Notes:** Was: 'World map renders a grid (square or hex) of tiles'. Irregular tiles were built and documented in README (OQ-1). Nominal tile raised from 96x96 to 256x256 after playtesting, 2026-10-17 (OQ-35): tiles felt cramped next to Mindustry maps.
 
 ### WM-002 Tile attributes
 
@@ -57,19 +57,19 @@ Where it stands (2026-10-10): One seeded world (terrain with rivers and lakes) c
 
 **Acceptance criteria:** Ownership is shown on the world map by colour; a tile turns Contested the tick an enemy unit enters and stops when none remain; a Contested tile runs the full sim and materialises abstract units on it (FB-013, UC-009).
 
-**As built:** Unclaimed / Owned only, shown as an owner tint on the world map. 'Contested' was removed in the 2026-10-10 cleanup because nothing could set it before combat exists. Transitions aren't logged separately (every claim is in the command log).
+**As built:** Unowned / owned / Contested. Territory.IsContested: Contested while another player's unit is on the tile (an unowned tile: units of two players). The world map tints owners and outlines Contested tiles; Contested tiles run the full sim and materialise abstract units (RateMode, AbstractTravel). Claims and losses raise events (UI-003).
 
 **Notes:** Re-add Contested with combat (CB-001, CB-003); see OQ-20. OQ-20 decided 2026-10-10.
 
 ### WM-005 Starting tile
 
-**Requirement:** Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle (WM-014).
+**Requirement:** Each player shall start owning exactly one tile, with a starting unit already deployed (landed) inside that tile's victory circle (WM-014). Its core is the player's first core (WM-016): it is given at the start, not built.
 
-**Acceptance criteria:** On new game each player owns 1 tile and has a core inside its victory circle; with several players, starts are spread fairly (OQ-22).
+**Acceptance criteria:** On new game each player owns 1 tile and has a landed starting unit whose core stands inside the victory circle and holds the starting items; it can lift off like any unit; with several players, starts are spread fairly (OQ-22).
 
-**As built:** Assigned: the land tile nearest the map centre with room for a core and 2+ land neighbours. Gets a core plus 300 copper ore and 150 iron ore (Balance.cs). Single player only.
+**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). Each start gets a free tile core placed by the sim nearest the circle centre with 300 copper ore + 150 iron ore (Balance.StartingItems), plus a separate landed scout (PlaceScout).
 
-**Notes:** Was: 'Player owns 1 tile and spawns with a starter core/HQ on it'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22).
+**Notes:** Was: 'Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22). Start as a deployed unit instead of a free core, 2026-10-17 (OQ-37).
 
 ### WM-006 Tile claim by victory circle
 
@@ -77,17 +77,19 @@ Where it stands (2026-10-10): One seeded world (terrain with rivers and lakes) c
 
 **Acceptance criteria:** Each player's timer runs while they have a building in the circle and resets to zero when they have none; no timer runs while the circle is empty. The first player to finish claims the tile, and every other player's buildings inside the circle are destroyed at that moment. Otherwise only ownership and the world-map control border change: buildings outside the circle keep their owner. Capture time is a config value.
 
-**As built:** Claim = pay 100 copper ore + 50 iron ore from an adjacent owned tile (C key or Claim button); the new tile gets a core and 120 copper ore. Claimable tiles are outlined on the world map.
+**As built:** World/Expansion.cs: a timer per player per circle runs while they have a building in it (a footprint counts if any cell is inside) and resets when they have none; the first to finish claims the tile and rivals' buildings in the circle are destroyed. Capture time is a match setting (MP-005). The ore claim cost is gone.
 
 **Notes:** Was: 'Claim an unclaimed adjacent tile by meeting a claim condition (e.g. outpost or constructor unit)'. Cost is a placeholder in Balance.cs until OQ-3 is settled. OQ-3 decided 2026-10-10: the ore claim cost (Balance.ClaimCost) goes away. Contested circles: OQ-23. OQ-23 decided 2026-10-10. Progress resets; rivals' buildings in the circle are destroyed on claim (owner, 2026-10-10).
 
 ### WM-007 Zoom between layers
 
-**Requirement:** The player shall switch seamlessly between the world-map view and an individual tile's RTS view.
+**Requirement:** The tile view and the world map shall be one continuous zoom: zooming out from a tile pulls back smoothly over the world, and past a zoom threshold the view becomes the world map; zooming back in over a tile enters its local map.
 
-**Acceptance criteria:** Selecting an owned tile and pressing enter/zoom opens its local map in < 2 s.
+**Acceptance criteria:** The mouse wheel moves between a tile and the world map with no cut or loading pause (Tab and Enter stay as shortcuts that animate the same zoom); around the threshold the tile rendering cross-fades into the world-map picture at the same camera position, so the point under the cursor stays put; zooming in over any tile the player has presence on (WM-015) enters it; the unit selection and the active tool survive the transition; which tiles count as viewed while zooming (full sim, FB-013) and where the threshold sits follow OQ-36.
 
-**As built:** Tab toggles between the world map and the last tile; double-click or Enter opens an owned tile. Switching is instant; each view keeps its own camera.
+**As built:** Tab toggles between the world map and the last tile; double-click or Enter opens a tile. Switching is instant; each view keeps its own camera (CameraController) and the world map draws from a separate downsampled picture (WorldSnapshot).
+
+**Notes:** Was: 'The player shall switch seamlessly between the world-map view and an individual tile's RTS view' (acceptance: enter opens the local map in < 2 s). Rewritten after playtesting 2026-10-17: the instant switch is jarring. Ordering units at any zoom: UC-005. Threshold and viewed tiles: OQ-36.
 
 ### WM-008 Fog of war (world)
 
@@ -145,7 +147,7 @@ Where it stands (2026-10-10): One seeded world (terrain with rivers and lakes) c
 
 **As built:** Deliberately a slightly stale overview, for performance.
 
-**Notes:** Added from what was built.
+**Notes:** Added from what was built. With continuous zoom (WM-007) this picture is what the camera shows past the threshold, so it has to stay cheap with 256-cell tiles (OQ-35).
 
 ### WM-014 Victory circles
 
@@ -153,9 +155,9 @@ Where it stands (2026-10-10): One seeded world (terrain with rivers and lakes) c
 
 **Acceptance criteria:** Every claimable tile has exactly one circle wholly inside it; it sits on the richest deposit cluster that fits while keeping clear of borders; the radius is one Balance constant sized to the nominal tile; same seed gives the same circles; the world map shows them.
 
-**As built:** Not built.
+**As built:** World/Gen/Circles.cs: one circle per tile, ocean tiles included, on the most deposit cells in the disc among centres at least Balance.CircleClearance from the border; radius Balance.CircleRadius = 12. Drawn on the world map with claim arcs.
 
-**Notes:** OQ-3 decided 2026-10-10. Radius placeholder: 12 cells (1/8 of a nominal 96-cell tile) until playtested. Ocean/unbuildable tiles: OQ-24. OQ-24 decided 2026-10-10: ocean and unbuildable tiles get circles too and can be claimed, which needs buildings that stand on water (FB-017).
+**Notes:** OQ-3 decided 2026-10-10. Radius placeholder: 1/8 of a nominal tile (12 cells at 96, 32 at 256; OQ-35) until playtested. Ocean/unbuildable tiles: OQ-24. OQ-24 decided 2026-10-10: ocean and unbuildable tiles get circles too and can be claimed, which needs buildings that stand on water (FB-017).
 
 ### WM-015 Building presence
 
@@ -163,19 +165,19 @@ Where it stands (2026-10-10): One seeded world (terrain with rivers and lakes) c
 
 **Acceptance criteria:** Placement is refused on a tile with none of the player's buildings or units, and inside an enemy-owned circle that holds an enemy building; it is allowed again once those buildings are destroyed.
 
-**As built:** Building (Placement.Check) and landing (UnitAssembly.CheckDeploy) need a tile the player owns.
+**As built:** Territory.HasPresence and EnemyCircleBlocks, used by Placement.Check, frames, blueprints and landing (tested). Building on a tile you don't own is paid from an owned neighbour (Territory.Payer; replaced by FB-019).
 
 **Notes:** Decided 2026-10-10. Conflicts with today's rule that building and landing need an owned tile.
 
-### WM-016 Tile cores and elimination
+### WM-016 Cores and elimination
 
-**Requirement:** The tile core is the first building in a player's starting victory circle and keeps their control of that tile. Players can build more cores; a player who loses their last core is eliminated.
+**Requirement:** There shall be one core building that does the jobs of today's tile core and unit core. A core stores items (FB-019), supplies power (FB-005) and a resource radius (FB-018), gives presence (WM-015), and lifts the framed group around it off as a unit (UD-010); when the unit lands, its core is a core building again. Every unit has exactly one core. The first core stands in the player's starting victory circle (WM-005). A player whose last core is destroyed, landed or on a unit, is eliminated.
 
-**Acceptance criteria:** Cores are buildable; destroying a player's last core eliminates them (MP-001).
+**Acceptance criteria:** One core kind in buildings.json with several variants (OQ-37); every variant costs items to build, none is free; a core on frame lifts off with G and its stock goes with it as the unit's cargo; a landed unit's core holds that cargo and adds it to the tile's funds; a player stays in the match while any core of theirs exists, on a tile or on a unit; destroying the last one eliminates them (MP-001).
 
-**As built:** One core per tile, placed by the sim on start and on claim; cores can't be built or destroyed.
+**As built:** Two buildings: core (3x3, free, its deliveries go to the shared tile inventory, power 20) and unit_core (1x1, 10 copper plate + 5 steel, power 10). The sim places a core on each start; cores are in the build menu; the last core can't be removed (Simulation.TryRemove). Lift-off needs one unit core and refuses a tile core on the frame. Elimination counts landed cores only (Victory.HasCore).
 
-**Notes:** Decided 2026-10-10.
+**Notes:** Was: 'The tile core is the first building in a player's starting victory circle and keeps their control of that tile. Players can build more cores; a player who loses their last core is eliminated.' Decided 2026-10-10. Core and unit core unified after playtesting 2026-10-17, as they do the same jobs. Footprint, cost and tiers: OQ-37.
 
 ## Decisions & open questions
 
@@ -187,6 +189,9 @@ Where it stands (2026-10-10): One seeded world (terrain with rivers and lakes) c
 | [OQ-22](#oq-22-with-several-players-how-are-starting-tiles-chosen) | With several players, how are starting tiles chosen? | WM-005, MP-002, MP-003 | Decided | Owner | 2026-10-10 |
 | [OQ-23](#oq-23-if-two-players-both-have-buildings-in-an-unclaimed-tiles-circle-whose-timer-runs) | If two players both have buildings in an unclaimed tile's circle, whose timer runs? | WM-006, WM-014 | Decided | Owner | 2026-10-10 |
 | [OQ-24](#oq-24-do-ocean-and-other-unbuildable-tiles-get-a-victory-circle-and-can-they-be-claimed) | Do ocean and other unbuildable tiles get a victory circle, and can they be claimed? | WM-014, UD-004 | Decided | Owner | 2026-10-10 |
+| [OQ-35](#oq-35-how-big-should-a-nominal-tile-be) | How big should a nominal tile be? | WM-001, FB-001, WM-014, NF-001 | Decided | Owner | 2026-10-17 |
+| [OQ-36](#oq-36-with-continuous-zoom-where-is-the-threshold-and-which-tiles-count-as-viewed) | With continuous zoom, where is the threshold and which tiles count as viewed? | WM-007, FB-013, UC-005, NF-001 | Decided | Owner | 2026-10-17 |
+| [OQ-37](#oq-37-what-does-the-unified-core-look-like) | What does the unified core look like? | WM-016, UD-010, UD-003, FB-005, WM-005 | Decided | Owner | 2026-10-17 |
 
 ### OQ-1 Square or hex tiles on the world map?
 
@@ -223,3 +228,21 @@ Where it stands (2026-10-10): One seeded world (terrain with rivers and lakes) c
 **Options / notes:** Circle needs buildable land; naval platforms as buildings; ocean tiles are unclaimable.
 
 **Decision:** Yes: every tile has a circle and can be claimed (FB-017 for building on water).
+
+### OQ-35 How big should a nominal tile be?
+
+**Options / notes:** Playtest 2026-10-17: tiles should be significantly bigger, on the scale of Mindustry maps. For reference, Mindustry's editor opens a new map at 200x200 and allows up to about 500 a side. Candidates: 192 (4x today's area), 256 (about 7x) or 320 (about 11x). Bigger tiles multiply world-gen time, memory, the world-map picture and the rate-model graph: a 9x9 world at 256 is 2304x2304 = 5.3M cells.
+
+**Decision:** Nominal 256x256 (Simulation.DefaultTileSize); victory-circle radius stays 1/8 of a tile (32 cells); I/O zone depth stays 4; the title screen offers 3/5/7 nominal tiles a side. Re-measure NF-001 and world-gen time at that size before going bigger.
+
+### OQ-36 With continuous zoom, where is the threshold and which tiles count as viewed?
+
+**Options / notes:** Viewed = only the tile under the screen centre (cheap, but neighbours visible at mid zoom look frozen in rate mode); or every tile the viewport touches below the threshold (looks right; cost bounded by the threshold). Threshold: a fixed zoom, or the zoom at which a tile fits the screen.
+
+**Decision:** Only the tile the player is looking at (the one under the screen centre) renders in full and runs the full sim; every other tile, neighbours included, stays in rate mode with abstract units, even where it shows at mid zoom. Past the threshold the player views no tile. Threshold (tunable): the zoom at which a nominal tile fits the screen height, with a short cross-fade band either side.
+
+### OQ-37 What does the unified core look like?
+
+**Options / notes:** One size for everything (e.g. 2x2, small enough for scouts within the 64-cell cap); or Mindustry-style tiers (Shard / Foundation / Nucleus) of one core kind differing in size, HP, storage and power. Today's tile core is free to build; the unit core costs 10 copper plate + 5 steel.
+
+**Decision:** One core kind with several variants in buildings.json (size, HP, power, storage capacity, cost); exact variants are content work. Nothing is free to build, cores included. Instead of a free core, each player starts with a deployed starting unit (WM-005). Every unit carries exactly one core.
