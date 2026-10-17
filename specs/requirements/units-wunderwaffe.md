@@ -13,7 +13,7 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 | [UD-003](#ud-003-design-validation) | Design validation | Must | Done | Yes | MVP | Functional | P4 | UD-002 | Updated |  |
 | [UD-004](#ud-004-locomotion-types) | Locomotion types | Must | Done | Yes | MVP | Functional | P4 | UD-001 | Updated |  |
 | [UD-005](#ud-005-design-library) | Design library | Must | Rejected | No | MVP | Functional | P4 | UD-003 |  |  |
-| [UD-006](#ud-006-unit-factory) | Unit factory | Must | Done | Yes | MVP | Functional | P4 | FB-009, FB-016, UD-010 | Updated |  |
+| [UD-006](#ud-006-unit-factory) | Unit factory | Must | In Progress | Partial | MVP | Functional | P4 | FB-009, FB-016, UD-010 | Updated |  |
 | [UD-007](#ud-007-block-damage-model) | Block damage model | Must | Done | Yes | MVP | Functional | P4 | UD-002, CB-001 |  |  |
 | [UD-008](#ud-008-test-range--simulator) | Test range / simulator | Could | Proposed | No | Beta | Functional | P4 | UD-003 |  |  |
 | [UD-009](#ud-009-design-sharing) | Design sharing | Could | Proposed | No | Beta | Functional | P4 | UD-005 |  |  |
@@ -80,13 +80,13 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 
 ### UD-006 Unit factory
 
-**Requirement:** A factory shall project a blueprint from the library within its radius and, fed resources by belts, build its blocks into the world one by one; when the last block is placed it triggers the unit core so the blocks lift off as a unit. Its radius and block cap come from its boosters (FB-016).
+**Requirement:** A factory shall project a blueprint from the library within its radius and, fed resources by belts, build its blocks into the world one by one; when the last block is placed it triggers the unit core so the blocks lift off as a unit. Its radius and block cap come from its boosters (FB-016). Each factory has a production setting: manual (one unit per trigger by the player) or continuous (it starts the next copy as soon as one lifts off). A failed lift-off stops the factory, raises an alert, and leaves it idle until the player resumes it.
 
-**Acceptance criteria:** The factory refuses blueprints over its block cap or outside its radius; it shows required inputs, buffer and progress; each block appears as it is paid for; completion lifts the unit off automatically. Building blueprints are allowed but the result stays in place and blocks the factory until removed.
+**Acceptance criteria:** The factory refuses blueprints over its block cap or outside its radius; it shows required inputs, buffer and progress; each block appears as it is paid for; completion lifts the unit off automatically. Building blueprints are allowed but the result stays in place and blocks the factory until removed. The production setting is switchable at any time, is sim state set by a command, and shows on the factory panel; in manual mode a finished factory waits idle for the next trigger. When a finished unit can't lift off (blocked, over the cap, no power), the factory stops with the reason shown, a factory alert is raised (UI-003), and it takes no more items until the player resumes it.
 
-**As built:** World/UnitFactory.cs: projects a library blueprint within its radius, takes items from belts and builds frame, systems, then armament block by block, lifting off when done; refuses over-cap or out-of-radius blueprints; a building blueprint stays and blocks it until removed; the factory panel shows status, stage progress, buffer and missing items (tested).
+**As built:** World/UnitFactory.cs: projects a library blueprint within its radius, takes items from belts and builds frame, systems, then armament block by block, lifting off when done; refuses over-cap or out-of-radius blueprints; a building blueprint stays and blocks it until removed; the factory panel shows status, stage progress, buffer and missing items (tested). There is no production setting: it always starts the next copy after a lift-off. A failed lift-off sets LiftOffFailed and retries every tick, with no alert and no resume.
 
-**Notes:** Was: 'A unit factory builds a selected design by consuming the summed block costs delivered via logistics'. Built production is in-world assembly, not a factory consuming summed block costs; see OQ-16. OQ-9 and OQ-16 decided 2026-10-10. Proposed boosters: OQ-25.
+**Notes:** Was: 'A unit factory builds a selected design by consuming the summed block costs delivered via logistics'. Built production is in-world assembly, not a factory consuming summed block costs; see OQ-16. OQ-9 and OQ-16 decided 2026-10-10. Proposed boosters: OQ-25. Owner, 2026-10-17: manual or continuous production per factory (OQ-43); a failed lift-off stops, alerts and waits for a manual resume; lift-off stays instant (OQ-44).
 
 ### UD-007 Block damage model
 
@@ -223,6 +223,8 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 | [OQ-10](#oq-10-can-a-wunderwaffe-move-between-tiles-or-is-it-tile-bound) | Can a Wunderwaffe move between tiles, or is it tile-bound? | WW-001, IO-003 | Decided | Owner | 2026-10-10 |
 | [OQ-16](#oq-16-are-units-designed-in-an-editor-and-produced-by-factories-ud-001005006-or-assembled-in-place-on-frame-and-lifted-off-as-built) | Are units designed in an editor and produced by factories (UD-001/005/006), or assembled in place on frame and lifted off (as built)? | UD-001, UD-005, UD-006, UD-010 | Decided | Owner | 2026-10-10 |
 | [OQ-27](#oq-27-does-mvp-combat-use-one-hp-pool-per-unit-or-per-block-damage-from-the-start) | Does MVP combat use one HP pool per unit, or per-block damage from the start? | CB-001, UD-007, UD-002 | Decided | Owner | 2026-10-10 |
+| [OQ-43](#oq-43-after-a-factory-lifts-a-unit-off-does-it-build-the-same-blueprint-again) | After a factory lifts a unit off, does it build the same blueprint again? | UD-006, UC-006 | Decided | Owner | 2026-10-17 |
+| [OQ-44](#oq-44-do-lift-off-and-landing-take-time) | Do lift-off and landing take time? | UD-010, UD-011, UD-006, WM-015 | Decided | Owner | 2026-10-17 |
 
 ### OQ-8 Is the designer 2D (top-down) or 3D (voxel)?
 
@@ -253,3 +255,15 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 **Options / notes:** Per-block (UD-007, Should) fits block design but costs more; a pool is quick and can become per-block later.
 
 **Decision:** Per-block damage from the start (UD-007 raised to Must).
+
+### OQ-43 After a factory lifts a unit off, does it build the same blueprint again?
+
+**Options / notes:** Built: yes, silently. When the unit lifts off, the factory starts the same blueprint again and keeps building copies from belt items until the player clears the projection; the spec doesn't say so. Options: build once and go idle; repeat until stopped (as built, with a visible toggle); a count or a queue of blueprints.
+
+**Decision:** A setting on each factory: build on manual trigger (one unit each time) or continuously (UD-006).
+
+### OQ-44 Do lift-off and landing take time?
+
+**Options / notes:** Built: both are instant. The framed group becomes a unit on the tick its core is triggered, and landing turns it back into buildings, core included, giving presence and build funds there at once. So a unit can land mid-fight and build straight away, and a landed group can lift off the moment it is attacked. A factory whose finished unit can't lift off (blocked, over the cap, no power) retries every tick with no limit and no notice beyond its status. Options: keep instant; a short wind-up during which the unit can't move or shoot; time growing with size.
+
+**Decision:** Keep lift-off and landing instant for now. A factory whose finished unit fails to lift off stops, raises an alert and sits idle until the player resumes it (UD-006).

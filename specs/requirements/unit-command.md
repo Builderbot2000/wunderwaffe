@@ -2,7 +2,7 @@
 
 P5 · Players command units and squads that act as a team.
 
-Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol, retreat, control groups, squads with formations and stances, rally points, terrain-aware pathing and abstract travel are built. To do from playtesting: units switch to abstract travel at the border and keep it until they stop.
+Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol, retreat, control groups, squads with formations and stances, rally points, terrain-aware pathing and abstract travel are built. To do from playtesting: units switch to abstract travel at the border and keep it until they stop; aggressive stance seeks out enemies across the tile and a new passive stance keeps course.
 
 ## Requirements
 
@@ -11,7 +11,7 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 | [UC-001](#uc-001-unit-selection--orders) | Unit selection & orders | Must | Done | Yes | MVP | Functional | P5 |  |  |  |
 | [UC-002](#uc-002-squads) | Squads | Must | Done | Yes | MVP | Functional | P5 | UC-001 |  |  |
 | [UC-003](#uc-003-formations) | Formations | Should | Done | Yes | Alpha | Functional | P5 | UC-002 |  |  |
-| [UC-004](#uc-004-squad-behaviours--stances) | Squad behaviours / stances | Should | Done | Yes | Alpha | Functional | P5 | UC-002 |  |  |
+| [UC-004](#uc-004-squad-behaviours--stances) | Squad behaviours / stances | Should | In Progress | Partial | Alpha | Functional | P5 | UC-002 | Updated |  |
 | [UC-005](#uc-005-world-map-level-orders) | World-map level orders | Must | In Progress | Partial | MVP | Functional | P5 | UC-002, IO-003, WM-007, UC-009 | Updated |  |
 | [UC-006](#uc-006-factory-rally--auto-assign) | Factory rally & auto-assign | Should | Done | Yes | Alpha | Functional | P5 | UC-002, UD-006 |  |  |
 | [UC-007](#uc-007-pathfinding) | Pathfinding | Must | Done | Yes | MVP | Non-Functional | P5 | UD-004 |  |  |
@@ -44,13 +44,13 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 
 ### UC-004 Squad behaviours / stances
 
-**Requirement:** Squads shall have stances (aggressive, defensive, hold fire, escort) controlling autonomous behaviour.
+**Requirement:** Units and squads shall have one of four stances controlling autonomous behaviour. Aggressive: seeks out any enemy on its tile and engages it. Defensive: engages enemies in range and may chase a little beyond it, but always returns (to its anchor, or to its course when it has an order) and never pursues indefinitely. Passive: keeps its course and order and opens fire only on enemies within weapon range; never chases. Hold fire: does nothing on its own, neither firing nor chasing, and only carries out its orders.
 
-**Acceptance criteria:** Defensive squad returns to anchor after chasing beyond leash range.
+**Acceptance criteria:** An aggressive unit with no order heads for and attacks the nearest enemy anywhere on its tile, not only those in weapon range. A defensive unit chases a target out of range at most the leash distance (UnitSim.LeashCells) from its anchor or course, then goes back and resumes its order. A passive unit on a move order keeps moving at the same speed and path while fired on, shoots enemies in range, and never leaves its path to chase. A hold-fire unit never fires or moves on its own, even when attacked. Travelling units that meet enemies (UC-009): aggressive stops to fight; defensive fights, chases within its leash and then resumes its course; passive and hold fire keep their course (passive shooting what comes into range). There is no escort stance.
 
-**As built:** Aggressive, defensive (returns to its anchor past the leash), hold fire and escort (E) stances; V cycles (UnitSim).
+**As built:** Aggressive, defensive (returns to its anchor past the leash), hold fire and escort (E) stances; V cycles (UnitSim). Aggressive only chases enemies it finds within weapon range, not across the tile; there is no passive stance; defensive returns to its anchor but not to a course; escort is still a stance, to be removed; and no stance decides course or standstill on meeting enemies while travelling.
 
-**Notes:** 2026-10-17: the stance also decides what a travelling unit does when it meets enemies (UC-009): keep its course through the fight or stop to fight. Which stance does which is still to set.
+**Notes:** Was: 'Squads shall have stances (aggressive, defensive, hold fire, escort) controlling autonomous behaviour.' 2026-10-17: the stance also decides what a travelling unit does when it meets enemies (UC-009): keep its course through the fight or stop to fight. Owner, same day: aggressive seeks out any enemy in the tile and engages; passive keeps course, fights back only when an enemy comes into range and doesn't pursue when it leaves. So aggressive stops to fight and passive keeps course. OQ-40 decided the same day: four stances (aggressive, defensive, passive, hold fire); defensive chases a little and always returns; hold fire does nothing on its own; no escort stance.
 
 ### UC-005 World-map level orders
 
@@ -94,7 +94,7 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 
 **Requirement:** A unit ordered to a destination on another tile shall fly physically across its rendered tile and, on crossing the border, become an abstract node: an icon on the world map following a terrain-legal route at a speed from its stats, without physics. It stays abstract until it stops at its destination, except while it passes through the rendered tile or meets enemies; the player opens the destination tile to render it again.
 
-**Acceptance criteria:** Crossing the rendered tile's border turns the unit into a node with no stop or wait; a unit ordered on a tile that isn't rendered is a node from the start. A node whose route enters the rendered tile materialises there and keeps its order, flying physically to the destination and turning back into a node when it leaves that tile. A node that meets enemy units interrupts its travel: the tile turns Contested and runs the full sim (FB-013), the unit materialises, and the skirmish plays out; by its stance (UC-004) it either keeps its course through the fight or stops to fight, and a unit that survives resumes its order, going abstract again once the tile is no longer Contested. When it stops it stays a node at its exact world position until its tile is opened, which spawns it there with its state. Travel time matches the full sim within a set tolerance.
+**Acceptance criteria:** Crossing the rendered tile's border turns the unit into a node with no stop or wait; a unit ordered on a tile that isn't rendered is a node from the start. A node whose route enters the rendered tile materialises there and keeps its order, flying physically to the destination and turning back into a node when it leaves that tile. A node that meets enemy units interrupts its travel: the tile turns Contested and runs the full sim (FB-013), the unit materialises, and the skirmish plays out; by its stance (UC-004) it either keeps its course through the fight (passive) or stops to fight (aggressive), and a unit that survives resumes its order, going abstract again once the tile is no longer Contested. When it stops it stays a node at its exact world position until its tile is opened, which spawns it there with its state. Travel time matches the full sim within a set tolerance.
 
 **As built:** World/AbstractTravel.cs: a unit on a rate-mode tile is a node moving along planned waypoints at cruise speed with no physics; it materialises where it is, keeping its order, when its tile is viewed or Contested, and goes abstract again on a rate-mode tile (tested); travel time within the set tolerance; turrets can't see nodes. Units go abstract by tile mode, not by crossing a border, and no stance decides between keeping course and stopping to fight.
 
@@ -102,4 +102,12 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 
 ## Decisions & open questions
 
-None yet.
+| # | Question | Related IDs | State | Decided By | Date |
+|---|---|---|---|---|---|
+| [OQ-40](#oq-40-what-do-defensive-hold-fire-and-escort-do-while-travelling-and-does-passive-replace-defensive) | What do defensive, hold fire and escort do while travelling, and does passive replace defensive? | UC-004, UC-009 | Decided | Owner | 2026-10-17 |
+
+### OQ-40 What do defensive, hold fire and escort do while travelling, and does passive replace defensive?
+
+**Options / notes:** Aggressive stops to fight and passive keeps course (owner, 2026-10-17). Defensive (chase within a leash of its anchor) overlaps with passive once the anchor is the unit's path. Options: drop defensive; keep it as 'stop, fight within the leash, then resume'; hold fire keeps course without firing; escort follows its charge's choice.
+
+**Decision:** Four stances. Aggressive seeks out and engages any enemy on the tile (stops to fight when travelling). Defensive engages and may chase a little out of range but always returns and never pursues indefinitely (resumes its course when travelling). Passive opens fire only within weapon range and keeps its course. Hold fire does nothing on its own and keeps its course. Escort is not a stance (UC-004).

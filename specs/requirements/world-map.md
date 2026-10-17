@@ -59,7 +59,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **As built:** Unowned / owned / Contested. Territory.IsContested: Contested while another player's unit is on the tile (an unowned tile: units of two players). The world map tints owners and outlines Contested tiles; Contested tiles run the full sim and materialise abstract units (RateMode, AbstractTravel). Claims and losses raise events (UI-003).
 
-**Notes:** Re-add Contested with combat (CB-001, CB-003); see OQ-20. OQ-20 decided 2026-10-10.
+**Notes:** Re-add Contested with combat (CB-001, CB-003); see OQ-20. OQ-20 decided 2026-10-10. What ownership gives, and no cost for holding tiles: OQ-45.
 
 ### WM-005 Starting tile
 
@@ -192,6 +192,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [OQ-35](#oq-35-how-big-should-a-nominal-tile-be) | How big should a nominal tile be? | WM-001, FB-001, WM-014, NF-001 | Decided | Owner | 2026-10-17 |
 | [OQ-36](#oq-36-with-continuous-zoom-where-is-the-threshold-and-which-tiles-count-as-viewed) | With continuous zoom, where is the threshold and which tiles count as viewed? | WM-007, FB-013, UC-005, NF-001 | Decided | Owner | 2026-10-17 |
 | [OQ-37](#oq-37-what-does-the-unified-core-look-like) | What does the unified core look like? | WM-016, UD-010, UD-003, FB-005, WM-005 | Decided | Owner | 2026-10-17 |
+| [OQ-45](#oq-45-does-holding-more-tiles-cost-anything-and-what-does-owning-a-tile-give) | Does holding more tiles cost anything, and what does owning a tile give? | WM-004, WM-006, MP-001, IO-001 | Decided | Owner | 2026-10-17 |
 
 ### OQ-1 Square or hex tiles on the world map?
 
@@ -246,3 +247,9 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 **Options / notes:** One size for everything (e.g. 2x2, small enough for scouts within the 64-cell cap); or Mindustry-style tiers (Shard / Foundation / Nucleus) of one core kind differing in size, HP, storage and power. Today's tile core is free to build; the unit core costs 10 copper plate + 5 steel.
 
 **Decision:** One core kind with several variants in buildings.json (size, HP, power, storage capacity, cost); exact variants are content work. Nothing is free to build, cores included. Instead of a free core, each player starts with a deployed starting unit (WM-005). Every unit carries exactly one core.
+
+### OQ-45 Does holding more tiles cost anything, and what does owning a tile give?
+
+**Options / notes:** No upkeep or rising cost for tiles; only units have upkeep (UD-013). Anti-snowball options: tile upkeep, rising claim time, catch-up.
+
+**Decision:** No cost: owning more tiles means defending more tiles, and a tile gives little without infrastructure built in it. Owning a tile gives the owner's colour on the world map, counts towards domination (MP-001), and stops enemies building in its circle while the owner's buildings stand there (WM-015). After a capture the loser's buildings outside the circle stay. Port links don't need either tile to be owned.

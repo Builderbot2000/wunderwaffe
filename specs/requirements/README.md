@@ -2,7 +2,7 @@
 
 Factory-builder × RTS × world domination. Build megafactories on world-map tiles, design mega units block by block, conquer the map.
 
-Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built column). Owner decisions on OQ-2..34 recorded the same day (OQ-25 is a proposal awaiting confirmation). Revised after playtesting on 2026-10-17 (OQ-35..39 decided the same day).
+Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built column). Owner decisions on OQ-2..34 recorded the same day (OQ-25 is a proposal awaiting confirmation). Revised after playtesting on 2026-10-17 (OQ-35..39 decided the same day). A review for unspecified mechanics the same day added OQ-40..48, all decided, and CB-007, FB-020, FB-021, MP-006.
 
 ## How to use
 
@@ -61,26 +61,26 @@ See also the [glossary](glossary.md).
 | Mechanic | Must | Should | Could | Won't | Total | Done | In Progress | % Done | Conflict | Review |
 |---|---|---|---|---|---|---|---|---|---|---|
 | [World Map](world-map.md) | 11 | 2 | 2 | 1 | 16 | 10 | 3 | 62% | 0 | 0 |
-| [Factory & Logistics](factory-logistics.md) | 15 | 3 | 1 | 0 | 19 | 14 | 2 | 74% | 0 | 0 |
+| [Factory & Logistics](factory-logistics.md) | 17 | 3 | 1 | 0 | 21 | 14 | 2 | 67% | 0 | 0 |
 | [Resources & Tech](resources-tech.md) | 7 | 1 | 2 | 0 | 10 | 4 | 0 | 40% | 0 | 1 |
 | [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
-| [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 12 | 1 | 63% | 0 | 1 |
-| [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 7 | 2 | 78% | 0 | 0 |
-| [Combat & Protection](combat-protection.md) | 7 | 4 | 1 | 0 | 12 | 6 | 0 | 50% | 0 | 0 |
-| [Multiplayer & Victory](multiplayer-victory.md) | 2 | 2 | 1 | 0 | 5 | 3 | 1 | 60% | 0 | 0 |
+| [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 11 | 2 | 58% | 0 | 1 |
+| [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 6 | 3 | 67% | 0 | 0 |
+| [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 6 | 0 | 46% | 0 | 0 |
+| [Multiplayer & Victory](multiplayer-victory.md) | 3 | 2 | 1 | 0 | 6 | 3 | 2 | 50% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 12 | 2 | 80% | 0 | 2 |
-| **Total** | 71 | 28 | 11 | 1 | 111 | 73 | 11 | 66% | 0 | 4 |
+| **Total** | 74 | 29 | 11 | 1 | 115 | 71 | 14 | 62% | 0 | 4 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 73 | 66% |
-| In Progress | 11 | 10% |
-| Approved | 2 | 2% |
+| Done | 71 | 62% |
+| In Progress | 14 | 12% |
+| Approved | 5 | 4% |
 | Proposed | 10 | 9% |
 | Deferred | 2 | 2% |
-| Rejected | 13 | 12% |
+| Rejected | 13 | 11% |
 
 ### Audit flags
 
@@ -88,21 +88,21 @@ See also the [glossary](glossary.md).
 |---|---|
 | Conflict | 0 |
 | Review | 4 |
-| Updated | 28 |
-| New | 20 |
+| Updated | 29 |
+| New | 24 |
 
 ### Design pillar coverage
 
 | Pillar | Name | Reqs | Must | Done |
 |---|---|---|---|---|
 | P1 | World map of tiles | 18 | 13 | 13 |
-| P2 | Tile = RTS factory map | 20 | 16 | 14 |
-| P3 | Inter-tile I/O | 9 | 4 | 6 |
-| P4 | Block-by-block unit design | 15 | 10 | 11 |
-| P5 | Squad command | 9 | 5 | 8 |
+| P2 | Tile = RTS factory map | 21 | 17 | 14 |
+| P3 | Inter-tile I/O | 10 | 5 | 6 |
+| P4 | Block-by-block unit design | 15 | 10 | 10 |
+| P5 | Squad command | 10 | 5 | 7 |
 | P6 | No Rush | 6 | 4 | 0 |
 | P7 | Resource-gated tech | 8 | 6 | 3 |
-| P8 | World domination | 15 | 8 | 10 |
+| P8 | World domination | 16 | 9 | 10 |
 
 <!-- END generated summary -->
 

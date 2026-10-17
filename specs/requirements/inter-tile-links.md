@@ -23,7 +23,7 @@ Where it stands (2026-10-17): Export and import ports in paired I/O zones move i
 
 **As built:** Zones are the cells within 4 steps of the shared border (PortRules.ZoneDepth); zones never overlap. While a port is picked, the tile view shades each zone and labels the tile it links to.
 
-**Notes:** Was: 'I/O ports on its edges ... placing an export port on edge X and an import port on the neighbour's matching edge creates a link'. Units don't use ports (see IO-003). Code issue: goals.json's 'link' step still tells players to use 'the same lane', which no longer applies.
+**Notes:** Was: 'I/O ports on its edges ... placing an export port on edge X and an import port on the neighbour's matching edge creates a link'. Units don't use ports (see IO-003). Ports work whoever owns the two tiles (OQ-45), and a linked pair carries power too (FB-020). Code issue: goals.json's 'link' step still tells players to use 'the same lane', which no longer applies.
 
 ### IO-002 Item transfer between tiles
 

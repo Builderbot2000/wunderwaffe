@@ -20,6 +20,7 @@ Where it stands (2026-10-17): Real-time combat with turrets, unit weapons, damag
 | [NR-005](#nr-005-expansion-tile-protection) | Expansion tile protection | Could | Rejected | No | Beta | Functional | P6 | WM-006 |  |  |
 | [NR-006](#nr-006-defenceoffence-balance) | Defence/offence balance | Must | Proposed | No | MVP | Non-Functional | P6 | FB-010, CB-001 | New |  |
 | [CB-006](#cb-006-wrecks) | Wrecks | Must | Done | Yes | MVP | Functional | P8 | CB-001 | New |  |
+| [CB-007](#cb-007-targeting-modes) | Targeting modes | Should | Approved | No | Alpha | Functional | P5 | CB-001, UC-004 | New |  |
 
 ### CB-001 Real-time combat
 
@@ -131,11 +132,21 @@ Where it stands (2026-10-17): Real-time combat with turrets, unit weapons, damag
 
 **Requirement:** Destroyed blocks and buildings shall leave dead blocks that don't block movement but do block building, and can be deconstructed for resources.
 
-**Acceptance criteria:** A destroyed block leaves a wreck in its cells; units pass through it; placement on it is refused; deconstructing it returns a share of its cost.
+**Acceptance criteria:** A destroyed block leaves a wreck in its cells; units pass through it; placement on it is refused; deconstructing it returns 25% of its cost.
 
 **As built:** Wreck layer on TileGrid: destroyed blocks and buildings leave wrecks that block placement; units fly over them; deconstructing one returns 25% of its cost (Balance.WreckRefundPercent).
 
-**Notes:** OQ-28 decided 2026-10-10. Confirmed: for now the player deconstructs wrecks like removing a building (salvage units, RS-005, come later for the field); items a destroyed block held are lost.
+**Notes:** OQ-28 decided 2026-10-10. Owner, 2026-10-17: 25% back on wrecks, 100% on removing an intact block or building (FB-002). Confirmed: for now the player deconstructs wrecks like removing a building (salvage units, RS-005, come later for the field); items a destroyed block held are lost.
+
+### CB-007 Targeting modes
+
+**Requirement:** Each unit and squad shall have a targeting mode, set like its stance (UC-004), that decides which enemy its weapons pick among those in range: nearest, most blocks, most weapons, and further modes as content needs them.
+
+**Acceptance criteria:** The player switches a unit's or squad's mode with one key or button, as with stances; the mode is sim state and goes through the command log; with several enemies in range, weapons pick by the mode (ties broken by distance, then id); an attack order on a target overrides the mode; squad focus fire uses the squad's mode.
+
+**As built:** Not built: weapons fire at the nearest target in range (Combat, Targets.Nearest), or at the ordered or squad target.
+
+**Notes:** Owner, 2026-10-17: a simple mode switch for now (OQ-41). Not decided: whether turrets get modes too; today they pick the nearest.
 
 ## Decisions & open questions
 
@@ -148,6 +159,7 @@ Where it stands (2026-10-17): Real-time combat with turrets, unit weapons, damag
 | [OQ-29](#oq-29-how-do-sight-and-targeting-work-inside-a-tile) | How do sight and targeting work inside a tile? | CB-001, FB-010, WM-008 | Decided | Owner | 2026-10-10 |
 | [OQ-30](#oq-30-how-are-units-resupplied-with-ammo-away-from-their-tiles) | How are units resupplied with ammo away from their tiles? | CB-004 | Decided | Owner | 2026-10-10 |
 | [OQ-31](#oq-31-is-there-unit-upkeep) | Is there unit upkeep? | WW-005 | Decided | Owner | 2026-10-10 |
+| [OQ-41](#oq-41-how-do-units-choose-which-enemy-to-shoot) | How do units choose which enemy to shoot? | CB-007, UC-004 | Decided | Owner | 2026-10-17 |
 
 ### OQ-4 What ends the protection period: time, tech tier, or both?
 
@@ -190,3 +202,9 @@ Where it stands (2026-10-17): Real-time combat with turrets, unit weapons, damag
 **Options / notes:** WW-005 mentions upkeep but nothing defines it.
 
 **Decision:** Yes, summed from the blocks inside the unit (UD-013).
+
+### OQ-41 How do units choose which enemy to shoot?
+
+**Options / notes:** Built: nearest in range, or the ordered or squad target. Options: fixed priorities per weapon, a per-unit mode, threat scoring.
+
+**Decision:** A per-unit and per-squad targeting mode, switched like the stance: by block count, number of weapons, distance and so on (CB-007).

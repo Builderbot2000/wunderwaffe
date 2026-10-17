@@ -27,6 +27,8 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [FB-017](#fb-017-buildings-on-water) | Buildings on water | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-011 | New |  |
 | [FB-018](#fb-018-resource-radius) | Resource radius | Should | Done | Yes | Alpha | Functional | P3 | FB-007, CB-004 | New |  |
 | [FB-019](#fb-019-build-funds-from-cores) | Build funds from cores | Must | Approved | No | MVP | Functional | P2 | WM-016, FB-007 | New |  |
+| [FB-020](#fb-020-power-layer-nodes-and-cross-tile-power) | Power layer, nodes and cross-tile power | Must | Approved | No | MVP | Functional | P3 | FB-005, IO-002 | New |  |
+| [FB-021](#fb-021-prefab-blueprints) | Prefab blueprints | Must | Approved | No | MVP | Functional | P2 | FB-009, WM-005 | New |  |
 
 ### FB-001 Tile local map
 
@@ -42,9 +44,11 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Requirement:** The player shall place, rotate and remove buildings on the tile grid, subject to footprint and terrain rules.
 
-**Acceptance criteria:** Invalid placement is previewed in red and rejected; removal refunds a defined % of cost.
+**Acceptance criteria:** Invalid placement is previewed in red and rejected; removal refunds 100% of cost (wrecks 25%, CB-006).
 
 **As built:** Place (left-click/drag), rotate (R), remove (right-click/drag). Green/red ghost uses the sim's own check. Refund is 100% (Balance.RefundPercent), and items held by the building go back to the tile inventory.
+
+**Notes:** Owner, 2026-10-17: 100% back on an intact block or building, 25% on a wreck (CB-006).
 
 ### FB-003 Extractors
 
@@ -72,7 +76,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **As built:** World/PowerNet.cs: cores (20) and landed unit cores (10) supply power; wire joins what it touches into networks; the fuel generator burns fuel from the fuel press; batteries store surplus; a short network slows every consumer by the same share; the top bar shows each network's balance. 'power' in buildings.json is the draw.
 
-**Notes:** Was: 'Pipes for fluids and a power network (generators, nodes, batteries)'. See OQ-21. OQ-21 decided 2026-10-10. Fluids split to FB-015. Long-range power nodes may come later as a separate building. Units carry their own power (UD-002). Core power and fuel generators decided 2026-10-10. Content needed (A silo): a fuel item and recipe, a fuel generator, and a battery block usable on tiles and on units (UD-003).
+**Notes:** Was: 'Pipes for fluids and a power network (generators, nodes, batteries)'. See OQ-21. OQ-21 decided 2026-10-10. Fluids split to FB-015. Power nodes, a separate cable layer and power over port links: FB-020 (OQ-42). Units carry their own power (UD-002). Core power and fuel generators decided 2026-10-10. Content needed (A silo): a fuel item and recipe, a fuel generator, and a battery block usable on tiles and on units (UD-003).
 
 ### FB-006 Processing buildings
 
@@ -100,7 +104,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **As built:** Not built: placement is instant.
 
-**Notes:** Rejected 2026-10-10: placing by hand stays instant. Factories (UD-006) are the gradual builders.
+**Notes:** Rejected 2026-10-10: placing by hand stays instant. Factories (UD-006) are the gradual builders. Owner, 2026-10-17: no automatic rebuilding of destroyed buildings for now; drone-based construction may replace instant placement later, and rebuilding would be settled then.
 
 ### FB-009 Blueprint library
 
@@ -212,6 +216,26 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Notes:** Added after playtesting 2026-10-17. Replaces paying from an owned neighbour: expanding means landing a unit, whose core brings its cargo as the new tile's funds. Rate mode books core deliveries per player per core (TileRates, FlowKind.Core).
 
+### FB-020 Power layer, nodes and cross-tile power
+
+**Requirement:** Power cables shall lie on their own layer, under buildings, like frame. A power node building shall join into one network every generator, battery and other node within its radius, as in Mindustry. A linked export/import port pair shall carry power between the two tiles, joining their networks.
+
+**Acceptance criteria:** A cable can be laid under a building or belt, and a building placed over a cable, without either blocking the other; cables still join what they touch. A node shows its radius while placed and joins every generator, battery and node inside it into its network; removing it splits the network again. With a linked port pair, a generator on one tile powers consumers on the other, and both tiles' power panels show the shared network. Rate mode uses the joined network's satisfaction.
+
+**As built:** Not built: wire is an ordinary building that takes its cell, there is no power node, and networks never leave their tile.
+
+**Notes:** Owner, 2026-10-17 (OQ-42). Not decided: whether a node also joins consumers in its radius (in Mindustry it does, by laser link), and whether a port link limits how much power it carries.
+
+### FB-021 Prefab blueprints
+
+**Requirement:** The blueprint library shall come with prefab blueprints (buildings and unit designs) that the player can pick from like their own, and the same prefabs shall set up what stands on the map before the match starts, such as each player's starting unit.
+
+**Acceptance criteria:** Prefabs are content: blueprint files shipped with the game data, loaded and validated like the other content (every block id exists, rotations and frame cells valid) and refused with an error otherwise. They show in the library alongside the player's own, marked as prefabs; they can be placed, projected by a factory and duplicated like any blueprint, but not renamed, retagged or deleted. Match setup places each player's starting layout from prefabs named in the setup (with the items their cores start with), instead of code; a map or setup can name extra prefabs for a seat, which is how an AI gets a head start (OQ-47). The AI picks its designs from the prefabs through the same queries as everyone else.
+
+**As built:** Not built: the library starts empty, the starting unit and items are set in code (Simulation.PlaceScout, Balance.StartingItems), and the AI's unit design is a constant (AiPlayer.UnitDesign).
+
+**Notes:** Owner, 2026-10-17: define the system first; which prefabs ship is a later content and balance update. Saves already store the setup, so a save replays with the prefabs it was started with only while content doesn't change (OQ-34).
+
 ## Decisions & open questions
 
 | # | Question | Related IDs | State | Decided By | Date |
@@ -224,6 +248,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [OQ-26](#oq-26-is-a-loaded-blueprint-only-a-ghost-guide-for-building-by-hand-or-can-it-be-placed-in-one-action-paying-the-whole-cost) | Is a loaded blueprint only a ghost guide for building by hand, or can it be placed in one action, paying the whole cost? | FB-009 | Decided | Owner | 2026-10-10 |
 | [OQ-38](#oq-38-with-several-cores-on-a-tile-which-pays-and-how-much-can-a-core-hold) | With several cores on a tile, which pays, and how much can a core hold? | FB-019, WM-016, FB-007 | Decided | Owner | 2026-10-17 |
 | [OQ-39](#oq-39-where-do-refunds-go-and-what-happens-to-a-lost-cores-items) | Where do refunds go, and what happens to a lost core's items? | FB-019, WM-016, FB-002 | Decided | Owner | 2026-10-17 |
+| [OQ-42](#oq-42-can-power-cross-tiles-and-do-cables-share-the-building-layer) | Can power cross tiles, and do cables share the building layer? | FB-005, FB-020, IO-002 | Decided | Owner | 2026-10-17 |
 
 ### OQ-11 Are unvisited tiles fully simulated or abstracted to rates?
 
@@ -272,3 +297,9 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 **Options / notes:** Where refunds and items drained from removed buildings go; what happens to a destroyed core's items; what a full core does with deliveries; whether capacity is per item or in total; whether storage next to a core adds to it (Mindustry links adjacent vaults to the core).
 
 **Decision:** Refunds and drained items go to the player's core on that tile nearest the building; with no core there, removal still works and the items are lost; a destroyed core's items are lost (salvage later, RS-005); capacity is per item, as in Mindustry, and a full core refuses deliveries so belts back up; storage linking to cores deferred.
+
+### OQ-42 Can power cross tiles, and do cables share the building layer?
+
+**Options / notes:** Built: wire is a building block, and networks stay inside one tile.
+
+**Decision:** Port links carry power as well as items. Cables go on their own layer. Add a power node building that joins all generators, batteries and other nodes within its radius, like Mindustry (FB-020).

@@ -102,7 +102,7 @@ Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HU
 
 **As built:** Integer-only sim, ordered iteration, seeded SplitMix64, integer CORDIC trig, FNV state hash; a 30-minute determinism test with rate mode and switching, replay tests and lockstep hash checks. Not checked across different machines.
 
-**Notes:** Updated 2026-10-05: decision OQ-12; lockstep assumed.; Priority is Should, but lockstep (MP-003) and replay saves (NF-002) depend on it; see OQ-18. Raised to Must 2026-10-10 (OQ-18).
+**Notes:** Updated 2026-10-05: decision OQ-12; lockstep assumed.; Priority is Should, but lockstep (MP-003) and replay saves (NF-002) depend on it; see OQ-18. Raised to Must 2026-10-10 (OQ-18). Owner, 2026-10-17: 'replays' means replaying the command log for saves and checks; there is no replay viewer yet.
 
 ### NF-005 Target platform
 
