@@ -426,7 +426,7 @@ public static class Planner
                 foreach (var m in machines)
                 {
                     var joined = Joined(sources, offFrame);
-                    if (joined.Contains(m))
+                    if (joined.Contains(m) || OnSuppliedCable(m.X, m.Y - 1, m.W, m.H + 2) || OnSuppliedCable(m.X - 1, m.Y, m.W + 2, m.H))
                         continue;
                     if (WireRoute(player, wire, m, joined) is not { } run)
                         return null;
@@ -444,6 +444,20 @@ public static class Planner
                 for (int i = 0; i < added; i++)
                     Pop();
             }
+        }
+
+        /// <summary>A cable of a network with something that makes power lies in the area (FB-020).</summary>
+        bool OnSuppliedCable(int x, int y, int w, int h)
+        {
+            for (int cy = y; cy < y + h; cy++)
+            {
+                for (int cx = x; cx < x + w; cx++)
+                {
+                    if (_g.Power.NetworkAtCable(cx, cy) is { } net && net.Members.Any(m => m.Def.PowerSupply > 0))
+                        return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>A real building on a network with something that makes power.</summary>
@@ -494,7 +508,7 @@ public static class Planner
             {
                 int i = queue.Dequeue();
                 int cx = i % w, cy = i / w;
-                if (Directions.All.Any(d => At(cx + d.Dx(), cy + d.Dy()) is { } n && joined.Contains(n)))
+                if (Directions.All.Any(d => At(cx + d.Dx(), cy + d.Dy()) is { } n && joined.Contains(n) || OnSuppliedCable(cx + d.Dx(), cy + d.Dy(), 1, 1)))
                 {
                     var run = new List<(int X, int Y)>();
                     for (int k = i; k >= 0; k = prev[k])

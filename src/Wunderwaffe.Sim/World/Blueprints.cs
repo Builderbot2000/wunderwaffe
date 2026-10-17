@@ -231,13 +231,37 @@ public static class Blueprints
             return result;
 
         Funds.TryPay(tile, player, plan.Cost);
+        Build(sim, tile, player, plan);
+        return BlueprintResult.Ok;
+    }
+
+    /// <summary>Lays a checked plan's frame and buildings, unpaid. Returns the buildings in blueprint order.</summary>
+    static List<PlacedBuilding> Build(Simulation sim, TileState tile, int player, BlueprintPlan plan)
+    {
         foreach (var (fx, fy) in plan.NewFrames)
             tile.Grid.SetFrame(fx, fy, true);
+        var placed = new List<PlacedBuilding>(plan.Blocks.Count);
         foreach (var p in plan.Blocks)
         {
             var recipe = p.RecipeId == null ? null : sim.Content.Recipes[p.RecipeId];
-            tile.Grid.Add(p.Def, player, p.X, p.Y, p.Width, p.Height, p.Rotation, recipe);
+            placed.Add(tile.Grid.Add(p.Def, player, p.X, p.Y, p.Width, p.Height, p.Rotation, recipe));
         }
-        return BlueprintResult.Ok;
+        return placed;
+    }
+
+    /// <summary>
+    /// Match setup (FB-021): lays a prefab with its top-left at (x, y) for free, its first core holding the prefab's
+    /// items. The spot must already be free and buildable; anything the placement rules refuse there is a content or
+    /// setup error and throws.
+    /// </summary>
+    internal static void Stamp(Simulation sim, TileState tile, int player, Content.PrefabDef prefab, int x, int y)
+    {
+        var result = Check(sim, tile, player, prefab.Blueprint, x, y, 0, false, out var plan);
+        if (result is not (BlueprintResult.Ok or BlueprintResult.CannotAfford))
+            throw new InvalidOperationException(
+                $"prefab '{prefab.Id}' doesn't fit at ({x}, {y}) on tile {tile.Id}: {string.Join(", ", plan.Problems.Select(p => p.Result))}");
+        var placed = Build(sim, tile, player, plan);
+        if (prefab.Items is { Count: > 0 } items)
+            placed.First(b => b.Kind == BuildingKind.Core).Stock!.Add(items);
     }
 }

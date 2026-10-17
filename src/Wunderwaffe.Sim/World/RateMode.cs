@@ -248,7 +248,8 @@ public static class RateMode
     /// </summary>
     static void UpdateModes(Simulation sim)
     {
-        var full = Territory.ContestedTiles(sim);
+        var contested = Territory.ContestedTiles(sim);
+        var full = (bool[])contested.Clone();
         foreach (var p in sim.Players)
         {
             if (p.ViewedTile >= 0 && p.ViewedTile < full.Length)
@@ -256,6 +257,6 @@ public static class RateMode
         }
         foreach (var tile in sim.Tiles)
             sim.RateState(tile.Id).Full = full[tile.Id];
-        AbstractTravel.Update(sim, full);
+        AbstractTravel.Update(sim, full, contested);
     }
 }

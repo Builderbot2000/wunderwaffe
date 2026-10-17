@@ -101,13 +101,16 @@ public partial class Hud
         .OrderByDescending(n => n.Demand).ThenBy(n => n.Id).ToList();
 
     /// <summary>Each power network's balance (FB-005): made, used, batteries, and how much of the demand is met.</summary>
-    static string PowerTooltip(List<PowerNetwork> nets) => string.Join("\n", nets.Select(n =>
+    string PowerTooltip(List<PowerNetwork> nets) => string.Join("\n", nets.Select(n =>
     {
         var text = $"{n.Satisfaction / 10}% · {GameText.Plural(n.Members.Count, "block", "blocks")} · makes {n.Supply} · uses {n.Demand}";
         if (n.Capacity > 0)
             text += $" · stored {n.Stored / Simulation.TicksPerSecond}/{n.Capacity / Simulation.TicksPerSecond}";
+        // A network joined across tiles by port links (FB-020): the same figures show on every tile it spans.
+        if (n.TileIds.Count > 1)
+            text += " · shared with " + string.Join(", ", n.TileIds.Where(id => id != _host.ViewedTile.Id).Select(id => _host.Sim.Tiles[id].Name));
         return text;
-    }).Prepend("Power networks on this tile (touching blocks, or joined by wire):"));
+    }).Prepend("Power networks on this tile (touching blocks, or joined by cable, power node or port link):"));
 
     static string Short(long n) => n >= 1_000_000 ? $"{n / 1_000_000.0:0.#}M" : n >= 10_000 ? $"{n / 1000.0:0.#}k" : n.ToString("N0");
 }

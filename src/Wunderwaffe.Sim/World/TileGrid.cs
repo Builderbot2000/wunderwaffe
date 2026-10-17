@@ -93,6 +93,7 @@ public sealed class TileGrid
     readonly List<PlacedBuilding> _cores = [];
     readonly bool[] _frames;
     readonly bool[] _platforms;
+    readonly bool[] _cables;
 
     /// <summary>A rectangular tile of buildable ground with no port zones.</summary>
     public TileGrid(int width, int height)
@@ -123,6 +124,8 @@ public sealed class TileGrid
         _deposits = new string?[width * height];
         _frames = new bool[width * height];
         _platforms = new bool[width * height];
+        _cables = new bool[width * height];
+        Power = new TilePower(this);
     }
 
     /// <summary>A copy of the ground alone (shape, buildability, terrain), with nothing on it: for trying out deposits.</summary>
@@ -163,7 +166,7 @@ public sealed class TileGrid
     public IReadOnlyList<PlacedBuilding> Relays => _relays;
 
     /// <summary>Power networks and boosted stats, rebuilt from the layout when <see cref="Revision"/> changes (FB-005, FB-016).</summary>
-    public TilePower Power { get; } = new();
+    public TilePower Power { get; }
 
     /// <summary>Weapons, shields and repair blocks, in id order: what the combat step visits.</summary>
     public IReadOnlyList<PlacedBuilding> CombatBuildings => _combat;
@@ -238,6 +241,20 @@ public sealed class TileGrid
             return;
         _platforms[y * Width + x] = on;
         PlatformCount += on ? 1 : -1;
+        Revision++;
+    }
+
+    /// <summary>Cells carrying a power cable (FB-020), a layer under buildings.</summary>
+    public int CableCount { get; private set; }
+
+    public bool HasCable(int x, int y) => InRect(x, y) && _cables[y * Width + x];
+
+    internal void SetCable(int x, int y, bool on)
+    {
+        if (_cables[y * Width + x] == on)
+            return;
+        _cables[y * Width + x] = on;
+        CableCount += on ? 1 : -1;
         Revision++;
     }
 
@@ -382,13 +399,14 @@ public sealed class TileGrid
     // ---- Snapshots (NF-008): put a grid's changing state back exactly, building ids and revision included. ----
 
     /// <summary>
-    /// Removes every building, frame, platform and wreck and forgets their ids, so a snapshot can add its own back.
+    /// Removes every building, frame, platform, cable and wreck and forgets their ids, so a snapshot can add its own back.
     /// </summary>
     internal void ClearForRestore()
     {
         Array.Clear(_cells);
         Array.Clear(_frames);
         Array.Clear(_platforms);
+        Array.Clear(_cables);
         _buildings.Clear();
         _buildings.Add(null);
         foreach (var list in new[] { _belts, _machines, _exportPorts, _importPorts, _combat, _suppliers, _factories, _storages, _relays, _cores })
@@ -400,6 +418,8 @@ public sealed class TileGrid
         BuildingCount = 0;
         FrameCount = 0;
         PlatformCount = 0;
+        CableCount = 0;
+        Power.Dirty = true;
     }
 
     /// <summary>Adds a building under a given id, higher than any added since <see cref="ClearForRestore"/>.</summary>

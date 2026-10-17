@@ -27,6 +27,10 @@ public sealed partial class Simulation(ContentDb content)
     readonly List<LoggedCommand> _log = [];
     readonly List<int> _startTileIds = [];
     int _nextUnitId = 1;
+    PowerWorld? _power;
+
+    /// <summary>Power networks over every tile (FB-005, FB-020), rebuilt from the layout; derived, so not hashed.</summary>
+    internal PowerWorld Power => _power ??= new PowerWorld(this);
 
     public ContentDb Content { get; } = content;
     public long Tick { get; private set; }
@@ -65,7 +69,7 @@ public sealed partial class Simulation(ContentDb content)
     /// </summary>
     public static Simulation NewGame(ContentDb content, GameSetup setup)
     {
-        if (setup.Problem() is { } problem)
+        if (setup.Problem(content) is { } problem)
             throw new ArgumentOutOfRangeException(nameof(setup), problem);
         var sim = new Simulation(content) { Setup = setup, RateModeEnabled = true };
         sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, setup.Players, richnessPercent: setup.RichnessPercent);
@@ -169,12 +173,17 @@ public sealed partial class Simulation(ContentDb content)
             return result;
 
         Funds.TryPay(tile, player, plan.Def.Cost);
-        if (plan.Def.Kind == BuildingKind.Platform)
+        if (plan.Def.Kind is BuildingKind.Platform or BuildingKind.Wire)
         {
             for (int cy = plan.Y; cy < plan.Y + plan.Height; cy++)
             {
                 for (int cx = plan.X; cx < plan.X + plan.Width; cx++)
-                    tile.Grid.SetPlatform(cx, cy, true);
+                {
+                    if (plan.Def.Kind == BuildingKind.Platform)
+                        tile.Grid.SetPlatform(cx, cy, true);
+                    else
+                        tile.Grid.SetCable(cx, cy, true);
+                }
             }
             return PlaceResult.Ok;
         }
@@ -184,7 +193,8 @@ public sealed partial class Simulation(ContentDb content)
     }
 
     /// <summary>
-    /// Removes a building of the player's and refunds it (FB-002), or, on a cell with nothing on it, a floating platform.
+    /// Removes a building of the player's and refunds it (FB-002), or, on a cell with nothing on it, a power cable (FB-020)
+    /// and then a floating platform.
     /// A player's last core stays (WM-016). The refund and whatever it held go to the player's nearest core on the tile
     /// (<see cref="Funds.Refund(TileState, int, int, int, int, int, IReadOnlyDictionary{string, int}, int)"/>), or are lost.
     /// </summary>
@@ -192,7 +202,7 @@ public sealed partial class Simulation(ContentDb content)
     {
         var grid = tile.Grid;
         if (grid.BuildingAt(x, y) is not { } b)
-            return grid.WreckAt(x, y) != null ? Combat.ClearWreck(this, tile, player, x, y) : TryRemovePlatform(tile, player, x, y);
+            return grid.WreckAt(x, y) != null ? Combat.ClearWreck(this, tile, player, x, y) : TryRemoveLayer(tile, player, x, y);
         if (b.Owner != player || (b.Kind == BuildingKind.Core && CoreCount(player) <= 1))
             return false;
 
@@ -204,13 +214,28 @@ public sealed partial class Simulation(ContentDb content)
         return true;
     }
 
-    bool TryRemovePlatform(TileState tile, int player, int x, int y)
+    /// <summary>Removes the cable on an empty cell, else its platform (if no frame or cable rests on it), and refunds it.</summary>
+    bool TryRemoveLayer(TileState tile, int player, int x, int y)
     {
         var grid = tile.Grid;
-        if (!grid.HasPlatform(x, y) || grid.HasFrame(x, y) || !Territory.HasPresence(this, player, tile))
+        if (!Territory.HasPresence(this, player, tile))
             return false;
-        grid.SetPlatform(x, y, false);
-        if (Content.BuildingList.FirstOrDefault(d => d.Kind == BuildingKind.Platform) is { } def)
+        BuildingKind kind;
+        if (grid.HasCable(x, y))
+        {
+            grid.SetCable(x, y, false);
+            kind = BuildingKind.Wire;
+        }
+        else if (grid.HasPlatform(x, y) && !grid.HasFrame(x, y))
+        {
+            grid.SetPlatform(x, y, false);
+            kind = BuildingKind.Platform;
+        }
+        else
+        {
+            return false;
+        }
+        if (Content.BuildingList.FirstOrDefault(d => d.Kind == kind) is { } def)
             Funds.Refund(tile, player, x, y, 1, 1, def.Cost, Balance.RefundPercent);
         return true;
     }

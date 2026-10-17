@@ -11,7 +11,7 @@ namespace Wunderwaffe.Sim.Core;
 /// hashed in <see cref="StateHash"/>; <c>SnapshotTests</c> check the two agree.
 /// </summary>
 public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, List<PlayerSnap> Players, List<UnitSnap> Units,
-    List<AbstractSnap> Abstract, SquadsSnap Squads, int NextProjectileId, List<ProjectileSnap> Projectiles)
+    List<AbstractSnap> Abstract, SquadsSnap Squads, int NextProjectileId, List<ProjectileSnap> Projectiles, List<int> Interrupted)
 {
     public static Snapshot Capture(Simulation sim) => new(
         sim.Tick,
@@ -22,7 +22,8 @@ public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, L
         sim.Abstract.Select(kv => new AbstractSnap(kv.Key, kv.Value.Waypoints.Select(p => new LongPoint(p.X, p.Y)).ToList(), kv.Value.Next)).ToList(),
         SquadsSnap.Of(sim.Squads),
         sim.NextProjectileId,
-        sim.Projectiles.Select(ProjectileSnap.Of).ToList());
+        sim.Projectiles.Select(ProjectileSnap.Of).ToList(),
+        [.. sim.InterruptedUnits.Keys]);
 
     /// <summary>
     /// A match in the snapshot's state: the world rebuilt from <paramref name="setup"/>, then everything that changes
@@ -39,6 +40,8 @@ public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, L
         foreach (var a in Abstract)
             sim.AbstractNodes[a.UnitId] = new AbstractNode(a.Waypoints.Select(p => (p.X, p.Y)).ToArray(), sim.UnitById(a.UnitId)!.Route) { Next = a.Next };
         Squads.Restore(sim.Squads);
+        foreach (int id in Interrupted)
+            sim.InterruptedUnits[id] = sim.UnitById(id)!.Order;
         sim.RestoreProjectiles(Projectiles.Select(p => p.Restore()), NextProjectileId);
         sim.RestoreClock(Tick, NextUnitId, log);
         sim.LatestSnapshot = this;
@@ -61,7 +64,7 @@ public sealed record ClaimSnap(int Player, int Ticks);
 
 public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingId, int NextWreckId,
     List<int> Frames, List<int> Platforms, List<BuildingSnap> Buildings, List<Wreck> Wrecks, List<ClaimSnap> Claims, StatsSnap Stats,
-    bool Full, List<AccSnap> Rates)
+    bool Full, List<AccSnap> Rates, List<int> Cables)
 {
     internal static TileSnap Of(Simulation sim, TileState t)
     {
@@ -75,12 +78,18 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
             if (g.HasPlatform(i % g.Width, i / g.Width))
                 platforms.Add(i);
         }
+        var cables = new List<int>();
+        for (int i = 0; g.CableCount > 0 && i < g.Width * g.Height; i++)
+        {
+            if (g.HasCable(i % g.Width, i / g.Width))
+                cables.Add(i);
+        }
         var rs = sim.RateState(t.Id);
         var acc = rs.Acc.Select((a, i) => (a, i)).Where(e => e.a != 0)
             .Select(e => new AccSnap(rs.AccKeys[e.i].Kind, rs.AccKeys[e.i].PortId, rs.AccKeys[e.i].Item, e.a)).ToList();
         return new TileSnap(t.Id, t.Owner, g.Revision, g.NextBuildingId, g.NextWreckId, frames, platforms,
             g.Buildings.Select(BuildingSnap.Of).ToList(), [.. g.Wrecks],
-            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc);
+            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc, cables);
     }
 
     internal void Restore(Simulation sim, TileState t)
@@ -97,6 +106,8 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
             g.SetFrame(i % g.Width, i / g.Width, true);
         foreach (int i in Platforms)
             g.SetPlatform(i % g.Width, i / g.Width, true);
+        foreach (int i in Cables)
+            g.SetCable(i % g.Width, i / g.Width, true);
         foreach (var b in Buildings)
             b.Restore(sim.Content, g);
         foreach (var w in Wrecks)
@@ -128,7 +139,7 @@ public sealed record CombatSnap(int Ammo, int Cooldown, int Charge, WeaponStatus
 
 /// <summary>A unit factory's state; its steps are rebuilt from the projection (<c>UnitFactory.StepsOf</c>).</summary>
 public sealed record FactorySnap(Blueprint? Projected, int OX, int OY, int Next, bool Working, int Progress,
-    Dictionary<string, int> Buffer, FactoryStatus Status, AssembleResult LiftOff, int Built);
+    Dictionary<string, int> Buffer, FactoryStatus Status, AssembleResult LiftOff, int Built, FactoryMode Mode = FactoryMode.Continuous);
 
 public sealed record StorageSnap(int DumpWait, int DumpCursor, Dictionary<string, int> Output, int OutputCount);
 
@@ -146,7 +157,7 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
             : null,
         b.Export is { } e ? new ExportSnap(e.Cursor, [.. e.InFlight]) : null,
         CombatSnap.Of(b.Combat),
-        b.Factory is { } f ? new FactorySnap(f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, new(f.Buffer), f.Status, f.LiftOff, f.Built) : null,
+        b.Factory is { } f ? new FactorySnap(f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, new(f.Buffer), f.Status, f.LiftOff, f.Built, f.Mode) : null,
         b.Storage is { } s ? new StorageSnap(s.DumpWait, s.DumpCursor, new(s.Output), s.OutputCount) : null,
         b.Battery?.Charge,
         b.Relay is { } r ? new RelaySnap(r.Cursor, r.Lanes.Select(l => l.ToList()).ToList()) : null,
@@ -187,6 +198,7 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
         {
             (f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, f.Status, f.LiftOff, f.Built) =
                 (fs.Projected, fs.OX, fs.OY, fs.Next, fs.Working, fs.Progress, fs.Status, fs.LiftOff, fs.Built);
+            f.Mode = fs.Mode;
             f.Steps = fs.Projected is { } bp ? UnitFactory.StepsOf(content, bp, fs.OX, fs.OY) : [];
             foreach (var (id, n) in fs.Buffer)
                 f.Buffer[id] = n;
@@ -242,7 +254,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
     int[]? Route, int[]? RouteRegions, int RouteIndex, int DestTileId, int DestX, int DestY,
     List<Point>? Path, int PathIndex, PathKeySnap? PathKey, PortalSnap? Portal,
     UnitOrder? Order, int SlotX, int SlotY, bool PatrolReturning, bool Chasing, Stance Stance, int AnchorX, int AnchorY,
-    int EscortId, int SquadId, List<CombatSnap?> BlockCombat, Dictionary<string, long> Cargo, long UpkeepDue, bool Unsupplied)
+    int SquadId, List<CombatSnap?> BlockCombat, Dictionary<string, long> Cargo, long UpkeepDue, bool Unsupplied)
 {
     internal static UnitSnap Of(Unit u) => new(u.Id, u.Owner, u.TileId, u.X, u.Y, u.VX, u.VY, u.Angle, u.AngVel,
         u.Blocks.Select(b => b with { }).ToList(), u.Cells.Select(c => new CellSnap(c.GX, c.GY, c.Mass)).ToList(), u.CoreGX, u.CoreGY,
@@ -250,7 +262,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
         u.Path?.Select(p => new Point(p.X, p.Y)).ToList(), u.PathIndex,
         u.PathKey is { } k ? new PathKeySnap(k.Tile, k.Next, k.Revision, k.GoalX, k.GoalY) : null,
         u.Portal is { } p ? new PortalSnap(p.Tile, p.Next, p.X, p.Y) : null,
-        u.Order, u.SlotX, u.SlotY, u.PatrolReturning, u.Chasing, u.Stance, u.AnchorX, u.AnchorY, u.EscortId, u.SquadId,
+        u.Order, u.SlotX, u.SlotY, u.PatrolReturning, u.Chasing, u.Stance, u.AnchorX, u.AnchorY, u.SquadId,
         u.BlockCombat.Select(CombatSnap.Of).ToList(), u.Cargo.Entries.ToDictionary(kv => kv.Key, kv => kv.Value), u.UpkeepDue, u.Unsupplied);
 
     internal Unit Restore(Simulation sim)
@@ -265,7 +277,7 @@ public sealed record UnitSnap(int Id, int Owner, int TileId, int X, int Y, int V
             PathKey = PathKey is { } k ? (k.Tile, k.Next, k.Revision, k.GoalX, k.GoalY) : null,
             Portal = Portal is { } p ? (p.Tile, p.Next, p.X, p.Y) : null,
             Order = Order, SlotX = SlotX, SlotY = SlotY, PatrolReturning = PatrolReturning, Chasing = Chasing, Stance = Stance,
-            AnchorX = AnchorX, AnchorY = AnchorY, EscortId = EscortId, SquadId = SquadId,
+            AnchorX = AnchorX, AnchorY = AnchorY, SquadId = SquadId,
             UpkeepDue = UpkeepDue, Unsupplied = Unsupplied,
         };
         for (int i = 0; i < BlockCombat.Count; i++)

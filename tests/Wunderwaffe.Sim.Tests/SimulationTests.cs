@@ -65,7 +65,7 @@ public class SimulationTests
             var core = Assert.Single(home.Grid.Cores);
             Assert.Equal((Simulation.CoreBuildingId, p), (core.DefId, core.Owner));
             Assert.True(home.InCircle(core.X, core.Y, core.Width, core.Height));
-            Assert.Equal(Balance.StartingItems.OrderBy(kv => kv.Key).Select(kv => (kv.Key, (long)kv.Value)),
+            Assert.Equal(StartItems(sim).OrderBy(kv => kv.Key).Select(kv => (kv.Key, (long)kv.Value)),
                 core.Stock!.Entries.Where(kv => kv.Value > 0).Select(kv => (kv.Key, kv.Value)));
             Assert.Equal(2, home.Grid.Buildings.Count(b => b.DefId == "thruster" && b.Owner == p));
             Assert.Equal(3, home.Grid.BuildingCount);

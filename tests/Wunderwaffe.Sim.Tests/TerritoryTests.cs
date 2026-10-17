@@ -265,7 +265,7 @@ public class TerritoryTests
         Assert.Equal(Me, east.Owner);
         Assert.Equal(3, east.Grid.BuildingCount);
         // The starting items came along in the core and pay for building here now (FB-019).
-        Assert.Equal(Balance.StartingItems["copper_ore"], Items(east, "copper_ore"));
+        Assert.Equal(StartItems(sim)["copper_ore"], Items(east, "copper_ore"));
         Assert.Equal(0, Items(home, "copper_ore"));
         Assert.Equal(PlaceResult.Ok, Placement.Check(sim, east, Me, "conveyor", 0, 0, 0, null, out _));
     }

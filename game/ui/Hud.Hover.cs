@@ -17,6 +17,7 @@ public partial class Hud
         bool show = GetViewport().GuiGetHoveredControl() == null && tile.Grid.InBounds(cell.X, cell.Y) && (
             tile.Grid.BuildingAt(cell.X, cell.Y) is { } b ? DescribeBuilding(tile, b)
             : tile.Grid.WreckAt(cell.X, cell.Y) is { } wreck ? DescribeWreck(wreck)
+            : tile.Grid.HasCable(cell.X, cell.Y) ? DescribeCable(tile, cell.X, cell.Y)
             : tile.Grid.DepositAt(cell.X, cell.Y) is { } ore && DescribeDeposit(ore));
         if (!show && !BuildTool.HasTool && (_host.Selected.Count > 0 || UnitTool.Status.Contains('\n')))
             show = SetHover(UnitTool.Status);
@@ -28,6 +29,19 @@ public partial class Hud
     {
         Ui.Clear(_hover);
         _hover.AddChild(Ui.Label(text, Ui.SmallFont, Ui.Text, SideWidth - 24));
+        return true;
+    }
+
+    /// <summary>A power cable (FB-020) on an otherwise empty cell, and the network it carries.</summary>
+    bool DescribeCable(TileState tile, int x, int y)
+    {
+        Ui.Clear(_hover);
+        _hover.AddChild(Ui.Label("Cable", 20));
+        _hover.AddChild(Ui.Label("Lies under buildings. Joins every power building on or beside its run into one network.",
+            Ui.SmallFont, Ui.Muted, SideWidth - 24));
+        var net = tile.Grid.Power.NetworkAtCable(x, y);
+        _hover.AddChild(Ui.Label(net == null ? "Joins no power building yet." : $"Network: makes {net.Supply}, uses {net.Demand}, {net.Satisfaction / 10}% met.",
+            Ui.SmallFont, net == null || net.Satisfaction >= 1000 ? Ui.Muted : Ui.Warn, SideWidth - 24));
         return true;
     }
 
@@ -107,8 +121,8 @@ public partial class Hud
                 if (m.Output.Count > 0)
                     AddBuffer("Out", m.Output);
                 break;
-            case BuildingKind.Wire:
-                Line("Joins every power building it touches into one network.");
+            case BuildingKind.PowerNode:
+                Line($"Joins every generator, battery and node within {def.PowerRadius} cells into its network, and what it touches.");
                 break;
             case BuildingKind.Battery when b.Battery is { } bat:
                 Line($"Stored {bat.Charge / Simulation.TicksPerSecond} of {bat.Capacity / Simulation.TicksPerSecond} power-seconds · up to {def.Discharge} a tick in or out.", Ui.Text);

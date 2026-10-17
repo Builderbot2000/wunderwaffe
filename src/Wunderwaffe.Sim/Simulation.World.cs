@@ -247,8 +247,11 @@ public sealed partial class Simulation
     }
 
     /// <summary>
-    /// Makes an existing unowned tile a player's first tile (WM-005): the player owns it and has a landed starting unit
-    /// (see <see cref="PlaceStartingUnit"/>) whose core stands in its victory circle and holds the starting items.
+    /// Makes an existing unowned tile a player's first tile (WM-005, FB-021): the player owns it and gets the prefabs
+    /// the setup names for the seat (<see cref="GameSetup.PrefabsFor"/>; the landed scout by default), the first nearest
+    /// the victory circle centre and the rest as close beside it as they fit, each core holding its prefab's items.
+    /// Building or landing needs presence on a tile (WM-015), so expansion starts with a unit flying to a neighbour's
+    /// victory circle and landing there; its core's stock pays for building there (FB-019).
     /// </summary>
     public void SettleStartingTile(TileState tile, int owner)
     {
@@ -256,31 +259,27 @@ public sealed partial class Simulation
             throw new InvalidOperationException($"tile {tile.Id} is already owned");
         tile.Owner = owner;
         Player(owner);
-        if (StartSpot(tile) is { } spot)
-            PlaceStartingUnit(tile, owner, spot.X, spot.Y);
+        foreach (var id in StartPrefabsOf(owner))
+        {
+            var prefab = Content.Prefabs[id];
+            var (w, h) = prefab.Blueprint.Size(Content.Buildings);
+            if (tile.Grid.BuildableCount >= w * h && FreeSpot(tile, w, h, tile.CircleX - w / 2, tile.CircleY - h / 2) is { } spot)
+                Blueprints.Stamp(this, tile, owner, prefab, spot.X, spot.Y);
+        }
     }
 
-    /// <summary>The starting unit's frame: a thruster, a 2x2 core and a thruster, two rows deep.</summary>
-    const int StartWidth = 4, StartHeight = 2;
+    IReadOnlyList<string> StartPrefabsOf(int player) => (Setup ?? GameSetup.Default).PrefabsFor(player);
 
-    /// <summary>
-    /// The player's first core (WM-005, WM-016), landed as a scout: a thruster, a core and a thruster in a row on frame,
-    /// all pushing east, with the top-left at (x, y). The core holds <see cref="Balance.StartingItems"/>. Building or
-    /// landing needs presence on a tile (WM-015), so expansion starts with a unit flying to a neighbour's victory circle
-    /// and landing there; its core's stock pays for building there (FB-019). Kept in code until prefabs take it over.
-    /// </summary>
-    void PlaceStartingUnit(TileState tile, int owner, int x, int y)
+    /// <summary>The box every seat's first prefab fits in: what a start tile needs room for.</summary>
+    (int W, int H) StartSize()
     {
-        for (int cy = y; cy < y + StartHeight; cy++)
+        int w = 1, h = 1, players = Setup?.Players ?? 1;
+        for (int p = 0; p < players; p++)
         {
-            for (int cx = x; cx < x + StartWidth; cx++)
-                tile.Grid.SetFrame(cx, cy, true);
+            var (pw, ph) = Content.Prefabs[StartPrefabsOf(p)[0]].Blueprint.Size(Content.Buildings);
+            (w, h) = (Math.Max(w, pw), Math.Max(h, ph));
         }
-        var thruster = Content.Buildings["thruster"];
-        tile.Grid.Add(thruster, owner, x, y, 1, 1, 0, null);
-        var core = tile.Grid.Add(CoreDef, owner, x + 1, y, CoreDef.Width, CoreDef.Height, 0, null);
-        tile.Grid.Add(thruster, owner, x + 1 + CoreDef.Width, y, 1, 1, 0, null);
-        core.Stock!.Add(Balance.StartingItems);
+        return (w, h);
     }
 
     /// <summary>A tile for the cells of the map already marked with the next id, inside the given box.</summary>
@@ -319,6 +318,7 @@ public sealed partial class Simulation
         // Hand-built tiles keep their circle in the middle; generation moves it onto the deposits (WM-014).
         (tile.CircleX, tile.CircleY) = (tile.CenterX - ox, tile.CenterY - oy);
         _tiles.Add(tile);
+        tile.Grid.Power.Join(Power, id);
         return tile;
     }
 
@@ -339,17 +339,16 @@ public sealed partial class Simulation
             t.Grid.SetZones(zones[t.Id]);
     }
 
-    BuildingDef CoreDef => Content.Buildings[CoreBuildingId];
-
     /// <summary>
-    /// Where the starting unit fits nearest the tile's victory circle centre (WM-005: its core stands in the circle).
-    /// Null if the tile has no room, as an all-water tile might not.
+    /// Where a box of the starting prefab's size (<see cref="StartSize"/>) fits nearest the tile's victory circle centre
+    /// (WM-005: its core stands in the circle). Null if the tile has no room, as an all-water tile might not.
     /// </summary>
     (int X, int Y)? StartSpot(TileState tile)
     {
-        if (tile.Grid.BuildableCount < StartWidth * StartHeight)
+        var (w, h) = StartSize();
+        if (tile.Grid.BuildableCount < w * h)
             return null;
-        return FreeSpot(tile, StartWidth, StartHeight, tile.CircleX - StartWidth / 2, tile.CircleY - StartHeight / 2);
+        return FreeSpot(tile, w, h, tile.CircleX - w / 2, tile.CircleY - h / 2);
     }
 
     /// <summary>

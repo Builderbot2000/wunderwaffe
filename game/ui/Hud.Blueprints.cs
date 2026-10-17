@@ -2,14 +2,16 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Wunderwaffe.Game.Input;
+using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game.Screens;
 
 /// <summary>
 /// The blueprint library panel (B, FB-009): every saved blueprint with its derived stats (UD-002), rename, tags,
-/// duplicate, delete, place, and build-in-factory. And the factory panel (UD-006, WW-004), shown while a unit factory is
-/// selected: status, per-stage progress, buffer and what is still missing.
+/// duplicate, delete, place, build-in-factory and copy as a code (UD-009); prefabs (FB-021) listed read-only after the
+/// player's own. And the factory panel (UD-006, WW-004), shown while a unit factory is selected: status and stop reason,
+/// production setting (manual or continuous) with trigger and resume, per-stage progress, buffer and what is still missing.
 /// </summary>
 public partial class Hud
 {
@@ -33,6 +35,9 @@ public partial class Hud
         title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         head.AddChild(title);
         head.AddChild(Ui.Button("Capture area", () => { BlueprintTool.StartCapture(); _library.Visible = false; }));
+        var import = Ui.Button("Import code", ImportCode);
+        import.TooltipText = "Add the blueprint whose code is on the clipboard";
+        head.AddChild(import);
         head.AddChild(Ui.Button("Close", () => _library.Visible = false));
         col.AddChild(head);
         col.AddChild(Ui.Label("K over a unit core records its design. Blocks can't be edited: rebuild and record again.",
@@ -57,6 +62,14 @@ public partial class Hud
         _factoryPanel.Visible = false;
 
         BlueprintTool.Notice += (text, good) => Toast(text, good ? Ui.Good : Ui.Warn);
+    }
+
+    void ImportCode()
+    {
+        if (BlueprintLibrary.Import(DisplayServer.ClipboardGet(), out var error) is { } entry)
+            Toast($"Imported {entry.Name}", Ui.Good);
+        else
+            Toast($"Can't import: {error}", Ui.Warn);
     }
 
     void ToggleLibrary()
@@ -115,11 +128,21 @@ public partial class Hud
         var stats = UnitStats.Of(Content, bp);
         bool unit = bp.IsUnit(Content.Buildings);
 
-        var name = new LineEdit { Text = e.Name, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        name.TextSubmitted += text => BlueprintLibrary.Rename(e.Id, text);
-        name.FocusExited += () => BlueprintLibrary.Rename(e.Id, name.Text);
         var top = Ui.Row(6);
-        top.AddChild(name);
+        if (e.IsPrefab)
+        {
+            var label = Ui.Label(e.Name, Ui.FontSize, Ui.Text);
+            label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            top.AddChild(label);
+            top.AddChild(Ui.Label("PREFAB", Ui.SmallFont, Ui.Muted));
+        }
+        else
+        {
+            var name = new LineEdit { Text = e.Name, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            name.TextSubmitted += text => BlueprintLibrary.Rename(e.Id, text);
+            name.FocusExited += () => BlueprintLibrary.Rename(e.Id, name.Text);
+            top.AddChild(name);
+        }
         if (unit && stats.IsWunderwaffe)
             top.AddChild(Ui.Label("WUNDERWAFFE", Ui.SmallFont, Ui.Accent));
         col.AddChild(top);
@@ -139,10 +162,18 @@ public partial class Hud
             col.AddChild(Ui.Label(line, Ui.SmallFont, Ui.Muted, LibraryWidth - 40));
         }
 
-        var tags = new LineEdit { Text = string.Join(", ", e.Tags), PlaceholderText = "tags, comma separated", SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        tags.TextSubmitted += text => BlueprintLibrary.SetTags(e.Id, text);
-        tags.FocusExited += () => BlueprintLibrary.SetTags(e.Id, tags.Text);
-        col.AddChild(tags);
+        if (e.IsPrefab)
+        {
+            if (e.Tags.Count > 0)
+                col.AddChild(Ui.Label(string.Join(", ", e.Tags), Ui.SmallFont, Ui.Muted));
+        }
+        else
+        {
+            var tags = new LineEdit { Text = string.Join(", ", e.Tags), PlaceholderText = "tags, comma separated", SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            tags.TextSubmitted += text => BlueprintLibrary.SetTags(e.Id, text);
+            tags.FocusExited += () => BlueprintLibrary.SetTags(e.Id, tags.Text);
+            col.AddChild(tags);
+        }
 
         var buttons = Ui.Row(6);
         buttons.AddChild(Ui.Button("Place", () => { BlueprintTool.Pick(e); _library.Visible = false; }));
@@ -152,7 +183,11 @@ public partial class Hud
         _factoryButtons.Add(factory);
         buttons.AddChild(factory);
         buttons.AddChild(Ui.Button("Duplicate", () => BlueprintLibrary.Duplicate(e.Id)));
-        buttons.AddChild(Ui.Button("Delete", () => BlueprintLibrary.Delete(e.Id)));
+        var copy = Ui.Button("Copy code", () => { DisplayServer.ClipboardSet(BlueprintLibrary.Export(e)); Toast("Blueprint code copied", Ui.Good); });
+        copy.TooltipText = "Copy this blueprint as a text code another player can import";
+        buttons.AddChild(copy);
+        if (!e.IsPrefab)
+            buttons.AddChild(Ui.Button("Delete", () => BlueprintLibrary.Delete(e.Id)));
         col.AddChild(buttons);
         return Ui.Panel(col);
     }
@@ -172,10 +207,12 @@ public partial class Hud
             FactoryStatus.Waiting => ("Waiting for items by belt", Ui.Warn),
             FactoryStatus.Building => ("Building", Ui.Good),
             FactoryStatus.Blocked => ("Blocked: something stands where the next block goes", Ui.Bad),
-            FactoryStatus.LiftOffFailed => ($"Can't lift off: {GameText.Assemble(f.LiftOff)}", Ui.Bad),
+            FactoryStatus.Stopped => ($"Stopped, can't lift off: {GameText.Assemble(f.LiftOff)}. Fix it, then resume.", Ui.Bad),
+            FactoryStatus.AwaitingTrigger => ("Done: waiting for Build one", Ui.Muted),
             _ => (f.Status.ToString(), Ui.Muted),
         };
         Line(status, color);
+        Line(f.Mode == FactoryMode.Manual ? "Production: manual, one unit per Build one" : "Production: continuous, starts the next copy at once", Ui.Text);
         if (f.Projected is { } bp)
         {
             var stats = UnitStats.Of(Content, bp);
@@ -209,6 +246,16 @@ public partial class Hud
         if (f.Projected != null)
             buttons.AddChild(Ui.Button("Stop", BlueprintTool.StopFactory));
         _factoryInfo.AddChild(buttons);
+        var control = Ui.Row(6);
+        int me = _host.LocalPlayer, tileId = tile.Id;
+        var other = f.Mode == FactoryMode.Manual ? FactoryMode.Continuous : FactoryMode.Manual;
+        control.AddChild(Ui.Button($"Make {other.ToString().ToLowerInvariant()}",
+            () => _host.Send(new SetFactoryModeCommand(me, tileId, factory.X, factory.Y, other))));
+        if (UnitFactory.CheckTrigger(tile, me, factory.X, factory.Y) == FactoryControlResult.Ok)
+            control.AddChild(Ui.Button("Build one", () => _host.Send(new TriggerFactoryCommand(me, tileId, factory.X, factory.Y))));
+        if (UnitFactory.CheckResume(tile, me, factory.X, factory.Y) == FactoryControlResult.Ok)
+            control.AddChild(Ui.Button("Resume", () => _host.Send(new ResumeFactoryCommand(me, tileId, factory.X, factory.Y))));
+        _factoryInfo.AddChild(control);
     }
 
     void AddFactoryItems(string label, IReadOnlyDictionary<string, int> items)

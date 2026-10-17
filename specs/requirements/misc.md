@@ -17,7 +17,7 @@ Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HU
 | [NF-002](#nf-002-save--load) | Save / load | Must | Done | Yes | MVP | Non-Functional |  |  | Review |  |
 | [NF-003](#nf-003-data-driven-content) | Data-driven content | Should | Done | Yes | Alpha | Non-Functional |  | RS-002 |  |  |
 | [NF-004](#nf-004-deterministic-simulation) | Deterministic simulation | Must | Done | Yes | MVP | Non-Functional |  |  | Review |  |
-| [NF-005](#nf-005-target-platform) | Target platform | Must | In Progress | Partial | MVP | Non-Functional |  |  |  |  |
+| [NF-005](#nf-005-target-platform) | Target platform | Must | Done | Yes | MVP | Non-Functional |  |  |  |  |
 | [NF-006](#nf-006-modding-support) | Modding support | Could | Proposed | No | Beta | Non-Functional |  | NF-003 |  |  |
 | [UI-006](#ui-006-title-pause--settings-menus) | Title, pause & settings menus | Must | Done | Yes | MVP | Functional |  |  | New |  |
 | [NF-007](#nf-007-automated-verification) | Automated verification | Should | Done | Yes | MVP | Non-Functional |  |  | New |  |
@@ -110,7 +110,7 @@ Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HU
 
 **Acceptance criteria:** Builds pass on Windows 10/11 64-bit.
 
-**As built:** Godot 4.7.2 .NET on Windows. No export presets or packaged builds yet.
+**As built:** Godot 4.7.2 .NET on Windows. `game/export_presets.cfg` has a "Windows Desktop" preset (x86_64, .pck beside the exe, `data/*.json` included as plain files); `Godot --path game --headless --export-release "Windows Desktop" ../build/windows/Wunderwaffe3037.exe` writes the build (gitignored, about 180 MB with the .NET runtime folder) once the 4.7.2 mono export templates are installed. The packaged exe launches and runs `--stress`.
 
 ### NF-006 Modding support
 

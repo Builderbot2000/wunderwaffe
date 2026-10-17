@@ -71,14 +71,8 @@ public static class UnitSim
 
     const int BoxColumns = 4;
 
-    /// <summary>How far, in cells, a defensive unit chases from its anchor, or an escort from its charge (UC-004).</summary>
+    /// <summary>How far, in cells, a defensive unit chases from its anchor or course (UC-004).</summary>
     public const int LeashCells = 12;
-
-    /// <summary>An escort moves up once it is this many cells, hull to hull, behind its charge.</summary>
-    const int EscortSlackCells = 3;
-
-    /// <summary>How often an escort checks on its charge, in ticks.</summary>
-    const int EscortCheckTicks = 30;
 
     // ---------------------------------------------------------------- orders
 
@@ -326,25 +320,30 @@ public static class UnitSim
 
     // ---------------------------------------------------------------- stances and combat hooks
 
-    /// <summary>Gives units a stance (UC-004); an escort follows <paramref name="escortId"/>. Anchors them where they stand.</summary>
-    internal static void SetStance(Simulation sim, int player, IReadOnlyList<int> unitIds, Stance stance, int escortId)
+    /// <summary>Gives units a stance (UC-004). Anchors them where they stand.</summary>
+    internal static void SetStance(Simulation sim, int player, IReadOnlyList<int> unitIds, Stance stance)
     {
+        if (!Enum.IsDefined(stance))
+            return;
         foreach (var u in Owned(sim, player, unitIds))
         {
-            if (stance == Stance.Escort && (escortId == u.Id || sim.UnitById(escortId) is not { } charge || charge.Owner != player))
-                continue;
             u.Stance = stance;
-            u.EscortId = stance == Stance.Escort ? escortId : -1;
             (u.AnchorX, u.AnchorY) = (u.X, u.Y);
         }
     }
+
+    /// <summary>
+    /// Whether a travelling unit that meets enemies stops to fight (aggressive, defensive) or keeps its course
+    /// (passive, hold fire), UC-004 / UC-009. Abstract travel asks this when a node meets enemy units.
+    /// </summary>
+    public static bool StopsToFight(Unit u) => u.Stance is Stance.Aggressive or Stance.Defensive;
 
     /// <summary>Whether a unit may fire on its own: not on hold-fire stance and not retreating.</summary>
     public static bool CanFire(Unit u) => u.Stance != Stance.HoldFire && u.Order?.Kind != OrderKind.Retreat;
 
     /// <summary>
     /// Whether combat may send the unit after something at world sub-cell (x, y): never on hold, retreat or hold-fire;
-    /// a defensive unit only within <see cref="LeashCells"/> of its anchor, an escort only that close to its charge.
+    /// a defensive unit only within <see cref="LeashCells"/> of its anchor; a passive one never.
     /// </summary>
     public static bool MayChase(Simulation sim, Unit u, long x, long y)
     {
@@ -353,7 +352,7 @@ public static class UnitSim
         return u.Stance switch
         {
             Stance.Defensive => Within(x, y, u.AnchorX, u.AnchorY, LeashCells),
-            Stance.Escort => sim.UnitById(u.EscortId) is not { } c || Within(x, y, c.X, c.Y, LeashCells),
+            Stance.Passive => false,
             _ => true,
         };
     }
@@ -417,7 +416,7 @@ public static class UnitSim
 
     /// <summary>
     /// Start of the unit phase: drops squad members that are gone, walks defensive units that strayed past their leash
-    /// back to their anchor, and keeps escorts close to their charge.
+    /// back to their anchor.
     /// </summary>
     internal static void Step(Simulation sim)
     {
@@ -433,26 +432,7 @@ public static class UnitSim
                 u.Chasing = false;
                 ReturnToAnchor(sim, u);
             }
-            else if (u.Stance == Stance.Escort && u.Order == null && !u.Chasing && (sim.Tick + u.Id) % EscortCheckTicks == 0
-                && sim.UnitById(u.EscortId) is { } charge)
-            {
-                Follow(sim, u, charge);
-            }
         }
-    }
-
-    /// <summary>Moves an escort up behind its charge once it lags more than a few cells.</summary>
-    static void Follow(Simulation sim, Unit u, Unit charge)
-    {
-        long dx = u.X - (long)charge.X, dy = u.Y - (long)charge.Y;
-        long dist = ISqrt(dx * dx + dy * dy), keep = (long)u.Radius + charge.Radius + Gap;
-        (u.AnchorX, u.AnchorY) = (charge.X, charge.Y);
-        if (dist <= keep + EscortSlackCells * (long)S || dist == 0)
-            return;
-        long x = charge.X + dx * keep / dist, y = charge.Y + dy * keep / dist;
-        var cell = ((int)FloorDiv(x, S), (int)FloorDiv(y, S));
-        if (sim.TileAtCell(cell.Item1, cell.Item2) is { } t)
-            Goto(sim, u, x, y, t, cell);
     }
 
     // ---------------------------------------------------------------- squads
@@ -569,11 +549,11 @@ public static class UnitSim
 
     internal static void SetSquadStance(Simulation sim, int player, int squadId, Stance stance)
     {
-        if (CheckSquad(sim, player, squadId) != SquadResult.Ok || stance == Stance.Escort)
+        if (CheckSquad(sim, player, squadId) != SquadResult.Ok || !Enum.IsDefined(stance))
             return;
         var squad = sim.Squads.ById(squadId)!;
         squad.Stance = stance;
-        SetStance(sim, player, squad.MemberList, stance, -1);
+        SetStance(sim, player, squad.MemberList, stance);
     }
 
     // ---------------------------------------------------------------- factory rally (UC-006)

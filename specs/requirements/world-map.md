@@ -14,7 +14,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-004](#wm-004-tile-ownership) | Tile ownership | Must | Done | Yes | MVP | Functional | P1 | WM-001 | Updated |  |
 | [WM-005](#wm-005-starting-tile) | Starting tile | Must | Done | Yes | MVP | Functional | P1 | WM-004 | Review |  |
 | [WM-006](#wm-006-tile-claim-by-victory-circle) | Tile claim by victory circle | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-015 | Updated |  |
-| [WM-007](#wm-007-zoom-between-layers) | Zoom between layers | Must | Approved | No | MVP | Functional | P1 | WM-001, FB-001, FB-013 | Updated |  |
+| [WM-007](#wm-007-zoom-between-layers) | Zoom between layers | Must | Done | Yes | MVP | Functional | P1 | WM-001, FB-001, FB-013 | Updated |  |
 | [WM-008](#wm-008-fog-of-war-world) | Fog of war (world) | Won't | Rejected | No | Alpha | Functional | P1 | WM-004 |  |  |
 | [WM-009](#wm-009-procedural-world-generation) | Procedural world generation | Should | Done | Yes | Alpha | Functional | P1 | WM-002 |  |  |
 | [WM-010](#wm-010-neutral--environmental-tiles) | Neutral / environmental tiles | Could | Proposed | No | Beta | Functional | P1 | WM-006 |  |  |
@@ -67,7 +67,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** On new game each player owns 1 tile and has a landed starting unit whose core stands inside the victory circle and holds the starting items; it can lift off like any unit; with several players, starts are spread fairly (OQ-22).
 
-**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (Simulation.PlaceStartingUnit: thruster, 2x2 core, thruster on a 4x2 frame, in code until prefabs, FB-021), whose core holds 600 copper ore + 300 iron ore (Balance.StartingItems; doubled for 256-cell tiles, OQ-35); it passes lift-off validation. Tested (SimulationTests, TerritoryTests).
+**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (the setup's start prefabs, FB-021; default game/data/prefabs/scout.json: thruster, 2x2 core, thruster on a 4x2 frame), whose core holds the prefab's items, 600 copper ore + 300 iron ore (doubled for 256-cell tiles, OQ-35); it passes lift-off validation. Tested (SimulationTests, TerritoryTests).
 
 **Notes:** Was: 'Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22). Start as a deployed unit instead of a free core, 2026-10-17 (OQ-37).
 
@@ -87,7 +87,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** The mouse wheel moves between a tile and the world map with no cut or loading pause (Tab and Enter stay as shortcuts that animate the same zoom); around the threshold the tile rendering cross-fades into the world-map picture at the same camera position, so the point under the cursor stays put; zooming in over any tile the player has presence on (WM-015) enters it; the unit selection and the active tool survive the transition; which tiles count as viewed while zooming (full sim, FB-013) and where the threshold sits follow OQ-36.
 
-**As built:** Tab toggles between the world map and the last tile; double-click or Enter opens a tile. Switching is instant; each view keeps its own camera (CameraController) and the world map draws from a separate downsampled picture (WorldSnapshot).
+**As built:** One camera (CameraController) holds a centre in world cells and a scale in screen pixels per cell, expressed each frame in whichever layer's canvas is up, so switching layers moves nothing on screen. The threshold is the scale at which a 256-cell nominal tile fits the screen height (`ThresholdFit`, tunable); the cross-fade runs from threshold / 1.35 to threshold x 1.35 (`FadeBand`): the tile view (and the units, combat and tool layers over it) fades over the world map, which is drawn beneath it scaled into the tile's canvas, and on the world-map side the tile view shows the tile a zoom would open. The wheel zooms toward the cursor; past the threshold it opens the tile under the screen centre, else the one under the cursor, if the player has presence there, and otherwise stops short of the threshold. Panning a tile view onto another tile with presence makes that the viewed tile. Tab, Enter, double-click and Open tile animate the same zoom (0.45 s); Tab returns to where each layer was left. Unit selection and the picked building or blueprint survive; the blueprint tool resets only when another tile opens. World-map labels stop growing past twice their size. Viewed tile for the sim (`view_tile`) is the open tile, none on the world map.
 
 **Notes:** Was: 'The player shall switch seamlessly between the world-map view and an individual tile's RTS view' (acceptance: enter opens the local map in < 2 s). Rewritten after playtesting 2026-10-17: the instant switch is jarring. Ordering units at any zoom: UC-005. Threshold and viewed tiles: OQ-36.
 

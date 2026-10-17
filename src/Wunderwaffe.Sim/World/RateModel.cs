@@ -71,10 +71,15 @@ public static class RateModel
         // after output boosters, power network index (-1 if none), boosted draw if it draws, supply while it burns.
         readonly int[] _ticks, _fullSpeed, _outPct, _net, _powerDraw, _powerMake;
 
-        // Per power network: what its other members supply and draw whatever the machines do, in power units, and the
-        // steady-state satisfaction in permille.
+        // Per power network with members here (local index into _nets): what its other members here supply and draw
+        // whatever the machines do, in power units, and the steady-state satisfaction in permille. A network spanning
+        // several tiles (FB-020) adds the other tiles' graphs' figures in Rebalance.
+        readonly PowerNetwork[] _nets;
+        readonly Dictionary<PowerNetwork, int> _netIndex = [];
         readonly long[] _fixedSupply, _fixedDemand;
         readonly int[] _sat;
+        int[] _lastSat = [];
+        Dictionary<int, TileGraph> _peers = [];
 
         // Per machine: batches per tick done in the last forward pass, and its busy share at full power (permille).
         readonly long[] _done;
@@ -94,7 +99,9 @@ public static class RateModel
             _k = items.Length;
             var grid = tile.Grid;
             // Networks and boosted machine stats as the full sim sees them; derived state only, rebuilt on Revision.
-            grid.Power.Refresh(grid);
+            _nets = [.. grid.Power.Networks];
+            for (int i = 0; i < _nets.Length; i++)
+                _netIndex[_nets[i]] = i;
             _nodes = [.. grid.Buildings];
             int n = _nodes.Length;
             var index = new Dictionary<int, int>(n);
@@ -135,7 +142,7 @@ public static class RateModel
                 };
                 if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort)
                     _partner[i] = PortRules.PartnerOf(grid, b);
-                _net[i] = grid.Power.NetworkOf(b)?.Id ?? -1;
+                _net[i] = grid.Power.NetworkOf(b) is { } net ? _netIndex[net] : -1;
                 if (recipe != null && b.Machine is { } m)
                 {
                     _ticks[i] = recipe.Ticks;
@@ -194,18 +201,17 @@ public static class RateModel
                 }).ToArray();
             (_order, _cyclic) = TopologicalOrder(n);
 
-            var nets = grid.Power.Networks;
-            _fixedSupply = new long[nets.Count];
-            _fixedDemand = new long[nets.Count];
-            _sat = new int[nets.Count];
-            foreach (var net in nets)
+            _fixedSupply = new long[_nets.Length];
+            _fixedDemand = new long[_nets.Length];
+            _sat = new int[_nets.Length];
+            for (int ni = 0; ni < _nets.Length; ni++)
             {
-                foreach (var b in net.Members)
+                foreach (var b in _nets[ni].MembersOn(tile.Id))
                 {
                     if (_kind[index[b.Id]] is NodeKind.Extractor or NodeKind.Crafter)
                         continue;
-                    _fixedSupply[net.Id] += PowerNet.SupplyOf(b);
-                    _fixedDemand[net.Id] += PowerNet.DrawOf(b);
+                    _fixedSupply[ni] += PowerNet.SupplyOf(b);
+                    _fixedDemand[ni] += PowerNet.DrawOf(b);
                 }
             }
             _cap = new long[n * _k];
@@ -301,6 +307,7 @@ public static class RateModel
         /// <summary>One round against the partners' latest results. True if what it offers its partners changed.</summary>
         public bool Solve(Dictionary<int, TileGraph> byId)
         {
+            _peers = byId;
             _linkCap.Clear();
             _supply.Clear();
             for (int i = 0; i < _nodes.Length; i++)
@@ -322,7 +329,10 @@ public static class RateModel
             var oldOut = _outTo.ToDictionary(kv => kv.Key, kv => (long[])kv.Value.Clone());
             var oldCap = _capTo.ToDictionary(kv => kv.Key, kv => (long[])kv.Value.Clone());
             Collect();
-            return !Same(oldOut, _outTo) || !Same(oldCap, _capTo);
+            // A network shared with another tile (FB-020) may settle differently once the partner's graph has run.
+            bool satChanged = !_sat.AsSpan().SequenceEqual(_lastSat);
+            _lastSat = (int[])_sat.Clone();
+            return !Same(oldOut, _outTo) || !Same(oldCap, _capTo) || satChanged;
         }
 
         /// <summary>Backward and forward passes until nothing more backs up.</summary>
@@ -369,32 +379,36 @@ public static class RateModel
         {
             if (_sat.Length == 0)
                 return false;
-            var supply = new long[_sat.Length];
-            for (int n = 0; n < _sat.Length; n++)
-                supply[n] = _fixedSupply[n] * 1000;
-            for (int i = 0; i < _nodes.Length; i++)
+            if (atFullPower)
             {
-                if (_ticks[i] == 0 || _net[i] < 0)
-                    continue;
-                if (_powerMake[i] > 0 && _batchCap[i] > 0)
-                    supply[_net[i]] += _powerMake[i] * Math.Min(1000, _done[i] * 1000 / _batchCap[i]);
-                if (atFullPower && _powerDraw[i] > 0 && _batchCap[i] > 0)
-                    _busy[i] = Math.Min(1000, _done[i] * 1000 / _batchCap[i]);
+                for (int i = 0; i < _nodes.Length; i++)
+                {
+                    if (_ticks[i] != 0 && _net[i] >= 0 && _powerDraw[i] > 0 && _batchCap[i] > 0)
+                        _busy[i] = Math.Min(1000, _done[i] * 1000 / _batchCap[i]);
+                }
             }
 
             bool changed = false;
             for (int n = 0; n < _sat.Length; n++)
             {
+                // A network over several tiles (FB-020) counts every tile's graph, each as of its latest round.
+                var net = _nets[n];
+                var parts = new List<(TileGraph Graph, int Net)> { (this, n) };
+                foreach (int id in net.TileIds)
+                {
+                    if (id != Tile.Id && _peers.TryGetValue(id, out var peer) && peer._netIndex.TryGetValue(net, out int pn))
+                        parts.Add((peer, pn));
+                }
+                long supply = 0;
+                foreach (var (g, gn) in parts)
+                    supply += g.SupplyOf(gn);
                 int s = 1000;
                 for (int step = 0; step < 1000; step++)
                 {
-                    long demand = _fixedDemand[n] * 1000;
-                    for (int i = 0; i < _nodes.Length; i++)
-                    {
-                        if (_net[i] == n && _powerDraw[i] > 0 && _busy[i] > 0)
-                            demand += _powerDraw[i] * (s == 0 ? 1000 : Math.Min(1000, _busy[i] * 1000 / s));
-                    }
-                    int next = demand <= supply[n] ? 1000 : (int)(supply[n] * 1000 / demand);
+                    long demand = 0;
+                    foreach (var (g, gn) in parts)
+                        demand += g.DemandOf(gn, s);
+                    int next = demand <= supply ? 1000 : (int)(supply * 1000 / demand);
                     if (next >= s)
                         break;
                     s = next;
@@ -405,6 +419,30 @@ public static class RateModel
             if (changed)
                 SetBatchCaps();
             return changed;
+        }
+
+        /// <summary>This tile's steady supply to local network <paramref name="n"/>, times 1000: generators as busy as their fuel lets them.</summary>
+        long SupplyOf(int n)
+        {
+            long supply = _fixedSupply[n] * 1000;
+            for (int i = 0; i < _nodes.Length; i++)
+            {
+                if (_ticks[i] != 0 && _net[i] == n && _powerMake[i] > 0 && _batchCap[i] > 0)
+                    supply += _powerMake[i] * Math.Min(1000, _done[i] * 1000 / _batchCap[i]);
+            }
+            return supply;
+        }
+
+        /// <summary>This tile's demand on local network <paramref name="n"/> at satisfaction <paramref name="s"/>, times 1000.</summary>
+        long DemandOf(int n, int s)
+        {
+            long demand = _fixedDemand[n] * 1000;
+            for (int i = 0; i < _nodes.Length; i++)
+            {
+                if (_net[i] == n && _powerDraw[i] > 0 && _busy[i] > 0)
+                    demand += _powerDraw[i] * (s == 0 ? 1000 : Math.Min(1000, _busy[i] * 1000 / s));
+            }
+            return demand;
         }
 
         static bool Same(Dictionary<int, long[]> a, SortedDictionary<int, long[]> b) =>

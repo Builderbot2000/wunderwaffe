@@ -38,9 +38,12 @@ internal static class UnitPhysics
         {
             if (sim.IsAbstract(u))
                 continue;
-            int px = u.X, py = u.Y;
+            int px = u.X, py = u.Y, tile = u.TileId;
             Control(sim, u);
             UpdateTile(sim, u, px, py);
+            // UC-009: crossing onto a tile that isn't rendered turns the unit into a node right here (C's hook).
+            if (u.TileId != tile && AbstractTravel.Crossed(sim, u))
+                continue;
             CollideBuildings(sim, u);
         }
         CollideUnits(sim);
