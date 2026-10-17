@@ -7,7 +7,8 @@ namespace Wunderwaffe.Sim.Tests;
 /// <summary>Victory circles, claims, presence, cores, Contested, platforms and fair starts (silo A).</summary>
 public class TerritoryTests
 {
-    const int Size = 30;
+    /// <summary>Hand-built tile size: room for a victory circle with ground around it.</summary>
+    const int Size = Balance.CircleRadius * 3;
 
     /// <summary>Home (0, 0) is mine and stocked; east (1, 0) is unowned. Circles sit in the middle of each tile.</summary>
     static (Simulation Sim, TileState Home, TileState East) TwoTiles()
@@ -467,7 +468,7 @@ public class TerritoryTests
         }
         // A deposit can lie only along a tile's edge, out of reach of any circle that fits, but that is rare.
         Assert.True(rich * 10 >= withDeposits * 9, $"{rich} of {withDeposits} circles hold deposits");
-        // Tiles are about 96 cells across against a 25-cell circle, so nearly all fit it wholly.
+        // Tiles are about 256 cells across against a 65-cell circle, so nearly all fit it wholly.
         Assert.True(inside * 10 >= sim.Tiles.Count * 9, $"{inside} of {sim.Tiles.Count} circles wholly inside");
 
         var again = Simulation.NewGame(TestContent.Load(), new GameSetup(w, h, seed));
@@ -479,7 +480,7 @@ public class TerritoryTests
     [InlineData(4, 3037UL)]
     public void SeveralPlayersGetSpreadOutFairStarts(int players, ulong seed)
     {
-        var setup = new GameSetup(9, 9, seed, Players: players);
+        var setup = new GameSetup(7, 7, seed, Players: players);
         var sim = Simulation.NewGame(TestContent.Load(), setup);
         var starts = sim.StartTileIds.Select(id => sim.Tiles[id]).ToList();
         Assert.Equal(players, starts.Distinct().Count());
@@ -528,7 +529,7 @@ public class TerritoryTests
         var again = Assert.Single(sim.Units);
         sim.Enqueue(new MoveUnitsCommand(Me, [again.Id], north.Id, north.CircleX, north.CircleY));
         sim.Step();
-        for (int i = 0; i < 60 * 60 && again.Moving; i++)
+        for (int i = 0; i < 3 * 60 * 60 && again.Moving; i++)
             sim.Step();
         Assert.Equal(north.Id, again.TileId);
     }

@@ -2,13 +2,13 @@
 
 P1 · The world is split into tiles; you start on one and expand.
 
-Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut into irregular 96-cell tiles, each with a victory circle. Any number of players get fair starts; tiles are claimed by holding a building in the circle, and you build wherever you have presence. Tab switches instantly between the world map and a tile. One core kind: each player starts with a landed unit whose core holds the starting items. To do from playtesting: continuous zoom, 256-cell tiles.
+Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut into irregular 256-cell tiles (3, 5 or 7 a side), each with a victory circle. Any number of players get fair starts; tiles are claimed by holding a building in the circle, and you build wherever you have presence. Tab switches instantly between the world map and a tile. One core kind: each player starts with a landed unit whose core holds the starting items. To do from playtesting: continuous zoom.
 
 ## Requirements
 
 | ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [WM-001](#wm-001-tiled-world-map) | Tiled world map | Must | In Progress | Partial | MVP | Functional | P1 |  | Updated |  |
+| [WM-001](#wm-001-tiled-world-map) | Tiled world map | Must | Done | Yes | MVP | Functional | P1 |  | Updated |  |
 | [WM-002](#wm-002-tile-attributes) | Tile attributes | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
 | [WM-003](#wm-003-tile-adjacency) | Tile adjacency | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
 | [WM-004](#wm-004-tile-ownership) | Tile ownership | Must | Done | Yes | MVP | Functional | P1 | WM-001 | Updated |  |
@@ -31,7 +31,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** The world is one generated cell grid cut into tiles of varying shape and size (about one per nominal 256x256 cells (OQ-35), 2-9 neighbours each); each tile has a unique ID, a name and a bounding box.
 
-**As built:** World/Gen/Partition.cs: RISK-like territories grown from seeds; borders follow ridges, coasts and rivers; ocean tiles are ordinary tiles. ~1 tile per nominal 96x96 cells, 2-9 neighbours.
+**As built:** World/Gen/Partition.cs: RISK-like territories grown from seeds; borders follow ridges, coasts and rivers; ocean tiles are ordinary tiles. ~1 tile per nominal 256x256 cells (Simulation.DefaultTileSize), 2-9 neighbours. The title screen offers 3, 5 or 7 nominal tiles a side (GameSetup.MaxSize = 7); generation takes about 0.4 / 1.1 / 2.3 s on the dev machine.
 
 **Notes:** Was: 'World map renders a grid (square or hex) of tiles'. Irregular tiles were built and documented in README (OQ-1). Nominal tile raised from 96x96 to 256x256 after playtesting, 2026-10-17 (OQ-35): tiles felt cramped next to Mindustry maps.
 
@@ -67,7 +67,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** On new game each player owns 1 tile and has a landed starting unit whose core stands inside the victory circle and holds the starting items; it can lift off like any unit; with several players, starts are spread fairly (OQ-22).
 
-**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (Simulation.PlaceStartingUnit: thruster, 2x2 core, thruster on a 4x2 frame, in code until prefabs, FB-021), whose core holds 300 copper ore + 150 iron ore (Balance.StartingItems); it passes lift-off validation. Tested (SimulationTests, TerritoryTests).
+**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (Simulation.PlaceStartingUnit: thruster, 2x2 core, thruster on a 4x2 frame, in code until prefabs, FB-021), whose core holds 600 copper ore + 300 iron ore (Balance.StartingItems; doubled for 256-cell tiles, OQ-35); it passes lift-off validation. Tested (SimulationTests, TerritoryTests).
 
 **Notes:** Was: 'Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22). Start as a deployed unit instead of a free core, 2026-10-17 (OQ-37).
 
@@ -155,7 +155,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** Every claimable tile has exactly one circle wholly inside it; it sits on the richest deposit cluster that fits while keeping clear of borders; the radius is one Balance constant sized to the nominal tile; same seed gives the same circles; the world map shows them.
 
-**As built:** World/Gen/Circles.cs: one circle per tile, ocean tiles included, on the most deposit cells in the disc among centres at least Balance.CircleClearance from the border; radius Balance.CircleRadius = 12. Drawn on the world map with claim arcs.
+**As built:** World/Gen/Circles.cs: one circle per tile, ocean tiles included, on the most deposit cells in the disc among centres at least Balance.CircleClearance from the border; radius Balance.CircleRadius = DefaultTileSize / 8 = 32, clearance Balance.CircleClearance = DefaultTileSize / 32 = 8. Drawn on the world map with claim arcs.
 
 **Notes:** OQ-3 decided 2026-10-10. Radius placeholder: 1/8 of a nominal tile (12 cells at 96, 32 at 256; OQ-35) until playtested. Ocean/unbuildable tiles: OQ-24. OQ-24 decided 2026-10-10: ocean and unbuildable tiles get circles too and can be claimed, which needs buildings that stand on water (FB-017).
 

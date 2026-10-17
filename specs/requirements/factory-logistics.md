@@ -2,13 +2,13 @@
 
 P2 · Each tile is a real-time factory map where you build.
 
-Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridges, storage, crafters, power networks, boosters, platforms on water, turrets and walls, blueprints, production stats and resource radii are built. Unviewed tiles run in rate mode. Each core holds its own stock, which funds building on its tile. To do from playtesting: bigger tiles. Fluids deferred.
+Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridges, storage, crafters, power networks, boosters, platforms on water, turrets and walls, blueprints, production stats and resource radii are built. Unviewed tiles run in rate mode. Each core holds its own stock, which funds building on its tile. Tiles are 256 cells (OQ-35). Fluids deferred.
 
 ## Requirements
 
 | ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [FB-001](#fb-001-tile-local-map) | Tile local map | Must | In Progress | Partial | MVP | Functional | P2 | WM-002 | Updated |  |
+| [FB-001](#fb-001-tile-local-map) | Tile local map | Must | Done | Yes | MVP | Functional | P2 | WM-002 | Updated |  |
 | [FB-002](#fb-002-building-placement) | Building placement | Must | Done | Yes | MVP | Functional | P2 | FB-001 |  |  |
 | [FB-003](#fb-003-extractors) | Extractors | Must | Done | Yes | MVP | Functional | P2 | FB-002, RS-001 | Updated |  |
 | [FB-004](#fb-004-logistics-conveyors) | Logistics: conveyors | Must | Done | Yes | MVP | Functional | P2 | FB-002 |  |  |
@@ -36,7 +36,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Acceptance criteria:** Entering a tile loads its local grid map with terrain and deposits matching the world tile; a nominal tile is 256x256 cells (OQ-35), the scale of a mid-size Mindustry map.
 
-**As built:** A tile's local map is its bounding box in the world map; cells of neighbouring tiles show dimmed and can't be built on. Terrain and deposits match the world. Nominal tile is 96x96 (Simulation.DefaultTileSize).
+**As built:** A tile's local map is its bounding box in the world map; cells of neighbouring tiles show dimmed and can't be built on. Terrain and deposits match the world. Nominal tile is 256x256 (Simulation.DefaultTileSize, OQ-35); deposit patches scaled to 16 per item per nominal tile, radius 4-10. Entering a tile centres the camera on its victory circle at 0.75 zoom.
 
 **Notes:** Size raised from a 96x96 nominal tile after playtesting 2026-10-17 (OQ-35).
 

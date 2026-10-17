@@ -72,7 +72,7 @@ Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HU
 
 **Acceptance criteria:** ≥ 60 FPS / 60 UPS with 8 full-sim tiles × 2,000 buildings plus 200 rate-mode tiles on target hardware.
 
-**As built:** StressScene: 8 viewed full-sim tiles x 2,000 buildings plus 200 rate-mode factories hold 60 UPS, under 4 ms/tick (StressTests, --stress); a ~280-unit firefight stays within budget. Measured on the dev machine with 96-cell tiles; frame rate not measured.
+**As built:** StressScene: 8 viewed full-sim tiles x 2,000 buildings plus 200 rate-mode factories hold 60 UPS, under 4 ms/tick (StressTests, --stress); a ~280-unit firefight stays within budget. Re-measured with 256-cell tiles (OQ-35), 2026-10-17: stress scene ~1.0 ms/tick in tests, 3.5 ms/tick in --stress (was 2.8 at 96); firefight 4.7-5.1 ms/tick against a 5 ms budget (unchanged, borderline); frame rate not measured.
 
 **Notes:** Updated 2026-10-05: decision OQ-11 No budget yet for units and projectiles in combat. 2026-10-17: a 256x256 nominal tile (OQ-35) has about 7x the cells of a 96 one, and continuous zoom may view several tiles at once (OQ-36); re-measure the stress scene and world-gen time at that size.
 

@@ -6,14 +6,14 @@ namespace Wunderwaffe.Sim;
 /// </summary>
 public static class Balance
 {
-    /// <summary>What a new player's core starts with (WM-005).</summary>
-    public static readonly IReadOnlyDictionary<string, int> StartingItems = Items(("copper_ore", 300), ("iron_ore", 150));
+    /// <summary>What a new player's core starts with (WM-005): doubled for 256-cell tiles (OQ-35), where belts run longer.</summary>
+    public static readonly IReadOnlyDictionary<string, int> StartingItems = Items(("copper_ore", 600), ("iron_ore", 300));
 
-    /// <summary>Radius of every tile's victory circle, in cells (WM-014): 1/8 of a nominal tile until playtested.</summary>
-    public const int CircleRadius = 12;
+    /// <summary>Radius of every tile's victory circle, in cells (WM-014): 1/8 of a nominal tile (OQ-35).</summary>
+    public const int CircleRadius = Simulation.DefaultTileSize / 8;
 
-    /// <summary>Cells kept between a victory circle and its tile's border where the tile has room (WM-014).</summary>
-    public const int CircleClearance = 4;
+    /// <summary>Cells kept between a victory circle and its tile's border where the tile has room (WM-014): 1/32 of a nominal tile, twice the port zone depth.</summary>
+    public const int CircleClearance = Simulation.DefaultTileSize / 32;
 
     /// <summary>
     /// Seconds a player must keep a building in a circle to claim its tile (WM-006), when the match setup doesn't say.

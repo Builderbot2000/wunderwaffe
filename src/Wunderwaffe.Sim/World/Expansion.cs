@@ -22,15 +22,12 @@ public static class Expansion
         if (tile.CircleCache.Revision == grid.Revision)
             return tile.CircleCache.Players;
 
+        // By building, not by cell: a 32-cell circle (OQ-35) is ~3,300 cells, rescanned whenever the grid changes.
         var players = new SortedSet<int>();
-        int r = Balance.CircleRadius;
-        for (int y = tile.CircleY - r; y <= tile.CircleY + r; y++)
+        foreach (var b in grid.Buildings)
         {
-            for (int x = tile.CircleX - r; x <= tile.CircleX + r; x++)
-            {
-                if (tile.InCircle(x, y) && grid.BuildingAt(x, y) is { Owner: >= 0 } b)
-                    players.Add(b.Owner);
-            }
+            if (b.Owner >= 0 && InCircle(tile, b))
+                players.Add(b.Owner);
         }
         tile.CircleCache = (grid.Revision, [.. players]);
         return tile.CircleCache.Players;

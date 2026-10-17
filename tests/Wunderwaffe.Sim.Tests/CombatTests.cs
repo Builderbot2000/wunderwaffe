@@ -8,11 +8,11 @@ namespace Wunderwaffe.Sim.Tests;
 public class CombatTests
 {
     /// <summary>My tile at world x 0-29, theirs at 30-59, both stocked.</summary>
-    static (Simulation Sim, TileState Mine, TileState Theirs) Arena()
+    static (Simulation Sim, TileState Mine, TileState Theirs) Arena(int size = 30)
     {
         var sim = NewSim();
-        var mine = Tile(sim, 0, 0, owner: Me);
-        var theirs = Tile(sim, 1, 0, owner: Them);
+        var mine = Tile(sim, 0, 0, size, Me);
+        var theirs = Tile(sim, 1, 0, size, Them);
         Fund(sim, mine, "shell", 1000);
         Fund(sim, theirs, "shell", 1000);
         return (sim, mine, theirs);
@@ -279,15 +279,15 @@ public class CombatTests
     [Fact]
     public void AttackMoveStopsToFightThenCarriesOn()
     {
-        var (sim, mine, theirs) = Arena();
+        var (sim, mine, theirs) = Arena(Balance.CircleRadius * 2); // the path and target stay outside the circles, so nobody claims a tile mid-fight
         Put(sim, mine, Me, "supply_depot", 4, 14);
         var unit = Gunship(sim, mine, Me, 4, 17, rack: true);
         Put(sim, theirs, Them, "conveyor", 2, 2);
         Run(sim, 61);
 
         sim.Enqueue(new AttackMoveCommand(Me, [unit.Id], theirs.Id, 10, 4));
-        Assert.True(RunUntil(sim, () => theirs.Grid.BuildingAt(2, 2) == null, 3000), "it fights what it passes");
-        Assert.True(RunUntil(sim, () => unit.Order == null, 3000), "then finishes the move");
+        Assert.True(RunUntil(sim, () => theirs.Grid.BuildingAt(2, 2) == null, 12000), "it fights what it passes");
+        Assert.True(RunUntil(sim, () => unit.Order == null, 6000), "then finishes the move");
         Assert.Equal(theirs.Id, unit.TileId);
     }
 

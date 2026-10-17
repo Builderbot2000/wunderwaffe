@@ -6,10 +6,11 @@ namespace Wunderwaffe.Sim.World;
 /// <summary>Seeded deposit layout for a tile's local map (WM-002, WM-009).</summary>
 public static class TileGenerator
 {
-    /// <summary>Patches of each item on a tile of <see cref="Simulation.DefaultTileSize"/> squared buildable cells.</summary>
-    const int PatchesPerItem = 6;
-    const int MinRadius = 3;
-    const int MaxRadius = 7;
+    /// <summary>Patches of each item on a tile of <see cref="Simulation.DefaultTileSize"/> squared buildable cells: fewer, larger
+    /// patches per area than a 96-cell tile had (6 of radius 3-7), so a 256-cell tile (OQ-35) reads as a few ore fields.</summary>
+    const int PatchesPerItem = 16;
+    const int MinRadius = 4;
+    const int MaxRadius = 10;
 
     /// <summary>
     /// Lays circular deposit patches on the tile's buildable ground. The number of patches follows the buildable

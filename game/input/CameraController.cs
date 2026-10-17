@@ -41,13 +41,18 @@ public partial class CameraController : Camera2D
         Zoom = new Vector2(zoom, zoom);
     }
 
-    /// <summary>The middle of the tile, where its core is, at 1:1.</summary>
+    /// <summary>
+    /// The tile's victory circle, where its core lands (WM-005), zoomed out a little so the whole circle shows: a
+    /// 256-cell tile (OQ-35) is far wider than the screen, and its middle can be far from the circle.
+    /// </summary>
     void CenterOnTile()
     {
         var tile = _host.ViewedTile;
-        Position = new Vector2(tile.CenterX - tile.OriginX + 0.5f, tile.CenterY - tile.OriginY + 0.5f) * Palette.CellPx;
-        Zoom = Vector2.One;
+        Position = new Vector2(tile.CircleX + 0.5f, tile.CircleY + 0.5f) * Palette.CellPx;
+        Zoom = new Vector2(TileZoom, TileZoom);
     }
+
+    const float TileZoom = 0.75f;
 
     /// <summary>
     /// Each layer keeps its own zoom. The tile view returns to where you left the same tile; the world map centres on

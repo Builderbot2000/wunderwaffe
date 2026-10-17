@@ -82,8 +82,8 @@ public class SimulationTests
         a.AddStartingTile(0, 0, Player, seed: 42);
         b.AddStartingTile(0, 0, Player, seed: 42);
         Assert.Equal(a.StateHash(), b.StateHash());
-        for (int y = 0; y < 96; y++)
-            for (int x = 0; x < 96; x++)
+        for (int y = 0; y < Simulation.DefaultTileSize; y++)
+            for (int x = 0; x < Simulation.DefaultTileSize; x++)
                 Assert.Equal(a.Tiles[0].Grid.DepositAt(x, y), b.Tiles[0].Grid.DepositAt(x, y));
     }
 }

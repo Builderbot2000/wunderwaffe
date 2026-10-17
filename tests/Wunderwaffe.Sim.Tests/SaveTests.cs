@@ -16,7 +16,8 @@ public class SaveTests(ITestOutputHelper output)
     /// </summary>
     internal static Simulation Session()
     {
-        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
+        // The smallest world: replays regenerate it, and it is 256-cell tiles (OQ-35).
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default with { Width = GameSetup.MinSize, Height = GameSetup.MinSize });
         var home = sim.Tiles[sim.StartTileId];
         // Home's shape and terrain depend on the seed, so build on the first open ground: belts on its top row, the
         // unit three rows down.

@@ -15,7 +15,7 @@ public sealed record GameSetup(
     int AiPlayers = 0, int CaptureSeconds = Balance.CaptureSeconds, int VictoryPercent = 60, int RichnessPercent = 100)
 {
     public const int MinSize = 3;
-    public const int MaxSize = 15;
+    public const int MaxSize = 7;
     public const int MaxPlayers = 8;
     public const int MinCaptureSeconds = 5, MaxCaptureSeconds = 600;
     public const int MinVictoryPercent = 10, MaxVictoryPercent = 100;

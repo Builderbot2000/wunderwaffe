@@ -111,7 +111,7 @@ public class JsonDriverTests(ITestOutputHelper output)
             ["X"] = (int)coalTile["CircleX"]!, ["Y"] = (int)coalTile["CircleY"]!,
         });
         c.Step(1);
-        for (int s = 0; s < 120 && (bool)c.Query("Unit", new { unitId = scout })!["Moving"]!; s++)
+        for (int s = 0; s < 360 && (bool)c.Query("Unit", new { unitId = scout })!["Moving"]!; s++)
             c.Step(60);
         Assert.Equal("Ok", (string)c.Query("CheckDeploy", new { unitId = scout })!);
         c.Command(new JsonObject { ["type"] = "deploy_unit", ["Player"] = 0, ["UnitId"] = scout });

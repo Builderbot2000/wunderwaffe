@@ -42,13 +42,13 @@ public class WorldGenTests
     [Fact]
     public void TilesHaveUniquePlainNamesFromTheSeed()
     {
-        var a = World(99, 12, 10);
+        var a = World(99, 7, 7);
         var names = a.Tiles.Select(t => t.Name).ToList();
         Assert.Equal(names.Count, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
         // A bare word: no number, and no terrain name stuck on.
         Assert.All(names, n => Assert.Matches("^[A-Z][a-z]+$", n));
-        Assert.Equal(names, World(99, 12, 10).Tiles.Select(t => t.Name));
-        Assert.NotEqual(names, World(100, 12, 10).Tiles.Select(t => t.Name));
+        Assert.Equal(names, World(99, 7, 7).Tiles.Select(t => t.Name));
+        Assert.NotEqual(names, World(100, 7, 7).Tiles.Select(t => t.Name));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class WorldGenTests
     [InlineData(5, 5, 2UL)]
     [InlineData(5, 5, 7UL)]
     [InlineData(6, 6, 12345UL)]
-    [InlineData(8, 8, 99UL)]
+    [InlineData(7, 7, 99UL)]
     public void EachTileHasOnePortZonePerNeighbourFacingIt(int w, int h, ulong seed)
     {
         var sim = World(seed, w, h);
@@ -199,7 +199,7 @@ public class WorldGenTests
     [Theory]
     [InlineData(3, 3, 1UL)]
     [InlineData(5, 5, 3037UL)]
-    [InlineData(9, 9, 77UL)]
+    [InlineData(7, 7, 77UL)]
     public void TheStartIsLandWithRoomToGrow(int w, int h, ulong seed)
     {
         var sim = World(seed, w, h);

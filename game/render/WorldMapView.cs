@@ -17,8 +17,11 @@ namespace Wunderwaffe.Game.Render;
 /// </summary>
 public partial class WorldMapView : Node2D
 {
-    /// <summary>Pixels per world cell.</summary>
-    public const float CellPx = 2f;
+    /// <summary>
+    /// Pixels per world cell. 2 px for a 96-cell tile, scaled with the tile size (OQ-35) so a tile, its label and its
+    /// unit dots keep the same proportions on screen.
+    /// </summary>
+    public const float CellPx = 2f * 96 / Sim.Simulation.DefaultTileSize;
 
     const int FontSize = 20;
     const float OwnerTint = 0.3f;
@@ -155,20 +158,25 @@ public partial class WorldMapView : Node2D
         var map = _host.Sim.Map;
         int d = WorldSnapshot.Downsample;
         int w = (map.Width + d - 1) / d, h = (map.Height + d - 1) / d;
-        var image = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
+        // Filled as bytes, not SetPixel: a 7 x 7 world of 256-cell tiles is ~800k pixels (OQ-35).
+        var pixels = new byte[w * h * 4];
         var tiles = _host.Sim.Tiles;
         for (int y = 0; y < h; y++)
         {
             for (int x = 0; x < w; x++)
             {
                 int id = map.TileAtCell(x * d, y * d);
-                if (id < 0)
+                if (id < 0 || tiles[id].Owner == TileState.Unowned)
                     continue;
-                int owner = tiles[id].Owner;
-                if (owner != TileState.Unowned)
-                    image.SetPixel(x, y, Palette.Owner(owner, 0.55f) with { A = OwnerTint });
+                var c = Palette.Owner(tiles[id].Owner, 0.55f);
+                int i = (y * w + x) * 4;
+                pixels[i] = (byte)(c.R * 255);
+                pixels[i + 1] = (byte)(c.G * 255);
+                pixels[i + 2] = (byte)(c.B * 255);
+                pixels[i + 3] = (byte)(OwnerTint * 255);
             }
         }
+        var image = Image.CreateFromData(w, h, false, Image.Format.Rgba8, pixels);
         image.GenerateMipmaps();
         _owners = ImageTexture.CreateFromImage(image);
         return true;

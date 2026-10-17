@@ -11,7 +11,7 @@ namespace Wunderwaffe.Game.Screens;
 /// </summary>
 public sealed class MatchSettings
 {
-    static readonly (string Name, int Size)[] MapSizes = [("Small · 5 × 5", 5), ("Medium · 7 × 7", 7), ("Large · 9 × 9", 9), ("Huge · 12 × 12", 12)];
+    static readonly (string Name, int Size)[] MapSizes = [("Small · 3 × 3", 3), ("Medium · 5 × 5", 5), ("Large · 7 × 7", 7)];
 
     readonly LineEdit _seed;
     readonly OptionButton _size;

@@ -9,10 +9,10 @@ namespace Wunderwaffe.Sim;
 public sealed partial class Simulation
 {
     /// <summary>
-    /// Nominal tile size in cells: hand-built tiles are this square, and generated tiles average about this area.
-    /// Placeholder until OQ-2 (tile size) is decided.
+    /// Nominal tile size in cells (WM-001, FB-001, OQ-35): hand-built tiles are this square, and generated tiles average
+    /// about this area. 256 puts a tile on the scale of a mid-size Mindustry map.
     /// </summary>
-    public const int DefaultTileSize = 96;
+    public const int DefaultTileSize = 256;
 
     /// <summary>
     /// Generates the world (WM-001, WM-002, WM-009): terrain over (width x height) nominal tiles, cut into irregular
