@@ -31,8 +31,13 @@ rules on top. Branch from the Wave 0 (foundation) commit.
 - **Elimination.** `Simulation.CoreCount` / `Victory.HasCore` count cores on tiles and units (every unit has one).
 - **Rate mode** books `FlowKind.Core` per core (`Flow.PortId` = the core's id), held to its capacity.
 - **Tests:** hand-built tiles get funds from a test-only `bank` core (1x1, no power, huge capacity) via
-  `Harness.Tile`/`Bank`/`Fund`; test content also adds a 1x1 `unit_core` core variant so unit tests keep one-row
-  designs. `Simulation.AddCore` puts a core down unpaid for tests and scenes.
+  `Harness.Tile`/`Bank`/`Fund`. `Simulation.AddCore` puts a core down unpaid for tests and scenes (`Harness.PutCore`).
+- **Test setup goes through `Harness` helpers.** Tests stock funds (`Fund`, `Fund(sim, tile, item, n)`, `Stock`,
+  `PutCore`) and build units (`LayUnit`, `LayScout`, `LiftOff`, `Scout`: thruster, 2x2 core, blocks on a two-deep frame)
+  only through them, never by hand, so the next rule change is one helper edit, not a hunt through every file. Lay a
+  custom frame by hand only when the layout is the test's subject (lift-off validation, blueprint shapes). When a rule
+  changes, delete the tests whose subject was replaced and write fresh ones for the new rule; don't patch old-design
+  tests into shape. A test that breaks only through setup gets a helper; one that needs more than that is deleted.
 
 ## Combat conventions (silo F)
 

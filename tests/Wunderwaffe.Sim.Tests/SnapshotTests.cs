@@ -47,8 +47,8 @@ public class SnapshotTests(ITestOutputHelper output)
             Sim.Step();
             Assert.Equal(before + 5, _home.Grid.BuildingCount);
 
-            var (x, y) = Open(_home, 3, 1);
-            _unit = AbstractTravelTests.Scout(Sim, _home, x + 1, y);
+            var (x, y) = Open(_home, 4, 2);
+            _unit = Harness.Scout(Sim, _home, x + 1, y);
             _here = (_home.CenterX - _home.OriginX, _home.CenterY - _home.OriginY);
             _there = (_east.CenterX - _east.OriginX, _east.CenterY - _east.OriginY);
         }

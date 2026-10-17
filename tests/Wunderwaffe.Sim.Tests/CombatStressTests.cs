@@ -12,15 +12,6 @@ public class CombatStressTests(ITestOutputHelper output)
     const int Size = 96;
     const int Me = Harness.Me, Them = Harness.Them;
 
-    static void Gunship(Simulation sim, TileState tile, int player, int x, int y)
-    {
-        for (int i = -1; i <= 1; i++)
-            sim.Enqueue(new PlaceFrameCommand(player, tile.Id, x + i, y));
-        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "thruster", x - 1, y));
-        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "unit_core", x, y));
-        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "gun_turret", x + 1, y));
-    }
-
     [Fact]
     public void TwoArmiesInAFirefightStayWithinTickBudget()
     {
@@ -28,22 +19,23 @@ public class CombatStressTests(ITestOutputHelper output)
         var mine = Harness.Tile(sim, 0, 0, Size, Me);
         var theirs = Harness.Tile(sim, 1, 0, Size, Them);
 
-        // Three columns of gunships each side of the border, a row every other cell; turrets behind them.
+        // Four columns of gunships (thruster, core, two guns) each side of the border, a row every third cell so their
+        // frames stay apart; turrets behind them.
         var cores = new List<(TileState Tile, int Player, int X, int Y)>();
-        for (int y = 2; y < Size - 2; y += 2)
+        for (int y = 0; y < Size - 2; y += 3)
         {
-            foreach (int x in new[] { 84, 88, 92 })
+            foreach (int x in new[] { 72, 78, 84, 90 })
             {
-                Gunship(sim, mine, Me, x, y);
+                Harness.LayUnit(sim, mine, x, y, Me, "gun_turret", "gun_turret");
                 cores.Add((mine, Me, x, y));
             }
-            foreach (int x in new[] { 3, 7, 11 })
+            foreach (int x in new[] { 2, 8, 14, 20 })
             {
-                Gunship(sim, theirs, Them, x, y);
+                Harness.LayUnit(sim, theirs, x, y, Them, "gun_turret", "gun_turret");
                 cores.Add((theirs, Them, x, y));
             }
-            sim.Enqueue(new PlaceBuildingCommand(Me, mine.Id, "laser_turret", 80, y));
-            sim.Enqueue(new PlaceBuildingCommand(Them, theirs.Id, "laser_turret", 15, y));
+            sim.Enqueue(new PlaceBuildingCommand(Me, mine.Id, "laser_turret", 68, y));
+            sim.Enqueue(new PlaceBuildingCommand(Them, theirs.Id, "laser_turret", 24, y));
         }
         sim.Step();
         foreach (var (tile, player, x, y) in cores)

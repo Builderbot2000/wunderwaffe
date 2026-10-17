@@ -14,8 +14,8 @@ public class PlacementTests
         var sim = new Simulation(TestContent.Load());
         var tile = sim.AddTile(0, 0, Player, size: 10);
         tile.Grid.SetDeposit(0, 0, "iron_ore");
-        Fund(sim, tile).Stock!.Add("copper_ore", 1000);
-        Fund(sim, tile).Stock!.Add("iron_ore", 1000);
+        Fund(sim, tile, "copper_ore", 1000);
+        Fund(sim, tile, "iron_ore", 1000);
         return (sim, tile);
     }
 
@@ -126,8 +126,8 @@ public class PlacementTests
         foreach (var tile in sim.Tiles)
             tile.Owner = Player;
         var coast = sim.Tiles.First(t => t.Grid.BuildableCount > 0 && t.Grid.BuildableCount < t.Grid.Area);
-        Fund(sim, coast).Stock!.Add("copper_ore", 1000);
-        Fund(sim, coast).Stock!.Add("iron_ore", 1000);
+        Fund(sim, coast, "copper_ore", 1000);
+        Fund(sim, coast, "iron_ore", 1000);
 
         var cells = Enumerable.Range(0, coast.Grid.Width * coast.Grid.Height)
             .Select(i => (X: i % coast.Grid.Width, Y: i / coast.Grid.Width)).ToList();

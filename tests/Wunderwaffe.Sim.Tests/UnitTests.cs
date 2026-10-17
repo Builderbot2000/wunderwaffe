@@ -15,24 +15,6 @@ public class UnitTests
                 sim.Enqueue(new PlaceFrameCommand(Me, tile.Id, cx, cy));
     }
 
-    /// <summary>Three framed cells in a row: a thruster pushing east on each end and the unit core between them.</summary>
-    static void LayScout(Simulation sim, TileState tile, int x, int y)
-    {
-        Frame(sim, tile, x - 1, y, 3);
-        Place(sim, tile, "thruster", x - 1, y, 0);
-        Place(sim, tile, "unit_core", x, y);
-        Place(sim, tile, "thruster", x + 1, y, 0);
-        sim.Step();
-    }
-
-    static Unit Scout(Simulation sim, TileState tile, int x = 10, int y = 10)
-    {
-        LayScout(sim, tile, x, y);
-        sim.Enqueue(new ActivateUnitCommand(Me, tile.Id, x, y));
-        sim.Step();
-        return sim.Units[^1];
-    }
-
     static void Move(Simulation sim, Unit u, TileState to, int x, int y, int player = Me) =>
         sim.Enqueue(new MoveUnitsCommand(player, [u.Id], to.Id, x, y));
 
@@ -58,11 +40,11 @@ public class UnitTests
     {
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default);
         var home = sim.Tiles[sim.StartTileId];
-        Fund(sim, home).Stock!.Add("copper_ore", 10_000);
-        Fund(sim, home).Stock!.Add("iron_ore", 10_000);
-        Fund(sim, home).Stock!.Add("steel", 1_000);
-        Fund(sim, home).Stock!.Add("iron_plate", 1_000);
-        Fund(sim, home).Stock!.Add("copper_plate", 1_000);
+        Fund(sim, home, "copper_ore", 10_000);
+        Fund(sim, home, "iron_ore", 10_000);
+        Fund(sim, home, "steel", 1_000);
+        Fund(sim, home, "iron_plate", 1_000);
+        Fund(sim, home, "copper_plate", 1_000);
         var (x, y) = Open(home, 3, 1);
         var unit = Scout(sim, home, x + 1, y);
         Assert.Equal(home.Id, unit.TileId);
@@ -145,13 +127,13 @@ public class UnitTests
 
         Assert.Equal(1, tile.Grid.BuildingCount); // the bank
         Assert.Equal(0, tile.Grid.FrameCount);
-        Assert.Equal(3, unit.Cells.Count);
+        Assert.Equal(8, unit.Cells.Count);
         Assert.Equal(2, unit.Thrusters.Count);
         Assert.Equal(3, unit.Blocks.Count);
         Assert.Equal(Me, unit.Owner);
-        // The blocks are symmetric about the core, so the centre of mass is the core's cell centre.
-        Assert.InRange(unit.X, (int)(10.4 * S), (int)(10.6 * S));
-        Assert.InRange(unit.Y, (int)(10.4 * S), (int)(10.6 * S));
+        // The blocks are symmetric about the core's middle column line; the thrusters pull the centre of mass up.
+        Assert.InRange(unit.X, (int)(10.9 * S), (int)(11.1 * S));
+        Assert.InRange(unit.Y, (int)(10.5 * S), (int)(11.0 * S));
         Assert.False(unit.Moving);
     }
 
@@ -161,8 +143,8 @@ public class UnitTests
         var sim = NewSim();
         var tile = Tile(sim);
         var unit = Scout(sim, tile);
-        // Thrusters cost 15 each, the core 15, and 3 frame cells at 2.
-        Assert.Equal(15 * 3 + 2 * 3, unit.Mass);
+        // Thrusters cost 15 each, the core 15, and 8 frame cells at 2.
+        Assert.Equal(15 * 3 + 2 * 8, unit.Mass);
     }
 
     [Fact]
@@ -182,10 +164,10 @@ public class UnitTests
         var tile = Tile(sim);
         Harness.Ore(tile, "iron_ore", 5, 5);
         Place(sim, tile, "drill", 5, 5); // 2x2
-        Frame(sim, tile, 4, 4, 2, 2);    // covers only part of the drill
-        Place(sim, tile, "unit_core", 4, 4);
+        Frame(sim, tile, 3, 4, 3, 2);    // covers only part of the drill
+        Place(sim, tile, "core", 3, 4);
         sim.Step();
-        Assert.Equal(AssembleResult.PartialBuilding, UnitAssembly.CheckActivate(sim, tile, Me, 4, 4, out _));
+        Assert.Equal(AssembleResult.PartialBuilding, UnitAssembly.CheckActivate(sim, tile, Me, 3, 4, out _));
     }
 
     [Fact]
@@ -195,12 +177,12 @@ public class UnitTests
         var tile = Tile(sim);
         Assert.Equal(AssembleResult.NoCore, UnitAssembly.CheckActivate(sim, tile, Me, 3, 3, out _));
 
-        Place(sim, tile, "unit_core", 3, 3);
+        Place(sim, tile, "core", 3, 3);
         sim.Step();
         Assert.Equal(AssembleResult.NoFrame, UnitAssembly.CheckActivate(sim, tile, Me, 3, 3, out _));
 
-        Frame(sim, tile, 3, 3, 3);
-        Place(sim, tile, "unit_core", 5, 3);
+        Frame(sim, tile, 3, 3, 4, 2);
+        Place(sim, tile, "core", 5, 3);
         sim.Step();
         Assert.Equal(AssembleResult.MultipleCores, UnitAssembly.CheckActivate(sim, tile, Me, 3, 3, out _));
         Assert.Equal(AssembleResult.NotOwner, UnitAssembly.CheckActivate(sim, tile, Them, 3, 3, out _));
@@ -211,30 +193,30 @@ public class UnitTests
     {
         var sim = NewSim();
         var tile = Tile(sim);
-        Frame(sim, tile, 3, 3, 4, 3);
-        Place(sim, tile, "unit_core", 3, 3);
-        Place(sim, tile, "core_large", 4, 3);
+        Frame(sim, tile, 3, 3, 5, 3);
+        Place(sim, tile, "core", 3, 3);
+        Place(sim, tile, "core_large", 5, 3);
         sim.Step();
         Assert.Equal(AssembleResult.MultipleCores, UnitAssembly.CheckActivate(sim, tile, Me, 3, 3, out _));
 
         var sim2 = NewSim();
         var tile2 = Tile(sim2);
-        Frame(sim2, tile2, 3, 3, 3);
-        Place(sim2, tile2, "unit_core", 3, 3);
-        Place(sim2, tile2, "export_port", 4, 3, 0);
+        Frame(sim2, tile2, 3, 3, 3, 2);
+        Place(sim2, tile2, "core", 3, 3);
+        Place(sim2, tile2, "export_port", 5, 3, 0);
         sim2.Step();
         // Ports are only legal in a port zone, and a tile with no neighbours has none, so the placement is refused.
-        Assert.Null(tile2.Grid.BuildingAt(4, 3));
+        Assert.Null(tile2.Grid.BuildingAt(5, 3));
 
         // A neighbour to the east gives tile 3 a port zone along its east side.
         var sim3 = NewSim();
         var tile3 = Tile(sim3, size: 6);
         Tile(sim3, 1, 0, size: 6);
-        Frame(sim3, tile3, 2, 2, 3);
-        Place(sim3, tile3, "unit_core", 2, 2);
+        Frame(sim3, tile3, 1, 2, 3, 2);
+        Place(sim3, tile3, "core", 1, 2);
         Place(sim3, tile3, "export_port", 3, 2, 0);
         sim3.Step();
-        Assert.Equal(AssembleResult.InvalidBlock, UnitAssembly.CheckActivate(sim3, tile3, Me, 2, 2, out _));
+        Assert.Equal(AssembleResult.InvalidBlock, UnitAssembly.CheckActivate(sim3, tile3, Me, 1, 2, out _));
     }
 
     [Fact]
@@ -243,7 +225,7 @@ public class UnitTests
         var sim = NewSim();
         var tile = Tile(sim, size: 30);
         Frame(sim, tile, 0, 0, 9, 8); // 72 cells
-        Place(sim, tile, "unit_core", 0, 0);
+        Place(sim, tile, "core", 0, 0);
         sim.Step();
         Assert.Equal(AssembleResult.TooLarge, UnitAssembly.CheckActivate(sim, tile, Me, 0, 0, out _));
     }
@@ -253,11 +235,11 @@ public class UnitTests
     {
         var sim = NewSim();
         var tile = Tile(sim);
-        Harness.Ore(tile, "iron_ore", 12, 10);
-        Frame(sim, tile, 10, 10, 4, 2);
-        Place(sim, tile, "unit_core", 10, 10);
-        Place(sim, tile, "thruster", 11, 10);
-        Place(sim, tile, "drill", 12, 10);
+        Harness.Ore(tile, "iron_ore", 13, 10);
+        Frame(sim, tile, 10, 10, 5, 2);
+        Place(sim, tile, "core", 10, 10);
+        Place(sim, tile, "thruster", 12, 10);
+        Place(sim, tile, "drill", 13, 10);
         Run(sim, 61); // one iron ore in the drill's output buffer
         long before = Items(tile, "iron_ore");
         Stock(tile.Grid.BuildingAt(10, 10)!, "copper_ore", 7);
@@ -286,7 +268,7 @@ public class UnitTests
 
         sim.Enqueue(new DeployUnitCommand(Me, unit.Id));
         sim.Step();
-        var core = tile.Grid.Cores.Single(c => c.DefId == "unit_core");
+        var core = tile.Grid.Cores.Single(c => c.DefId == "core");
         Assert.Equal(40, core.Stock!.Get("copper_ore"));
         Assert.Equal(funds + 40, Items(tile, "copper_ore"));
     }
@@ -445,8 +427,8 @@ public class UnitTests
         Assert.False(unit.Moving);
 
         // A block with a core but no engine has no locomotion, so it can't lift off at all (UD-003).
-        Frame(sim, a, 2, 2);
-        Place(sim, a, "unit_core", 2, 2);
+        Frame(sim, a, 2, 2, 2, 2);
+        Place(sim, a, "core", 2, 2);
         sim.Step();
         Assert.Equal(AssembleResult.NoLocomotion, UnitAssembly.CheckActivate(sim, a, Me, 2, 2, out _));
     }
@@ -559,10 +541,10 @@ public class UnitTests
         sim.Step();
 
         Assert.Empty(sim.Units);
-        Assert.Equal("unit_core", tile.Grid.BuildingAt(10, 10)!.DefId);
+        Assert.Equal("core", tile.Grid.BuildingAt(10, 10)!.DefId);
         Assert.Equal("thruster", tile.Grid.BuildingAt(9, 10)!.DefId);
-        Assert.Equal("thruster", tile.Grid.BuildingAt(11, 10)!.DefId);
-        Assert.Equal(3, tile.Grid.FrameCount);
+        Assert.Equal("thruster", tile.Grid.BuildingAt(12, 10)!.DefId);
+        Assert.Equal(8, tile.Grid.FrameCount);
     }
 
     [Fact]
@@ -585,7 +567,7 @@ public class UnitTests
         var landed = tile.Grid.BuildingAt(9, 10)!;
         Assert.Equal(sim.Content.Buildings["thruster"].Hp, landed.Hp);
         Assert.Equal(Me, landed.Owner);
-        Assert.Equal(sim.Content.Buildings["unit_core"].Hp, tile.Grid.BuildingAt(10, 10)!.Hp);
+        Assert.Equal(sim.Content.Buildings["core"].Hp, tile.Grid.BuildingAt(10, 10)!.Hp);
     }
 
     [Fact]
@@ -608,7 +590,7 @@ public class UnitTests
         var thrusters = tile.Grid.Buildings.Where(b => b.DefId == "thruster").ToList();
         Assert.Equal(2, thrusters.Count);
         Assert.All(thrusters, t => Assert.Equal(quarters, t.Rotation));
-        Assert.Equal(1, tile.Grid.Buildings.Count(b => b.DefId == "unit_core"));
+        Assert.Equal(1, tile.Grid.Buildings.Count(b => b.DefId == "core"));
     }
 
     [Fact]

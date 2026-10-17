@@ -2,7 +2,7 @@
 
 P2 · Each tile is a real-time factory map where you build.
 
-Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridges, storage, crafters, power networks, boosters, platforms on water, turrets and walls, blueprints, production stats and resource radii are built. Unviewed tiles run in rate mode. To do from playtesting: per-core stocks that fund building on their own tile, bigger tiles. Fluids deferred.
+Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridges, storage, crafters, power networks, boosters, platforms on water, turrets and walls, blueprints, production stats and resource radii are built. Unviewed tiles run in rate mode. Each core holds its own stock, which funds building on its tile. To do from playtesting: bigger tiles. Fluids deferred.
 
 ## Requirements
 
@@ -14,7 +14,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [FB-004](#fb-004-logistics-conveyors) | Logistics: conveyors | Must | Done | Yes | MVP | Functional | P2 | FB-002 |  |  |
 | [FB-005](#fb-005-power) | Power | Must | Done | Yes | MVP | Functional | P2 | FB-002 | Updated |  |
 | [FB-006](#fb-006-processing-buildings) | Processing buildings | Must | Done | Yes | MVP | Functional | P2 | RS-002 |  |  |
-| [FB-007](#fb-007-storage) | Storage | Must | In Progress | Partial | MVP | Functional | P2 | FB-002 | Updated |  |
+| [FB-007](#fb-007-storage) | Storage | Must | Done | Yes | MVP | Functional | P2 | FB-002 | Review |  |
 | [FB-008](#fb-008-construction-drones--builder) | Construction drones / builder | Should | Rejected | No | Alpha | Functional | P2 | FB-002 |  |  |
 | [FB-009](#fb-009-blueprint-library) | Blueprint library | Must | Done | Yes | MVP | Functional | P2 | FB-002 | Updated |  |
 | [FB-010](#fb-010-defensive-structures) | Defensive structures | Must | Done | Yes | MVP | Functional | P2 | FB-002, CB-001 |  |  |
@@ -26,7 +26,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [FB-016](#fb-016-building-boosters) | Building boosters | Must | Done | Yes | MVP | Functional | P2 | FB-002 | New |  |
 | [FB-017](#fb-017-buildings-on-water) | Buildings on water | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-011 | New |  |
 | [FB-018](#fb-018-resource-radius) | Resource radius | Should | Done | Yes | Alpha | Functional | P3 | FB-007, CB-004 | New |  |
-| [FB-019](#fb-019-build-funds-from-cores) | Build funds from cores | Must | Approved | No | MVP | Functional | P2 | WM-016, FB-007 | New |  |
+| [FB-019](#fb-019-build-funds-from-cores) | Build funds from cores | Must | Done | Yes | MVP | Functional | P2 | WM-016, FB-007 | Review |  |
 | [FB-020](#fb-020-power-layer-nodes-and-cross-tile-power) | Power layer, nodes and cross-tile power | Must | Approved | No | MVP | Functional | P3 | FB-005, IO-002 | New |  |
 | [FB-021](#fb-021-prefab-blueprints) | Prefab blueprints | Must | Approved | No | MVP | Functional | P2 | FB-009, WM-005 | New |  |
 
@@ -92,7 +92,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Acceptance criteria:** Items delivered into a core are added to that core's stock, up to its variant's capacity (OQ-38), and count towards its owner's build funds on that tile (FB-019).
 
-**As built:** Cores deliver into one shared tile inventory with no capacity, which pays for building. Storage buildings exist: container, supply depot and ammo rack (load from belts, unload onto belts, give items back when removed).
+**As built:** Each core has its own stock (PlacedBuilding.Stock), filled by belts and machines up to its variant's per-item capacity (Funds.Accepts: a full core refuses, so belts back up; rate mode holds to it too), and counted in its owner's funds on its tile (FB-019). Storage buildings: container, supply depot and ammo rack (load from belts, unload onto belts, give items back when removed).
 
 **Notes:** Was: 'storage buildings and a tile core with a shared inventory' / 'Items delivered to core are added to tile inventory and usable for construction'. Per-core stock after playtesting 2026-10-17 (FB-019, WM-016).
 
@@ -212,7 +212,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Acceptance criteria:** Placing buildings, frames and blueprints and lifting off on tile T are paid only from the player's landed cores on T (no paying from neighbouring tiles); with no core on T the player can't pay for anything there; the HUD stock shows that sum for the viewed tile (world map: all landed cores); landing a unit adds its core's cargo to the sum and lifting off takes it away; starting items go into the starting unit's core; payment order and capacity follow OQ-38, refunds and lost cores OQ-39.
 
-**As built:** Each tile has one shared inventory (TileState.Inventory), filled by belts into its core and by starting items. Territory.Payer pays from the tile if the player owns it, else from an owned neighbour; refunds go the same way (RefundTo). Unit cores hold no items; units carry Cargo.
+**As built:** World/Funds.cs. Buildings, frames, blueprints and repairs on a tile are paid only from the player's cores standing there, lowest id first, all or nothing (CanPay/TryPay, OQ-38); never from neighbours, other players or units. Refunds, held items of removed buildings and wreck refunds go to the player's nearest core on the tile, else are lost (Refund, OQ-39). HUD stock is Funds.Total for the viewed tile (world map: GameQuery.ResourceTotals over every standing core). Lift-off moves a core's stock into Unit.Cargo and landing back; starting items are in the starting unit's core. There is no tile inventory. Tested (TerritoryTests).
 
 **Notes:** Added after playtesting 2026-10-17. Replaces paying from an owned neighbour: expanding means landing a unit, whose core brings its cargo as the new tile's funds. Rate mode books core deliveries per player per core (TileRates, FlowKind.Core).
 

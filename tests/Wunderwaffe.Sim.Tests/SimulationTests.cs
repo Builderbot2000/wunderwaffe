@@ -37,13 +37,10 @@ public class SimulationTests
     }
 
     [Fact]
-    public void StartingTileHasCoreDepositsAndItems()
+    public void StartingTileHasDepositsButNoCoalRegionalItem()
     {
         var sim = new Simulation(TestContent.Load());
         var tile = sim.AddStartingTile(0, 0, Player, seed: 1);
-
-        Assert.Single(tile.Grid.Buildings, b => b.DefId == Simulation.CoreBuildingId);
-        Assert.Equal(Balance.StartingItems["copper_ore"], Items(tile, "copper_ore"));
         var deposits = new HashSet<string?>();
         for (int y = 0; y < tile.Grid.Height; y++)
             for (int x = 0; x < tile.Grid.Width; x++)
@@ -52,6 +49,29 @@ public class SimulationTests
         Assert.Contains("copper_ore", deposits);
         // RS-003: coal is regional, so a starting tile never has it.
         Assert.DoesNotContain("coal", deposits);
+    }
+
+    [Fact]
+    public void EachStartIsALandedUnitWhoseCoreHoldsTheStartingItems()
+    {
+        // WM-005, OQ-37: no free core; each player starts with a landed unit (thruster, core, thruster on frame) whose
+        // core stands in the circle and holds the starting items, and nothing else holds anything.
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default with { Players = 2 });
+        Assert.Empty(sim.Units);
+        for (int p = 0; p < 2; p++)
+        {
+            var home = sim.Tiles[sim.StartTileIds[p]];
+            Assert.Equal(p, home.Owner);
+            var core = Assert.Single(home.Grid.Cores);
+            Assert.Equal((Simulation.CoreBuildingId, p), (core.DefId, core.Owner));
+            Assert.True(home.InCircle(core.X, core.Y, core.Width, core.Height));
+            Assert.Equal(Balance.StartingItems.OrderBy(kv => kv.Key).Select(kv => (kv.Key, (long)kv.Value)),
+                core.Stock!.Entries.Where(kv => kv.Value > 0).Select(kv => (kv.Key, kv.Value)));
+            Assert.Equal(2, home.Grid.Buildings.Count(b => b.DefId == "thruster" && b.Owner == p));
+            Assert.Equal(3, home.Grid.BuildingCount);
+            Assert.True(home.Grid.HasFrame(core.X, core.Y));
+            Assert.Equal(AssembleResult.Ok, UnitAssembly.CheckActivate(sim, home, p, core.X, core.Y, out _));
+        }
     }
 
     [Fact]

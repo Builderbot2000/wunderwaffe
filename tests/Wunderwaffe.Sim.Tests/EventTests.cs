@@ -17,7 +17,7 @@ public class EventTests
         var east = sim.AddTile(1, 0, Them, 30);
         // Planted with the tile lent to Me, as TerritoryTests does: an enemy circle can't be built in while held.
         east.Owner = Me;
-        Fund(sim, east).Stock!.Add(sim.Content.Buildings["conveyor"].Cost);
+        Fund(sim, east, sim.Content.Buildings["conveyor"].Cost);
         sim.Enqueue(new PlaceBuildingCommand(Me, east.Id, "conveyor", east.CircleX, east.CircleY));
         sim.Step();
         east.Owner = Them;

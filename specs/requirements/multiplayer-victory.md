@@ -21,7 +21,7 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 
 **Acceptance criteria:** Victory triggers at threshold; end screen shows stats.
 
-**As built:** World/Victory.cs: a player with no landed core is eliminated; domination at the match's tile share; end screen with winner, reason and per-player stats (Hud.Match).
+**As built:** World/Victory.cs: a player with no core, on a tile or on a unit, is eliminated; domination at the match's tile share; end screen with winner, reason and per-player stats (Hud.Match).
 
 **Notes:** Elimination decided 2026-10-10. 2026-10-17: cores on units count too (WM-016), so a player whose cores are all in flight is still in the match.
 

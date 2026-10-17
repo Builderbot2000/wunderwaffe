@@ -8,18 +8,17 @@ namespace Wunderwaffe.Sim.Tests;
 public class FactoryTests
 {
     /// <summary>
-    /// Content where the unit core costs copper ore and thrusters iron ore, so drills next to a factory can feed it
+    /// Content where thrusters cost iron ore (the core already costs ores), so drills next to a factory can feed it
     /// without a whole plate and steel chain. No power draws, so no network is needed; ore-priced parts need no
     /// Precision Jig.
     /// </summary>
     static Simulation OreSim() => new(TestContent.Load(json => json
-        .Replace("\"cost\": { \"copper_plate\": 10, \"steel\": 5 }", "\"cost\": { \"copper_ore\": 4 }")
         .Replace("\"cost\": { \"iron_plate\": 10, \"steel\": 5 }", "\"cost\": { \"iron_ore\": 4 }"), power: false));
 
-    /// <summary>Thruster, core, thruster in a row on three frame cells.</summary>
+    /// <summary>The standard scout: thruster, 2x2 core, thruster in a row on a 4x2 frame.</summary>
     static readonly Blueprint Scout = new(
-        [new BlueprintBlock("thruster", 0, 0, 0), new BlueprintBlock("unit_core", 1, 0, 0), new BlueprintBlock("thruster", 2, 0, 0)],
-        [new BlueprintCell(0, 0), new BlueprintCell(1, 0), new BlueprintCell(2, 0)]);
+        [new BlueprintBlock("thruster", 0, 0, 0), new BlueprintBlock("core", 1, 0, 0), new BlueprintBlock("thruster", 3, 0, 0)],
+        [.. Enumerable.Range(0, 8).Select(i => new BlueprintCell(i % 4, i / 4))]);
 
     /// <summary>
     /// A factory at (10, 10)-(12, 12) fed copper ore by a drill and a two-cell belt from the west, and iron ore by two
@@ -51,26 +50,26 @@ public class FactoryTests
         var f = factory.Factory!;
         Project(sim, tile, Scout, 14, 11);
         sim.Step();
-        Assert.Equal(6, f.Steps.Count);
-        Assert.Equal([BuildStage.Frame, BuildStage.Frame, BuildStage.Frame, BuildStage.Systems, BuildStage.Systems, BuildStage.Systems],
-            f.Steps.Select(s => s.Stage));
-        Assert.Equal(14, UnitFactory.Missing(f)["iron_ore"]);
+        Assert.Equal(11, f.Steps.Count);
+        Assert.Equal([.. Enumerable.Repeat(BuildStage.Frame, 8), .. Enumerable.Repeat(BuildStage.Systems, 3)], f.Steps.Select(s => s.Stage));
+        // 8 frame cells at 2, the core's 5 and the thrusters' 4 each.
+        Assert.Equal(29, UnitFactory.Missing(f)["iron_ore"]);
 
         // Blocks appear one at a time as they are paid for: frame first, then the rest.
         var seen = new List<int>();
-        for (int i = 0; i < 3000 && sim.Units.Count == 0; i++)
+        for (int i = 0; i < 6000 && sim.Units.Count == 0; i++)
         {
             int placed = tile.Grid.FrameCount * 10 + tile.Grid.Buildings.Count(b => b.X >= 14 && b.DefId != "bank");
             if (seen.Count == 0 || seen[^1] != placed)
                 seen.Add(placed);
             sim.Step();
         }
-        Assert.Equal([0, 10, 20, 30, 31, 32, 33], seen);
+        Assert.Equal([0, 10, 20, 30, 40, 50, 60, 70, 80, 81, 82, 83], seen);
 
         var unit = Assert.Single(sim.Units);
         Assert.Equal(Me, unit.Owner);
         Assert.Equal(2, unit.Thrusters.Count);
-        Assert.Equal(3, unit.Cells.Count);
+        Assert.Equal(8, unit.Cells.Count);
         Assert.Equal(1, f.Built);
         Assert.Equal(0, tile.Grid.FrameCount);
         Assert.Equal(1, sim.PlayerOrNull(Me)!.Launched);
@@ -93,8 +92,8 @@ public class FactoryTests
         Run(sim, 100);
         Assert.Equal(FactoryStatus.Waiting, f.Status);
         Assert.Equal(0, tile.Grid.FrameCount);
-        Assert.Equal(new SortedDictionary<string, int> { ["copper_ore"] = 4, ["iron_ore"] = 14 }, UnitFactory.Missing(f));
-        Assert.Equal([(BuildStage.Frame, 0, 3), (BuildStage.Systems, 0, 3), (BuildStage.Armament, 0, 0)], UnitFactory.StageProgress(f));
+        Assert.Equal(new SortedDictionary<string, int> { ["copper_ore"] = 10, ["iron_ore"] = 29 }, UnitFactory.Missing(f));
+        Assert.Equal([(BuildStage.Frame, 0, 8), (BuildStage.Systems, 0, 3), (BuildStage.Armament, 0, 0)], UnitFactory.StageProgress(f));
     }
 
     [Fact]
@@ -119,8 +118,8 @@ public class FactoryTests
         sim.Step();
 
         Assert.Equal(ProjectResult.Ok, Check(Scout, 14, 11));
-        Assert.Equal(ProjectResult.Ok, Check(Scout, 16, 4)); // corner of the radius: (18, 4) is 6 cells out
-        Assert.Equal(ProjectResult.OutOfRange, Check(Scout, 17, 4));
+        Assert.Equal(ProjectResult.Ok, Check(Scout, 15, 4)); // corner of the radius: (18, 4) is 6 cells out
+        Assert.Equal(ProjectResult.OutOfRange, Check(Scout, 16, 4));
         Assert.Equal(ProjectResult.Blocked, Check(Scout, 14, 16)); // over the conveyor
         Assert.Equal(ProjectResult.Blocked, Check(Scout, 9, 11));  // over the factory itself
         Assert.Equal(ProjectResult.NotOwner, Check(Scout, 14, 11, player: Them));
@@ -128,7 +127,7 @@ public class FactoryTests
         Assert.Equal(ProjectResult.Ok, Check(null, 0, 0));
 
         // A unit with 17 frame cells is one over the base cap.
-        var big = new Blueprint([new BlueprintBlock("unit_core", 0, 0, 0), new BlueprintBlock("thruster", 1, 0, 0)],
+        var big = new Blueprint([new BlueprintBlock("core", 0, 0, 0), new BlueprintBlock("thruster", 2, 0, 0)],
             [.. Enumerable.Range(0, 17).Select(i => new BlueprintCell(i % 9, i / 9))]);
         Assert.Equal(17, UnitFactory.SizeOf(defs, big));
         Assert.Equal(ProjectResult.TooLarge, Check(big, 14, 11));
@@ -150,7 +149,7 @@ public class FactoryTests
         sim.Step();
         var factory = tile.Grid.BuildingAt(25, 25)!;
         int cells = Balance.WunderwaffeCells + 1;
-        var mega = new Blueprint([new BlueprintBlock("unit_core", 0, 0, 0), new BlueprintBlock("thruster", 1, 0, 0)],
+        var mega = new Blueprint([new BlueprintBlock("core", 0, 0, 0), new BlueprintBlock("thruster", 2, 0, 0)],
             [.. Enumerable.Range(0, cells).Select(i => new BlueprintCell(i % 7, i / 7))]);
         Assert.True(UnitStats.Of(sim.Content, mega).IsWunderwaffe);
         Assert.True(UnitFactory.BlockCap(sim, tile, factory) < cells);

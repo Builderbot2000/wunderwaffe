@@ -91,7 +91,7 @@ public class StressTests(ITestOutputHelper output)
         {
             var tile = sim.AddTile(t, 0, owner: 0);
             foreach (var item in new[] { "copper_ore", "iron_plate", "copper_plate" })
-                Fund(sim, tile).Stock!.Add(item, 1_000_000);
+                Fund(sim, tile, item, 1_000_000);
             for (int r = 0; r < rows; r++)
             {
                 int y = r * 3;

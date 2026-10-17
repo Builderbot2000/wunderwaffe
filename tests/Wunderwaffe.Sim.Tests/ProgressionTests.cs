@@ -65,7 +65,7 @@ public class ProgressionTests
         var theirs = sim.AddTile(1, 0, Them, size: 10);
         theirs.Grid.SetDeposit(0, 0, "ore");
         sim.Enqueue(new PlaceBuildingCommand(Them, theirs.Id, "drill", 0, 0));
-        sim.AddCore(theirs, Them, 1, 0);
+        PutCore(sim, theirs, Them, 1, 0);
         Run(sim, 40);
         Assert.Equal(0, sim.PlayerOrNull(Me)?.ProducedOf("ore") ?? 0);
         Assert.True(sim.PlayerOrNull(Them)!.ProducedOf("ore") >= 3);
@@ -83,7 +83,7 @@ public class ProgressionTests
         Assert.Equal(0, Progression.Progress(sim, Me, Progression.CurrentGoal(sim, Me)!.Condition));
 
         sim.Enqueue(new PlaceBuildingCommand(Me, tile.Id, "drill", 0, 0));
-        sim.AddCore(tile, Me, 1, 0);
+        PutCore(sim, tile, Me, 1, 0);
         Run(sim, 30);
         Assert.Equal(2, me.GoalsDone);
         Assert.Null(Progression.CurrentGoal(sim, Me));
@@ -107,13 +107,8 @@ public class ProgressionTests
         long shipped = sim.PlayerOrNull(Me)!.Shipped;
         Assert.True(shipped >= 5, $"shipped {shipped}");
 
-        for (int x = 9; x <= 11; x++)
-            sim.Enqueue(new PlaceFrameCommand(Me, a.Id, x, 5));
-        Place(sim, a, "unit_core", 10, 5);
-        Place(sim, a, "thruster", 11, 5);
-        sim.Step();
-        sim.Enqueue(new ActivateUnitCommand(Me, a.Id, 10, 5));
-        sim.Step();
+        LayUnit(sim, a, 10, 5, Me);
+        LiftOff(sim, a, 10, 5);
         Assert.Equal(1, sim.PlayerOrNull(Me)!.Launched);
     }
 

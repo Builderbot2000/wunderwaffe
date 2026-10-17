@@ -54,10 +54,10 @@ public class TerritoryTests
         Assert.Null(east.Grid.BuildingAt(1, 0));
 
         // Their core there doesn't pay for me either.
-        Stock(sim.AddCore(east, Them, 10, 10), "copper_ore", 50);
+        Stock(PutCore(sim, east, Them, 10, 10), "copper_ore", 50);
         Assert.Equal(PlaceResult.CannotAfford, Placement.Check(sim, east, Me, "conveyor", 1, 0, 0, null, out _));
 
-        var mine = sim.AddCore(east, Me, 20, 20);
+        var mine = PutCore(sim, east, Me, 20, 20);
         Stock(mine, "copper_ore", 5);
         Place(sim, east, "conveyor", 1, 0);
         sim.Step();
@@ -79,8 +79,8 @@ public class TerritoryTests
         // together takes nothing.
         var sim = NewSim();
         var tile = sim.AddTile(0, 0, Me, Size);
-        var first = sim.AddCore(tile, Me, 20, 20);
-        var second = sim.AddCore(tile, Me, 24, 20);
+        var first = PutCore(sim, tile, Me, 20, 20);
+        var second = PutCore(sim, tile, Me, 24, 20);
         Stock(first, "copper_ore", 15);
         Stock(second, "copper_ore", 20);
         Stock(second, "iron_ore", 30);
@@ -105,8 +105,8 @@ public class TerritoryTests
         // OQ-39: a removed building's refund and held items go to its owner's nearest core on the tile.
         var sim = NewSim();
         var tile = sim.AddTile(0, 0, Me, Size);
-        var west = sim.AddCore(tile, Me, 0, 10);
-        var east = sim.AddCore(tile, Me, 26, 10);
+        var west = PutCore(sim, tile, Me, 0, 10);
+        var east = PutCore(sim, tile, Me, 26, 10);
         Stock(west, "copper_ore", 100);
         Place(sim, tile, "conveyor", 22, 10);
         sim.Step();
@@ -130,7 +130,7 @@ public class TerritoryTests
         // OQ-39: capacity is per item; a full core takes no more of that item, so the belt into it fills.
         var sim = NewSim();
         var tile = Tile(sim, 0, 0, Size);
-        var core = sim.AddCore(tile, Me, 10, 10);
+        var core = PutCore(sim, tile, Me, 10, 10);
         int cap = core.Def.Capacity;
         Stock(core, "copper_ore", cap - 3);
         Ore(tile, "copper_ore", 2, 10);
@@ -278,10 +278,7 @@ public class TerritoryTests
         east.Owner = Them;
         Plant(sim, east, Them, "conveyor", east.CircleX, east.CircleY + 3);
 
-        Frame3(sim, home, 26, 15);
-        sim.Enqueue(new ActivateUnitCommand(Me, home.Id, 27, 15));
-        sim.Step();
-        var scout = sim.Units.Single();
+        var scout = Scout(sim, home, 27, 15);
         sim.Enqueue(new MoveUnitsCommand(Me, [scout.Id], east.Id, east.CircleX, east.CircleY));
         sim.Step();
         for (int i = 0; i < 60 * 60 && scout.Moving; i++)
@@ -293,26 +290,13 @@ public class TerritoryTests
         Assert.Equal([false, true], Territory.ContestedTiles(sim));
     }
 
-    static void Frame3(Simulation sim, TileState tile, int x, int y)
-    {
-        for (int i = 0; i < 3; i++)
-            sim.Enqueue(new PlaceFrameCommand(Me, tile.Id, x + i, y));
-        Place(sim, tile, "thruster", x, y);
-        Place(sim, tile, "unit_core", x + 1, y);
-        Place(sim, tile, "thruster", x + 2, y);
-        sim.Step();
-    }
-
     [Fact]
     public void AnUnownedTileIsContestedOnlyWithTwoPlayersOnIt()
     {
         var sim = NewSim();
         var home = Tile(sim, 0, 0, Size);
         var east = sim.AddTile(1, 0, size: Size);
-        Frame3(sim, home, 26, 15);
-        sim.Enqueue(new ActivateUnitCommand(Me, home.Id, 27, 15));
-        sim.Step();
-        var scout = sim.Units.Single();
+        var scout = Scout(sim, home, 27, 15);
         sim.Enqueue(new MoveUnitsCommand(Me, [scout.Id], east.Id, 10, 15));
         sim.Step();
         for (int i = 0; i < 60 * 60 && scout.Moving; i++)
@@ -398,8 +382,8 @@ public class TerritoryTests
                         && content.TerrainList[g.TerrainAt(x + 1, y)] is { Water: true, Buildable: false })
                     {
                         t.Owner = Me;
-                        Fund(sim, t).Stock!.Add("copper_ore", 1000);
-                        Fund(sim, t).Stock!.Add("iron_ore", 1000);
+                        Fund(sim, t, "copper_ore", 1000);
+                        Fund(sim, t, "iron_ore", 1000);
                         return (sim, t, x, y);
                     }
                 }
@@ -557,7 +541,7 @@ public class TerritoryTests
         long iron = Items(home, "iron_ore");
         Assert.Equal(PlaceResult.NoPresence, UnitAssembly.CheckFrame(sim, east, Them, 5, 5));
         Assert.Equal(PlaceResult.CannotAfford, UnitAssembly.CheckFrame(sim, east, Me, 5, 5));
-        var mine = sim.AddCore(east, Me, 20, 20);
+        var mine = PutCore(sim, east, Me, 20, 20);
         Stock(mine, "iron_ore", 10);
         Assert.Equal(PlaceResult.Ok, UnitAssembly.CheckFrame(sim, east, Me, 5, 5));
         sim.Enqueue(new PlaceFrameCommand(Me, east.Id, 5, 5));
@@ -579,7 +563,7 @@ public class TerritoryTests
         long copper = Items(home, "copper_ore");
         var belts = new Blueprint([new BlueprintBlock("conveyor", 0, 0, 0), new BlueprintBlock("conveyor", 1, 0, 0)], []);
         Assert.Equal(BlueprintResult.CannotAfford, Blueprints.Check(sim, east, Me, belts, 5, 5, 0, false, out _));
-        var mine = sim.AddCore(east, Me, 20, 20);
+        var mine = PutCore(sim, east, Me, 20, 20);
         Stock(mine, "copper_ore", 10);
         Assert.Equal(BlueprintResult.Ok, Blueprints.Check(sim, east, Me, belts, 5, 5, 0, false, out var plan));
         sim.Enqueue(new PlaceBlueprintCommand(Me, east.Id, belts, 5, 5));

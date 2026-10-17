@@ -2,7 +2,7 @@
 
 P1 · The world is split into tiles; you start on one and expand.
 
-Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut into irregular 96-cell tiles, each with a victory circle. Any number of players get fair starts; tiles are claimed by holding a building in the circle, and you build wherever you have presence. Tab switches instantly between the world map and a tile. To do from playtesting: continuous zoom, 256-cell tiles, one unified core.
+Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut into irregular 96-cell tiles, each with a victory circle. Any number of players get fair starts; tiles are claimed by holding a building in the circle, and you build wherever you have presence. Tab switches instantly between the world map and a tile. One core kind: each player starts with a landed unit whose core holds the starting items. To do from playtesting: continuous zoom, 256-cell tiles.
 
 ## Requirements
 
@@ -12,7 +12,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-002](#wm-002-tile-attributes) | Tile attributes | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
 | [WM-003](#wm-003-tile-adjacency) | Tile adjacency | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
 | [WM-004](#wm-004-tile-ownership) | Tile ownership | Must | Done | Yes | MVP | Functional | P1 | WM-001 | Updated |  |
-| [WM-005](#wm-005-starting-tile) | Starting tile | Must | In Progress | Partial | MVP | Functional | P1 | WM-004 | Updated |  |
+| [WM-005](#wm-005-starting-tile) | Starting tile | Must | Done | Yes | MVP | Functional | P1 | WM-004 | Review |  |
 | [WM-006](#wm-006-tile-claim-by-victory-circle) | Tile claim by victory circle | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-015 | Updated |  |
 | [WM-007](#wm-007-zoom-between-layers) | Zoom between layers | Must | Approved | No | MVP | Functional | P1 | WM-001, FB-001, FB-013 | Updated |  |
 | [WM-008](#wm-008-fog-of-war-world) | Fog of war (world) | Won't | Rejected | No | Alpha | Functional | P1 | WM-004 |  |  |
@@ -23,7 +23,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-013](#wm-013-world-map-overview) | World map overview | Should | Done | Yes | MVP | Functional | P1 | WM-007 | New |  |
 | [WM-014](#wm-014-victory-circles) | Victory circles | Must | Done | Yes | MVP | Functional | P1 | WM-009 | New |  |
 | [WM-015](#wm-015-building-presence) | Building presence | Must | Done | Yes | MVP | Functional | P1 | WM-014 | New |  |
-| [WM-016](#wm-016-cores-and-elimination) | Cores and elimination | Must | In Progress | Partial | MVP | Functional | P8 | WM-005, CB-001, UD-010 | Updated |  |
+| [WM-016](#wm-016-cores-and-elimination) | Cores and elimination | Must | Done | Yes | MVP | Functional | P8 | WM-005, CB-001, UD-010 | Review |  |
 
 ### WM-001 Tiled world map
 
@@ -67,7 +67,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** On new game each player owns 1 tile and has a landed starting unit whose core stands inside the victory circle and holds the starting items; it can lift off like any unit; with several players, starts are spread fairly (OQ-22).
 
-**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). Each start gets a free tile core placed by the sim nearest the circle centre with 300 copper ore + 150 iron ore (Balance.StartingItems), plus a separate landed scout (PlaceScout).
+**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (Simulation.PlaceStartingUnit: thruster, 2x2 core, thruster on a 4x2 frame, in code until prefabs, FB-021), whose core holds 300 copper ore + 150 iron ore (Balance.StartingItems); it passes lift-off validation. Tested (SimulationTests, TerritoryTests).
 
 **Notes:** Was: 'Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22). Start as a deployed unit instead of a free core, 2026-10-17 (OQ-37).
 
@@ -175,7 +175,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** One core kind in buildings.json with several variants (OQ-37); every variant costs items to build, none is free; a core on frame lifts off with G and its stock goes with it as the unit's cargo; a landed unit's core holds that cargo and adds it to the tile's funds; a player stays in the match while any core of theirs exists, on a tile or on a unit; destroying the last one eliminates them (MP-001).
 
-**As built:** Two buildings: core (3x3, free, its deliveries go to the shared tile inventory, power 20) and unit_core (1x1, 10 copper plate + 5 steel, power 10). The sim places a core on each start; cores are in the build menu; the last core can't be removed (Simulation.TryRemove). Lift-off needs one unit core and refuses a tile core on the frame. Elimination counts landed cores only (Victory.HasCore).
+**As built:** BuildingKind.Core is the only core kind, with two variants in buildings.json: core (2x2, 10 copper ore + 5 iron ore, power 20, capacity 1000 of each item, supply radius 16) and core_large (3x3, 60 iron plate + 40 copper plate, capacity 5000). Every variant has a cost and a capacity (validated in ContentDb). Each core holds its own stock (PlacedBuilding.Stock, FB-019). Lift-off needs exactly one core on the frame and takes its stock as cargo; landing puts it back (UD-010). The last core can't be removed (Simulation.TryRemove). Elimination counts cores on tiles and on units (Simulation.CoreCount, Victory.HasCore). Tested (TerritoryTests, UnitTests).
 
 **Notes:** Was: 'The tile core is the first building in a player's starting victory circle and keeps their control of that tile. Players can build more cores; a player who loses their last core is eliminated.' Decided 2026-10-10. Core and unit core unified after playtesting 2026-10-17, as they do the same jobs. Footprint, cost and tiers: OQ-37.
 

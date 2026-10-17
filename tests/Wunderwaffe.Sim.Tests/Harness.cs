@@ -62,6 +62,69 @@ static class Harness
         throw new InvalidOperationException($"no room for a core on tile {tile.Id}");
     }
 
+    /// <summary>Adds items to the player's funds on the tile: into their first core there (<see cref="Fund(Simulation, TileState, int)"/>).</summary>
+    public static PlacedBuilding Fund(Simulation sim, TileState tile, string item, long n, int player = Me)
+    {
+        var core = Fund(sim, tile, player);
+        core.Stock!.Add(item, n);
+        return core;
+    }
+
+    /// <inheritdoc cref="Fund(Simulation, TileState, string, long, int)"/>
+    public static PlacedBuilding Fund(Simulation sim, TileState tile, IReadOnlyDictionary<string, int> items, int player = Me)
+    {
+        var core = Fund(sim, tile, player);
+        core.Stock!.Add(items);
+        return core;
+    }
+
+    /// <summary>A core of <paramref name="player"/>'s at (x, y), put down unpaid and empty (see <see cref="Stock"/>).</summary>
+    public static PlacedBuilding PutCore(Simulation sim, TileState tile, int player, int x, int y, string defId = Simulation.CoreBuildingId) =>
+        sim.AddCore(tile, player, x, y, defId);
+
+    /// <summary>
+    /// The standard test unit (WM-016), laid by <paramref name="player"/>'s commands and paid from the tile's funds: a
+    /// thruster pushing east at (x - 1, y), the 2x2 <c>core</c> with its top-left at (x, y), then <paramref name="right"/>
+    /// side by side along y from x + 2, all on a frame two rows deep (deeper for taller blocks). Steps once so it
+    /// stands. Lift it off with <see cref="LiftOff"/> at (x, y).
+    /// </summary>
+    public static void LayUnit(Simulation sim, TileState tile, int x, int y, int player, params string[] right)
+    {
+        var defs = right.Select(id => sim.Content.Buildings[id]).ToList();
+        int end = x + 2 + defs.Sum(d => d.Width), h = Math.Max(2, defs.Select(d => d.Height).DefaultIfEmpty(0).Max());
+        for (int cy = y; cy < y + h; cy++)
+            for (int cx = x - 1; cx < end; cx++)
+                sim.Enqueue(new PlaceFrameCommand(player, tile.Id, cx, cy));
+        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "thruster", x - 1, y));
+        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, Simulation.CoreBuildingId, x, y));
+        int bx = x + 2;
+        foreach (var d in defs)
+        {
+            sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, d.Id, bx, y));
+            bx += d.Width;
+        }
+        sim.Step();
+    }
+
+    /// <summary>The standard scout: <see cref="LayUnit"/> with a second thruster on the right, so it flies east and west.</summary>
+    public static void LayScout(Simulation sim, TileState tile, int x, int y, int player = Me) =>
+        LayUnit(sim, tile, x, y, player, "thruster");
+
+    /// <summary>Lifts off the unit whose core is at (x, y) and returns it.</summary>
+    public static Unit LiftOff(Simulation sim, TileState tile, int x, int y, int player = Me)
+    {
+        sim.Enqueue(new ActivateUnitCommand(player, tile.Id, x, y));
+        sim.Step();
+        return sim.Units[^1];
+    }
+
+    /// <summary>A standard scout (<see cref="LayScout"/>) at (x, y), lifted off.</summary>
+    public static Unit Scout(Simulation sim, TileState tile, int x = 10, int y = 10, int player = Me)
+    {
+        LayScout(sim, tile, x, y, player);
+        return LiftOff(sim, tile, x, y, player);
+    }
+
     /// <summary>
     /// Top-left of the first w x h block of free, buildable cells, row by row. For generated tiles, whose shape and
     /// terrain depend on the seed.

@@ -2,7 +2,7 @@
 
 P4 · Units, up to mega 'Wunderwaffe' units, are built block by block.
 
-Where it stands (2026-10-17): Units are built on frame by hand or by boosted factories from library blueprints, validated at lift-off, with derived stats, locomotion classes, per-block damage, upkeep and a Wunderwaffe class. To do from playtesting: the unit core merges into the core. No test range or design sharing.
+Where it stands (2026-10-17): Units are built on frame by hand or by boosted factories from library blueprints, validated at lift-off, with derived stats, locomotion classes, per-block damage, upkeep and a Wunderwaffe class. A unit lifts off on the one core kind (WM-016), taking the core's stock as cargo. No test range or design sharing.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 | [WW-004](#ww-004-staged-assembly) | Staged assembly | Should | Done | Yes | Alpha | Functional | P4 | WW-002 |  |  |
 | [WW-005](#ww-005-strategic-impact) | Strategic impact | Must | Proposed | No | MVP | Functional | P8 | WW-001, CB-001 |  |  |
 | [WW-006](#ww-006-visibility--alerts) | Visibility & alerts | Could | Rejected | No | Beta | Functional | P8 | WW-002, WM-008 |  |  |
-| [UD-010](#ud-010-in-world-unit-assembly) | In-world unit assembly | Must | In Progress | Partial | MVP | Functional | P4 | FB-002, WM-016 | Updated |  |
+| [UD-010](#ud-010-in-world-unit-assembly) | In-world unit assembly | Must | Done | Yes | MVP | Functional | P4 | FB-002, WM-016 | Review |  |
 | [UD-011](#ud-011-landing) | Landing | Should | Done | Yes | MVP | Functional | P4 | UD-010 | Review |  |
 | [UD-012](#ud-012-unit-physics) | Unit physics | Must | Done | Yes | MVP | Functional | P4 | UD-002 | New |  |
 | [UD-013](#ud-013-upkeep) | Upkeep | Should | Done | Yes | Alpha | Functional | P4 | UD-002, FB-018 | New |  |
@@ -180,7 +180,7 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 
 **Acceptance criteria:** Frame costs 2 iron ore a cell, refunded on removal; G over a core on frame lifts off up to 64 connected cells; the core's stock and the items held by lifted buildings go with the unit as its core's cargo.
 
-**As built:** UnitAssembly.cs. A separate unit_core block lifts off; items held by lifted buildings return to the tile inventory.
+**As built:** UnitAssembly.cs. Frame costs 2 iron ore a cell (Balance.FrameCost), refunded on removal; G over a core on frame flood-fills up to 64 cells (MaxCells) and lifts the group off (Launch), its core's stock and the lifted buildings' items becoming Unit.Cargo; Deploy puts the whole cargo back into the landed core. Tested (UnitTests).
 
 **Notes:** Added from what was built. Was: 'triggering a unit core' / 'items held by lifted buildings return to the tile inventory'. Unit core merged into the core after playtesting 2026-10-17 (WM-016).
 

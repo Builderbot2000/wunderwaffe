@@ -13,8 +13,8 @@ public class CombatTests
         var sim = NewSim();
         var mine = Tile(sim, 0, 0, owner: Me);
         var theirs = Tile(sim, 1, 0, owner: Them);
-        Fund(sim, mine).Stock!.Add("shell", 1000);
-        Fund(sim, theirs).Stock!.Add("shell", 1000);
+        Fund(sim, mine, "shell", 1000);
+        Fund(sim, theirs, "shell", 1000);
         return (sim, mine, theirs);
     }
 
@@ -22,23 +22,15 @@ public class CombatTests
         sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, id, x, y, rotation, recipe));
 
     /// <summary>
-    /// A small gunship lifted off at (x, y): a thruster pushing east, the unit core, a gun and optionally an ammo rack,
-    /// in a row from x - 1.
+    /// A small gunship lifted off with its core at (x, y) (<see cref="Harness.LayUnit"/>): a thruster pushing east, the
+    /// core, a gun, a second thruster unless <paramref name="oneEngine"/>, and optionally an ammo rack.
     /// </summary>
-    static Unit Gunship(Simulation sim, TileState tile, int player, int x, int y, string gun = "gun_turret", bool rack = false)
+    static Unit Gunship(Simulation sim, TileState tile, int player, int x, int y, string gun = "gun_turret", bool rack = false,
+        bool oneEngine = false)
     {
-        int cells = rack ? 4 : 3;
-        for (int i = 0; i < cells; i++)
-            sim.Enqueue(new PlaceFrameCommand(player, tile.Id, x - 1 + i, y));
-        Put(sim, tile, player, "thruster", x - 1, y);
-        Put(sim, tile, player, "unit_core", x, y);
-        Put(sim, tile, player, gun, x + 1, y);
-        if (rack)
-            Put(sim, tile, player, "ammo_rack", x + 2, y);
-        sim.Step();
-        sim.Enqueue(new ActivateUnitCommand(player, tile.Id, x, y));
-        sim.Step();
-        var unit = sim.Units[^1];
+        string[] right = [gun, .. oneEngine ? Array.Empty<string>() : ["thruster"], .. rack ? ["ammo_rack"] : Array.Empty<string>()];
+        LayUnit(sim, tile, x, y, player, right);
+        var unit = LiftOff(sim, tile, x, y, player);
         Assert.Equal(player, unit.Owner);
         return unit;
     }
@@ -76,8 +68,8 @@ public class CombatTests
     {
         var content = TestContent.Load();
         var bp = new Blueprint(
-            [new BlueprintBlock("gun_turret", 0, 0, 0), new BlueprintBlock("unit_core", 1, 0, 0), new BlueprintBlock("thruster", 2, 0, 0)],
-            [new BlueprintCell(0, 0), new BlueprintCell(1, 0), new BlueprintCell(2, 0)]);
+            [new BlueprintBlock("gun_turret", 0, 0, 0), new BlueprintBlock("core", 1, 0, 0), new BlueprintBlock("thruster", 3, 0, 0)],
+            [.. Enumerable.Range(0, 8).Select(i => new BlueprintCell(i % 4, i / 4))]);
         Assert.Equal(Combat.Dps(content.Buildings["gun_turret"]), UnitStats.Of(content, bp).Dps);
         // UD-006: frame, then systems, then armament.
         var last = UnitFactory.StepsOf(content, bp, 0, 0)[^1];
@@ -170,7 +162,7 @@ public class CombatTests
     public void LosingBlocksDisablesWhatTheyDid()
     {
         var (sim, mine, _) = Arena();
-        var unit = Gunship(sim, mine, Me, 10, 10);
+        var unit = Gunship(sim, mine, Me, 10, 10, oneEngine: true);
         int speed = unit.MaxSpeed;
         Assert.True(speed > 0);
         Assert.Equal(10, Combat.WeaponRange(sim, unit));
@@ -324,6 +316,8 @@ public class CombatTests
     {
         var (sim, mine, theirs) = Arena();
         var unit = Gunship(sim, mine, Me, 25, 15);
+        // It loaded up while its core stood landed on my tile (a core's radius supplies from my funds there): empty it.
+        unit.BlockCombat[Block(unit, "gun_turret")]!.Ammo = 0;
         Put(sim, theirs, Them, "smelter", 2, 15, recipe: "smelt_iron");
         Run(sim, 60);
         Assert.Equal(WeaponStatus.NoAmmo, Combat.UnitWeaponStatus(sim, unit));
@@ -339,17 +333,9 @@ public class CombatTests
     public void AUnitWithStorageSuppliesItsFriends()
     {
         var (sim, mine, _) = Arena();
-        // A supply depot riding on a unit: core, thruster (UD-003 needs locomotion), depot (2x2) on frame.
-        for (int y = 20; y < 22; y++)
-            for (int x = 20; x < 23; x++)
-                sim.Enqueue(new PlaceFrameCommand(Me, mine.Id, x, y));
-        Put(sim, mine, Me, "unit_core", 20, 20);
-        Put(sim, mine, Me, "thruster", 20, 21);
-        Put(sim, mine, Me, "supply_depot", 21, 20);
-        sim.Step();
-        sim.Enqueue(new ActivateUnitCommand(Me, mine.Id, 20, 20));
-        sim.Step();
-        var carrier = sim.Units[^1];
+        // A supply depot (2x2) riding on a unit, after the thruster and core.
+        LayUnit(sim, mine, 21, 20, Me, "supply_depot");
+        var carrier = LiftOff(sim, mine, 21, 20);
         carrier.Cargo.Add("shell", 30);
         var gunship = Gunship(sim, mine, Me, 24, 25);
         Run(sim, 61);
@@ -367,7 +353,7 @@ public class CombatTests
         var (sim, mine, _) = Arena();
         Put(sim, mine, Me, "smelter", 5, 5, recipe: "smelt_iron");
         Put(sim, mine, Me, "repair_bay", 8, 5);
-        var unit = Gunship(sim, mine, Me, 10, 9);
+        var unit = Gunship(sim, mine, Me, 10, 9, oneEngine: true);
         var smelter = At(mine, 5, 5);
         smelter.Hp = 50;
         int thruster = Block(unit, "thruster");

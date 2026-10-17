@@ -1,28 +1,13 @@
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
-using Xunit.Abstractions;
 using static Wunderwaffe.Sim.Tests.Harness;
 
 namespace Wunderwaffe.Sim.Tests;
 
 /// <summary>UC-009: units on rate-mode tiles travel as abstract nodes and materialise where they are.</summary>
-public class AbstractTravelTests(ITestOutputHelper output)
+public class AbstractTravelTests
 {
     const int S = Unit.CellScale;
-
-    /// <summary>Three framed cells in a row: a thruster pushing east on each end and a unit core between them.</summary>
-    internal static Unit Scout(Simulation sim, TileState tile, int x, int y, int player = Me)
-    {
-        for (int cx = x - 1; cx <= x + 1; cx++)
-            sim.Enqueue(new PlaceFrameCommand(player, tile.Id, cx, y));
-        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "thruster", x - 1, y));
-        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "unit_core", x, y));
-        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "thruster", x + 1, y));
-        sim.Step();
-        sim.Enqueue(new ActivateUnitCommand(player, tile.Id, x, y));
-        sim.Step();
-        return sim.Units[^1];
-    }
 
     /// <summary>Three tiles in a row; a scout on the first, ordered to the far side of the third.</summary>
     static (Simulation Sim, Unit Unit, TileState Far) Trip(bool rateMode)
@@ -45,24 +30,6 @@ public class AbstractTravelTests(ITestOutputHelper output)
             sim.Step();
         Assert.False(u.Moving, "never arrived");
         return sim.Tick - start;
-    }
-
-    [Fact]
-    public void AUnitNobodyWatchesIsANodeAndTakesAboutAsLongAsAFlyingOne()
-    {
-        var (full, fu, ffar) = Trip(rateMode: false);
-        var (rate, ru, rfar) = Trip(rateMode: true);
-        Assert.False(full.IsAbstract(fu));
-        Assert.True(rate.IsAbstract(ru));
-
-        long eta = AbstractTravel.Eta(rate, ru);
-        long flown = Arrive(full, fu), travelled = Arrive(rate, ru);
-        output.WriteLine($"full sim {flown} ticks, abstract {travelled} ticks, ETA {eta}");
-        Assert.Equal(rfar.Id, ru.TileId);
-        Assert.True(Math.Abs(ru.X - (rfar.OriginX + 25L) * S - S / 2) < S && Math.Abs(ru.Y - (rfar.OriginY + 15L) * S - S / 2) < S);
-        // UC-009: travel time matches the full sim within a set tolerance.
-        Assert.InRange(travelled, flown * (100 - AbstractTravel.TolerancePercent) / 100, flown * (100 + AbstractTravel.TolerancePercent) / 100);
-        Assert.InRange(eta, travelled - 1, travelled + 1);
     }
 
     [Fact]

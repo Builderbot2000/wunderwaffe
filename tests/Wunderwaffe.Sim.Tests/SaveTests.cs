@@ -35,10 +35,10 @@ public class SaveTests(ITestOutputHelper output)
         At(1, Enumerable.Range(0, 10).Select(i => (Command)new PlaceBuildingCommand(Me, home.Id, "conveyor", x0 + i, y0)).ToArray());
         At(2, new RemoveBuildingCommand(Me, home.Id, x0 + 5, y0), new DebugDestroyCommand(Me, home.Id, x0 + 6, y0),
             new PlaceBuildingCommand(Me, home.Id, "sorter", x0 + 5, y0), new SetFilterCommand(Me, home.Id, x0 + 5, y0, "copper_ore"));
-        At(3, new PlaceFrameCommand(Me, home.Id, ux, uy), new PlaceFrameCommand(Me, home.Id, ux + 1, uy), new PlaceFrameCommand(Me, home.Id, ux + 2, uy),
-            new PlaceFrameCommand(Me, home.Id, ux + 3, uy), new RemoveFrameCommand(Me, home.Id, ux + 3, uy));
-        At(4, new PlaceBuildingCommand(Me, home.Id, "thruster", ux, uy), new PlaceBuildingCommand(Me, home.Id, "unit_core", ux + 1, uy),
-            new PlaceBuildingCommand(Me, home.Id, "thruster", ux + 2, uy));
+        At(3, [.. Enumerable.Range(0, 8).Select(i => (Command)new PlaceFrameCommand(Me, home.Id, ux + i % 4, uy + i / 4)),
+            new PlaceFrameCommand(Me, home.Id, ux + 4, uy), new RemoveFrameCommand(Me, home.Id, ux + 4, uy)]);
+        At(4, new PlaceBuildingCommand(Me, home.Id, "thruster", ux, uy), new PlaceBuildingCommand(Me, home.Id, "core", ux + 1, uy),
+            new PlaceBuildingCommand(Me, home.Id, "thruster", ux + 3, uy));
         At(5, new ActivateUnitCommand(Me, home.Id, ux + 1, uy));
         At(6, new MoveUnitsCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY));
         At(7, new SetRallyCommand(Me, home.Id, x0, y0, home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY, 0),

@@ -137,18 +137,18 @@ public class PowerTests
     }
 
     [Fact]
-    public void ThrustersAreInertOnATileUnitCoresSupplyAndOnboardSupplyIsGeneratorPlusBattery()
+    public void ThrustersAreInertOnATileCoresSupplyAndOnboardSupplyIsGeneratorPlusBattery()
     {
         var content = TestContent.Load();
         Assert.False(content.Buildings["thruster"].IsPower);
-        Assert.True(content.Buildings["unit_core"].IsPower);
-        Assert.Equal(10, PowerNet.OnboardSupply(content.Buildings["unit_core"]));
+        Assert.True(content.Buildings["core"].IsPower);
+        Assert.Equal(20, PowerNet.OnboardSupply(content.Buildings["core"]));
         Assert.Equal(content.Buildings["battery"].Discharge, PowerNet.OnboardSupply(content.Buildings["battery"]));
         Assert.Equal(40, PowerNet.OnboardSupply(content.Buildings["fuel_generator"]));
     }
 
     [Fact]
-    public void AUnitFactoryBuildsOnlyWhilePoweredAndALandedUnitCorePowersATile()
+    public void AUnitFactoryBuildsOnlyWhilePoweredAndALandedCorePowersATile()
     {
         var sim = PoweredSim();
         var tile = Tile(sim, size: 40);
@@ -157,11 +157,11 @@ public class PowerTests
         var factory = tile.Grid.BuildingAt(10, 10)!;
         Assert.Equal(0, UnitFactory.BuildSpeed(sim, tile, factory));
 
-        // No core on the tile: a unit core touching the factory supplies its 10 (a landed scout on a claimed tile).
-        Place(sim, tile, "unit_core", 13, 10);
+        // A core touching the factory supplies its 20 (as a landed scout's would).
+        Place(sim, tile, "core", 13, 10);
         Run(sim, 2);
         Assert.Equal(100, UnitFactory.BuildSpeed(sim, tile, factory));
-        Assert.Equal(10, PowerNet.Networks(tile).Single().Supply);
+        Assert.Equal(20, PowerNet.Networks(tile).Single().Supply);
         Assert.True(PowerNet.IsPowered(tile, factory));
     }
 }

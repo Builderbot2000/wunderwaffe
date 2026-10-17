@@ -9,21 +9,11 @@ public class MovementTests
 {
     const int S = Unit.CellScale;
 
-    /// <summary>Thruster, unit core, thruster in a row on frame, plus <paramref name="extra"/> blocks to the right; lifted off.</summary>
+    /// <summary>The standard scout (<see cref="Harness.LayScout"/>) plus <paramref name="extra"/> blocks to the right; lifted off.</summary>
     static Unit Scout(Simulation sim, TileState tile, int x, int y, params string[] extra)
     {
-        int w = 3 + extra.Length;
-        for (int i = 0; i < w; i++)
-            sim.Enqueue(new PlaceFrameCommand(Me, tile.Id, x - 1 + i, y));
-        Place(sim, tile, "thruster", x - 1, y);
-        Place(sim, tile, "unit_core", x, y);
-        Place(sim, tile, "thruster", x + 1, y);
-        for (int i = 0; i < extra.Length; i++)
-            Place(sim, tile, extra[i], x + 2 + i, y);
-        sim.Step();
-        sim.Enqueue(new ActivateUnitCommand(Me, tile.Id, x, y));
-        sim.Step();
-        return sim.Units[^1];
+        LayUnit(sim, tile, x, y, Me, ["thruster", .. extra]);
+        return LiftOff(sim, tile, x, y);
     }
 
     static bool RunUntil(Simulation sim, Func<bool> done, int maxTicks)
@@ -45,12 +35,12 @@ public class MovementTests
     // --- locomotion classes (UD-004) ---
 
     [Theory]
-    [InlineData(new[] { "thruster", "unit_core" }, LocomotionResult.Ok, LocomotionClass.Ground)]
+    [InlineData(new[] { "thruster", "core" }, LocomotionResult.Ok, LocomotionClass.Ground)]
     [InlineData(new[] { "thruster", "wheels" }, LocomotionResult.Ok, LocomotionClass.Ground)]
     [InlineData(new[] { "thruster", "hull" }, LocomotionResult.Ok, LocomotionClass.Naval)]
     [InlineData(new[] { "thruster", "rotor", "hull", "wheels" }, LocomotionResult.Ok, LocomotionClass.Air)]
     [InlineData(new[] { "hull", "wheels" }, LocomotionResult.Conflicting, LocomotionClass.Naval)]
-    [InlineData(new[] { "unit_core", "drill" }, LocomotionResult.None, LocomotionClass.Ground)]
+    [InlineData(new[] { "core", "drill" }, LocomotionResult.None, LocomotionClass.Ground)]
     public void BlocksDecideTheLocomotionClass(string[] blocks, LocomotionResult result, LocomotionClass cls)
     {
         var defs = TestContent.Load().Buildings;
@@ -87,18 +77,12 @@ public class MovementTests
     {
         var sim = NewSim();
         var tile = Tile(sim);
-        for (int i = 0; i < 4; i++)
-            sim.Enqueue(new PlaceFrameCommand(Me, tile.Id, 4 + i, 5));
-        Place(sim, tile, "thruster", 4, 5);
-        Place(sim, tile, "unit_core", 5, 5);
-        Place(sim, tile, "hull", 6, 5);
-        Place(sim, tile, "wheels", 7, 5);
-        sim.Step();
+        LayUnit(sim, tile, 5, 5, Me, "hull", "wheels");
         Assert.Equal(AssembleResult.ConflictingLocomotion, UnitAssembly.CheckActivate(sim, tile, Me, 5, 5, out _));
 
         // Swapping the wheels for a rotor makes it an air unit.
-        sim.Enqueue(new RemoveBuildingCommand(Me, tile.Id, 7, 5));
-        Place(sim, tile, "rotor", 7, 5);
+        sim.Enqueue(new RemoveBuildingCommand(Me, tile.Id, 8, 5));
+        Place(sim, tile, "rotor", 8, 5);
         sim.Step();
         sim.Enqueue(new ActivateUnitCommand(Me, tile.Id, 5, 5));
         sim.Step();
@@ -165,7 +149,7 @@ public class MovementTests
         var (sim, land, deep) = WorldWithSea();
         var home = sim.Tiles[sim.StartTileId];
         foreach (var item in new[] { "copper_ore", "iron_ore", "copper_plate", "iron_plate", "steel" })
-            Fund(sim, home).Stock!.Add(item, 10_000);
+            Fund(sim, home, item, 10_000);
         var unit = Scout(sim, home, land.X - home.OriginX, land.Y - home.OriginY);
         var deepTile = sim.TileAtCell(deep.X, deep.Y)!;
         var plan = UnitNav.Plan(sim, unit, deepTile.Id, deep.X - deepTile.OriginX, deep.Y - deepTile.OriginY);
@@ -407,12 +391,7 @@ public class MovementTests
         sim.Enqueue(new CreateSquadCommand(Me, "Reserve", [first.Id]));
         sim.Step();
 
-        for (int i = 0; i < 3; i++)
-            sim.Enqueue(new PlaceFrameCommand(Me, tile.Id, 9 + i, 20));
-        Place(sim, tile, "thruster", 9, 20);
-        Place(sim, tile, "unit_core", 10, 20);
-        Place(sim, tile, "thruster", 11, 20);
-        sim.Step();
+        LayScout(sim, tile, 10, 20);
         Assert.Equal(RallyResult.NoSuchSquad, UnitSim.CheckRally(sim, Me, tile.Id, 10, 20, tile.Id, 30, 30, 9));
         Assert.Equal(RallyResult.NotOwner, UnitSim.CheckRally(sim, Them, tile.Id, 10, 20, -1, 0, 0, 0));
         sim.Enqueue(new SetRallyCommand(Me, tile.Id, 10, 20, tile.Id, 30, 30, 1));

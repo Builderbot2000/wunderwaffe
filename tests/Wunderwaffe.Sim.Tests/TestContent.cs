@@ -25,10 +25,7 @@ static class TestContent
                 b!["power"] = 0;
         }
         if (buildingsJson == null)
-        {
-            buildings.Add(JsonNode.Parse(UnitCore));
             buildings.Add(JsonNode.Parse(Bank));
-        }
         foreach (var json in extraBuildings)
             buildings.Add(JsonNode.Parse(json));
         return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), buildings.ToJsonString(), Read("goals.json"), Read("terrain.json"));
@@ -39,27 +36,20 @@ static class TestContent
         """{ "id": "test_factory", "name": "Test Factory", "menu": "production", "kind": "wall", "category": "factory", "width": 3, "height": 3, "power": 0, "hp": 100, "cost": {} }""";
 
     /// <summary>
-    /// A test-only 1x1 core variant (WM-016), always added: unit mechanics tests lay designs a cell high on it, as with
-    /// the old unit core. The real variants (2x2 <c>core</c> and up) are what generated starts and the AI use.
-    /// </summary>
-    /// <summary>
     /// A test-only 1x1 core with no power and room for anything: the funds of hand-built test tiles
     /// (<see cref="Harness.Bank"/>), kept out of power networks and layouts.
     /// </summary>
     public const string Bank =
         """{ "id": "bank", "name": "Bank", "menu": "logistics", "kind": "core", "width": 1, "height": 1, "power": 0, "capacity": 1000000000, "hp": 1000, "cost": { "copper_ore": 1 } }""";
 
-    public const string UnitCore =
-        """{ "id": "unit_core", "name": "Unit Core", "menu": "units", "kind": "core", "width": 1, "height": 1, "power": 0, "powerSupply": 10, "capacity": 1000, "hp": 300, "cost": { "copper_plate": 10, "steel": 5 } }""";
-
     /// <summary>
-    /// The real content plus the test cores, with buildings.json edited by <paramref name="editBuildings"/>, which must
+    /// The real content plus the test bank core, with buildings.json edited by <paramref name="editBuildings"/>, which must
     /// change it; without power draws if not <paramref name="power"/>.
     /// </summary>
     public static ContentDb Load(Func<string, string> editBuildings, bool power = true)
     {
         string real = Read("buildings.json").TrimEnd();
-        string buildings = real[..^1].TrimEnd() + ",\n" + UnitCore + ",\n" + Bank + "\n]";
+        string buildings = real[..^1].TrimEnd() + ",\n" + Bank + "\n]";
         string edited = editBuildings(buildings);
         if (edited == buildings)
             throw new InvalidOperationException("the edit changed nothing; buildings.json has moved on");
