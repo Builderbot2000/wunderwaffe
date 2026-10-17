@@ -9,8 +9,8 @@ public sealed partial class GameQuery
     public Blueprint? BlueprintFromArea(int tileId, int x, int y, int width, int height) =>
         Sim.TryGetTile(tileId) is { } t ? Blueprints.FromArea(t, x, y, width, height) : null;
 
-    /// <summary>Records the unit design around a unit core, or null if it wouldn't lift off.</summary>
-    public Blueprint? BlueprintFromUnitCore(int tileId, int x, int y) =>
+    /// <summary>Records the unit design around a core on a frame, or null if it wouldn't lift off.</summary>
+    public Blueprint? BlueprintFromCore(int tileId, int x, int y) =>
         Sim.TryGetTile(tileId) is { } t ? Blueprints.FromUnitCore(Sim, t, Player, x, y, out _) : null;
 
     /// <summary>Records one of the units in play as a blueprint.</summary>

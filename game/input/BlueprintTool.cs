@@ -69,8 +69,13 @@ public partial class BlueprintTool : Node2D
     public override void _Ready()
     {
         _host = SimHost.Instance;
+        // The active mode survives zooming out and back (WM-007); only opening another tile drops it.
+        int tile = -1;
         _host.ShowOnlyIn(this, ViewMode.Tile, () =>
         {
+            if (_host.View != ViewMode.Tile || _host.ViewedTile.Id == tile)
+                return;
+            tile = _host.ViewedTile.Id;
             Cancel();
             _factoryTile = -1;
         });

@@ -10,6 +10,10 @@ namespace Wunderwaffe.Game.Render;
 /// as a flat <see cref="Palette"/> colour. Rebuilds only when the grid's revision changes.
 /// The ground is the tile's terrain, one colour per cell. The tile's bounding box also shows the land of the tiles
 /// around it, dimmed, with the border drawn over it and each I/O zone outlined in its own colour.
+/// <para>
+/// Near the zoom threshold (WM-007) it fades over the world map at <see cref="SimHost.TileOpacity"/>; on the world map
+/// side it shows <see cref="SimHost.FadeTile"/>, scaled into the world map's canvas so both pictures line up.
+/// </para>
 /// </summary>
 public partial class TileView : Node2D
 {
@@ -44,7 +48,6 @@ public partial class TileView : Node2D
     public override void _Ready()
     {
         _host = SimHost.Instance;
-        _host.ShowOnlyIn(this, ViewMode.Tile);
         _terrain = new Sprite2D
         {
             Name = "Terrain",
@@ -69,7 +72,16 @@ public partial class TileView : Node2D
 
     public override void _Process(double delta)
     {
-        var tile = _host.ViewedTile;
+        bool onTile = _host.View == ViewMode.Tile;
+        var shown = onTile ? _host.ViewedTile : _host.FadeTile;
+        Visible = shown != null && _host.TileOpacity > 0;
+        if (shown is not { } tile || !Visible)
+            return;
+        Modulate = Colors.White with { A = _host.TileOpacity };
+        // The tile layer's canvas is the tile's local cells; on the world map, map that into world-map pixels.
+        const float toMap = WorldMapView.CellPx / Palette.CellPx;
+        Scale = onTile ? Vector2.One : Vector2.One * toMap;
+        Position = onTile ? Vector2.Zero : new Vector2(tile.OriginX, tile.OriginY) * WorldMapView.CellPx;
         TileGrid grid = tile.Grid;
         // Grids of different tiles can share a revision number, so the tile id is part of "what's drawn".
         if (grid.Revision != _drawnRevision || tile.Id != _drawnTileId)
