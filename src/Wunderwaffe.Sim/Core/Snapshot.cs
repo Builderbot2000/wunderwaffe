@@ -64,7 +64,7 @@ public sealed record ClaimSnap(int Player, int Ticks);
 
 public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingId, int NextWreckId,
     List<int> Frames, List<int> Platforms, List<BuildingSnap> Buildings, List<Wreck> Wrecks, List<ClaimSnap> Claims, StatsSnap Stats,
-    bool Full, List<AccSnap> Rates)
+    bool Full, List<AccSnap> Rates, List<int> Cables)
 {
     internal static TileSnap Of(Simulation sim, TileState t)
     {
@@ -78,12 +78,18 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
             if (g.HasPlatform(i % g.Width, i / g.Width))
                 platforms.Add(i);
         }
+        var cables = new List<int>();
+        for (int i = 0; g.CableCount > 0 && i < g.Width * g.Height; i++)
+        {
+            if (g.HasCable(i % g.Width, i / g.Width))
+                cables.Add(i);
+        }
         var rs = sim.RateState(t.Id);
         var acc = rs.Acc.Select((a, i) => (a, i)).Where(e => e.a != 0)
             .Select(e => new AccSnap(rs.AccKeys[e.i].Kind, rs.AccKeys[e.i].PortId, rs.AccKeys[e.i].Item, e.a)).ToList();
         return new TileSnap(t.Id, t.Owner, g.Revision, g.NextBuildingId, g.NextWreckId, frames, platforms,
             g.Buildings.Select(BuildingSnap.Of).ToList(), [.. g.Wrecks],
-            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc);
+            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc, cables);
     }
 
     internal void Restore(Simulation sim, TileState t)
@@ -100,6 +106,8 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
             g.SetFrame(i % g.Width, i / g.Width, true);
         foreach (int i in Platforms)
             g.SetPlatform(i % g.Width, i / g.Width, true);
+        foreach (int i in Cables)
+            g.SetCable(i % g.Width, i / g.Width, true);
         foreach (var b in Buildings)
             b.Restore(sim.Content, g);
         foreach (var w in Wrecks)

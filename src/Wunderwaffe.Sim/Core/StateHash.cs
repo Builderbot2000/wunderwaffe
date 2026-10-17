@@ -126,6 +126,15 @@ internal sealed class StateHash
             Mix(partner);
             Mix(n);
         }
+        Mix(g.CableCount);
+        for (int y = 0; g.CableCount > 0 && y < g.Height; y++)
+        {
+            for (int x = 0; x < g.Width; x++)
+            {
+                if (g.HasCable(x, y))
+                    Mix(y * g.Width + x);
+            }
+        }
     }
 
     void MixEntity(PlacedBuilding b)

@@ -27,7 +27,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [FB-017](#fb-017-buildings-on-water) | Buildings on water | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-011 | New |  |
 | [FB-018](#fb-018-resource-radius) | Resource radius | Should | Done | Yes | Alpha | Functional | P3 | FB-007, CB-004 | New |  |
 | [FB-019](#fb-019-build-funds-from-cores) | Build funds from cores | Must | Done | Yes | MVP | Functional | P2 | WM-016, FB-007 | Review |  |
-| [FB-020](#fb-020-power-layer-nodes-and-cross-tile-power) | Power layer, nodes and cross-tile power | Must | Approved | No | MVP | Functional | P3 | FB-005, IO-002 | New |  |
+| [FB-020](#fb-020-power-layer-nodes-and-cross-tile-power) | Power layer, nodes and cross-tile power | Must | Done | Yes | MVP | Functional | P3 | FB-005, IO-002 | New |  |
 | [FB-021](#fb-021-prefab-blueprints) | Prefab blueprints | Must | Approved | No | MVP | Functional | P2 | FB-009, WM-005 | New |  |
 
 ### FB-001 Tile local map
@@ -74,7 +74,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Acceptance criteria:** A new player can run their first drills, smelters and a fuel line on core power alone; generators turn fuel into power; buildings stop or slow when their network falls short; UI shows each network's balance; the power value in buildings.json is the draw.
 
-**As built:** World/PowerNet.cs: cores (20) and landed unit cores (10) supply power; wire joins what it touches into networks; the fuel generator burns fuel from the fuel press; batteries store surplus; a short network slows every consumer by the same share; the top bar shows each network's balance. 'power' in buildings.json is the draw.
+**As built:** World/PowerNet.cs: cores (20) and landed unit cores (10) supply power; cables (a layer under buildings, FB-020) join what they touch into networks; the fuel generator burns fuel from the fuel press; batteries store surplus; a short network slows every consumer by the same share; the top bar shows each network's balance. 'power' in buildings.json is the draw.
 
 **Notes:** Was: 'Pipes for fluids and a power network (generators, nodes, batteries)'. See OQ-21. OQ-21 decided 2026-10-10. Fluids split to FB-015. Power nodes, a separate cable layer and power over port links: FB-020 (OQ-42). Units carry their own power (UD-002). Core power and fuel generators decided 2026-10-10. Content needed (A silo): a fuel item and recipe, a fuel generator, and a battery block usable on tiles and on units (UD-003).
 
@@ -222,9 +222,11 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Acceptance criteria:** A cable can be laid under a building or belt, and a building placed over a cable, without either blocking the other; cables still join what they touch. A node shows its radius while placed and joins every generator, battery and node inside it into its network; removing it splits the network again. With a linked port pair, a generator on one tile powers consumers on the other, and both tiles' power panels show the shared network. Rate mode uses the joined network's satisfaction.
 
-**As built:** Not built: wire is an ordinary building that takes its cell, there is no power node, and networks never leave their tile.
+**As built:** World/PowerNet.cs, cable layer in World/TileGrid.cs (HasCable/SetCable, hashed, in snapshots). The 'wire' building (named Cable) is laid on the cable layer: it only clashes with another cable, buildings and belts stand on it, and it joins every power building on or edge-beside its run; removing on a cell takes the building first, then the cable, then a platform. Power Node (power_node, powerRadius 8): joins every generator (anything with powerSupply), battery and node whose footprint is within its radius (straight-line between nearest cells), not consumers; removing it splits the network again; the build tool shades its radius and lines to what it would join. A linked port pair (export port in the partner's zone, import port on the partner in this tile's zone, whoever owns them) joins the parts the two ports touch, with no carry limit: networks are world-wide objects (PowerWorld), each tile's power panel lists those with members on it and names the tiles it is shared with. A shared network balances once per tick, when its first full-sim tile steps. Rate mode (RateModel.Rebalance) sums supply and demand over every port-linked tile's graph on the network. Tested (PowerLayerTests).
 
-**Notes:** Owner, 2026-10-17 (OQ-42). Not decided: whether a node also joins consumers in its radius (in Mindustry it does, by laser link), and whether a port link limits how much power it carries.
+**Decisions:** A node joins only generators, batteries and nodes by radius; consumers join by touching or cable. A port link carries any amount of power and works whoever owns the two tiles (OQ-45). Ports conduct: they join what they touch or a cable beside them.
+
+**Notes:** Owner, 2026-10-17 (OQ-42). Built 2026-10-17 (silo B): nodes do not join consumers and port links have no carry limit; revisit either if playtests ask.
 
 ### FB-021 Prefab blueprints
 

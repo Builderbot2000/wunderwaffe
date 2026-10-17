@@ -109,7 +109,8 @@ public class DemoLoopTests(ITestOutputHelper output)
         for (int x = 62; x <= 91; x++)
             Place(home, "conveyor", x, 48, West);
         sim.Step();
-        Assert.Equal(5 + wires.Count, coal.Grid.BuildingCount);
+        Assert.Equal(5, coal.Grid.BuildingCount);
+        Assert.Equal(wires.Count, coal.Grid.CableCount);
         Assert.Same(coal.Grid.Power.NetworkOf(landed), coal.Grid.Power.NetworkOf(coal.Grid.BuildingAt(1, 46)!));
 
         // Goal 6: the steel mill, once affordable; it needs plates from its own smelter and coal from the port. It

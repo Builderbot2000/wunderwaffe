@@ -5,10 +5,13 @@ namespace Wunderwaffe.Sim.Api;
 /// <summary>Factory queries (silo B): power networks, boosters, sorter filters and production statistics.</summary>
 public sealed partial class GameQuery
 {
-    /// <summary>A tile's power networks with this tick's balance (FB-005), in id order.</summary>
+    /// <summary>
+    /// Networks with members on a tile, with this tick's balance (FB-005), in id order. Members are those on this tile;
+    /// a network joined across tiles by port links (FB-020) lists every tile it spans in <see cref="PowerView.Tiles"/>.
+    /// </summary>
     public IReadOnlyList<PowerView> PowerNetworks(int tileId) =>
         Sim.TryGetTile(tileId) is { } t
-            ? PowerNet.Networks(t).Select(n => new PowerView(n.Id, n.Members.Select(m => m.Id).ToList(), n.Supply, n.Demand, n.Stored, n.Capacity, n.Satisfaction)).ToList()
+            ? PowerNet.Networks(t).Select(n => new PowerView(n.Id, n.MembersOn(t.Id).Select(m => m.Id).ToList(), n.Supply, n.Demand, n.Stored, n.Capacity, n.Satisfaction, [.. n.TileIds])).ToList()
             : [];
 
     /// <summary>Permille of its demand a building gets: 1000 if it draws nothing, 0 if it is on no network.</summary>

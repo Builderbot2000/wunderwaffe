@@ -242,6 +242,8 @@ public sealed class ContentDb
         if (b.Kind is BuildingKind.Wire or BuildingKind.Junction or BuildingKind.Router or BuildingKind.Sorter or BuildingKind.Bridge
             && (b.Width != 1 || b.Height != 1))
             Error($"a {b.Kind} must be 1x1");
+        if ((b.Kind == BuildingKind.PowerNode) != (b.PowerRadius > 0))
+            Error("power nodes, and only power nodes, have a powerRadius > 0");
 
         if ((b.Kind == BuildingKind.Booster) != (b.Booster != null))
             Error("boosters, and only boosters, have a 'booster' section");

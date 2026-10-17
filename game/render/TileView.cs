@@ -35,6 +35,7 @@ public partial class TileView : Node2D
     MultiMeshInstance2D _deposits = null!;
     MultiMeshInstance2D _frames = null!;
     MultiMeshInstance2D _platforms = null!;
+    MultiMeshInstance2D _cables = null!;
     MultiMeshInstance2D _buildings = null!;
     Node2D _depositIcons = null!;
     Node2D _buildingSprites = null!;
@@ -62,6 +63,7 @@ public partial class TileView : Node2D
         _depositIcons = AddGroup("DepositIcons");
         _platforms = AddLayer(this, "Platforms", Sprites.Get(Sprites.Platform));
         _frames = AddLayer(this, "Frames", Sprites.Get(Sprites.Frame));
+        _cables = AddLayer(this, "Cables", null);
         _buildings = AddLayer(this, "Buildings", null);
         _buildingSprites = AddGroup("BuildingSprites");
         _items = AddLayer(this, "Items", null);
@@ -97,6 +99,7 @@ public partial class TileView : Node2D
             DrawDeposits(grid);
             DrawPlatforms(grid);
             DrawFrames(grid);
+            DrawCables(grid);
             DrawBuildings(grid);
         }
         DrawItems(grid);
@@ -352,6 +355,35 @@ public partial class TileView : Node2D
         {
             mm.SetInstanceTransform2D(i, Rect(cells[i].X, cells[i].Y, 1, 1, sprite ? 0 : 0.06f, 0));
             mm.SetInstanceColor(i, sprite ? Colors.White : Palette.Frame);
+        }
+    }
+
+    /// <summary>Power cables (FB-020): a dot per cell and a bar to each cable east or south of it, under the buildings.</summary>
+    void DrawCables(TileGrid grid)
+    {
+        const float Thick = 0.22f;
+        float px = Palette.CellPx;
+        var quads = new List<Transform2D>();
+        for (int y = 0; grid.CableCount > 0 && y < grid.Height; y++)
+        {
+            for (int x = 0; x < grid.Width; x++)
+            {
+                if (!grid.HasCable(x, y))
+                    continue;
+                var centre = new Vector2(x + 0.5f, y + 0.5f) * px;
+                quads.Add(new Transform2D(0, new Vector2(Thick * 1.6f * px, -Thick * 1.6f * px), 0, centre));
+                if (grid.HasCable(x + 1, y))
+                    quads.Add(new Transform2D(0, new Vector2(px, -Thick * px), 0, centre + new Vector2(px / 2, 0)));
+                if (grid.HasCable(x, y + 1))
+                    quads.Add(new Transform2D(0, new Vector2(Thick * px, -px), 0, centre + new Vector2(0, px / 2)));
+            }
+        }
+        var mm = _cables.Multimesh;
+        mm.InstanceCount = quads.Count;
+        for (int i = 0; i < quads.Count; i++)
+        {
+            mm.SetInstanceTransform2D(i, quads[i]);
+            mm.SetInstanceColor(i, Palette.Cable);
         }
     }
 
