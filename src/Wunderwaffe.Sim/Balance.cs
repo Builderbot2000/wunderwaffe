@@ -23,9 +23,6 @@ public static class Balance
     /// <summary>A start should have a regional deposit within this many tile steps (OQ-22).</summary>
     public const int RegionalHops = 2;
 
-    /// <summary>What a unit frame cell costs, paid from the tile inventory and refunded on removal.</summary>
-    public static readonly IReadOnlyDictionary<string, int> FrameCost = Items(("iron_ore", 2));
-
     /// <summary>Share of a building's cost returned on removal (FB-002).</summary>
     public const int RefundPercent = 100;
 
@@ -50,7 +47,4 @@ public static class Balance
 
     /// <summary>Ticks between upkeep payments; upkeep is declared per minute (UD-013).</summary>
     public const int UpkeepPeriod = 60 * Simulation.TicksPerSecond;
-
-    static IReadOnlyDictionary<string, int> Items(params (string Id, int N)[] items) =>
-        new SortedDictionary<string, int>(items.ToDictionary(i => i.Id, i => i.N), StringComparer.Ordinal);
 }

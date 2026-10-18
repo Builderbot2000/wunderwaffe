@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 
@@ -63,13 +64,13 @@ public class SimulationTests
             var home = sim.Tiles[sim.StartTileIds[p]];
             Assert.Equal(p, home.Owner);
             var core = Assert.Single(home.Grid.Cores);
-            Assert.Equal((Simulation.CoreBuildingId, p), (core.DefId, core.Owner));
+            Assert.Equal(("core", p), (core.DefId, core.Owner));
             Assert.True(home.InCircle(core.X, core.Y, core.Width, core.Height));
             Assert.Equal(StartItems(sim).OrderBy(kv => kv.Key).Select(kv => (kv.Key, (long)kv.Value)),
                 core.Stock!.Entries.Where(kv => kv.Value > 0).Select(kv => (kv.Key, kv.Value)));
             Assert.Equal(2, home.Grid.Buildings.Count(b => b.DefId == "thruster" && b.Owner == p));
             Assert.Equal(3, home.Grid.BuildingCount);
-            Assert.True(home.Grid.HasFrame(core.X, core.Y));
+            Assert.True(home.Grid.Has(BuildingKind.Frame, core.X, core.Y));
             Assert.Equal(AssembleResult.Ok, UnitAssembly.CheckActivate(sim, home, p, core.X, core.Y, out _));
         }
     }

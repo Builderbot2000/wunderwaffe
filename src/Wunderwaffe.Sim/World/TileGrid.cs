@@ -63,14 +63,14 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
 }
 
 /// <summary>
-/// A tile's local map (FB-001): which building occupies each cell and which deposit lies under it. It covers the
+/// A tile's local map (FB-001): which building occupies each cell, and what each cell layer (FB-022: deposits,
+/// platforms, frame, cables, from layers.json) holds there. It covers the
 /// tile's bounding box in the world map; cells of the box that belong to other tiles are outside the tile
 /// (<see cref="InBounds(int, int)"/> is false) and are kept only to draw the land around it.
 /// </summary>
 public sealed class TileGrid
 {
     readonly int[] _cells;
-    readonly string?[] _deposits;
     readonly bool[] _mask;
     readonly bool[] _buildable;
     readonly byte[] _terrain;
@@ -91,21 +91,18 @@ public sealed class TileGrid
     readonly List<PlacedBuilding> _storages = [];
     readonly List<PlacedBuilding> _relays = [];
     readonly List<PlacedBuilding> _cores = [];
-    readonly bool[] _frames;
-    readonly bool[] _platforms;
-    readonly bool[] _cables;
 
-    /// <summary>A rectangular tile of buildable ground with no port zones.</summary>
-    public TileGrid(int width, int height)
-        : this(width, height, Filled(width * height, true), Filled(width * height, true), new byte[width * height])
-    {
-    }
+    // Cell layers (FB-022): per layer, the entry each cell holds (0 = empty), and how many cells hold each entry.
+    readonly byte[][] _layers;
+    readonly int[][] _layerCounts;
 
     /// <param name="mask">Which cells of the box are part of the tile.</param>
     /// <param name="buildable">Which cells of the tile have ground buildings may stand on.</param>
     /// <param name="terrain">Terrain index of every cell of the box, inside the tile or not.</param>
-    internal TileGrid(int width, int height, bool[] mask, bool[] buildable, byte[] terrain)
+    /// <param name="layers">The content's cell layers.</param>
+    internal TileGrid(int width, int height, bool[] mask, bool[] buildable, byte[] terrain, LayerSet layers)
     {
+        Layers = layers;
         _mask = mask;
         _buildable = buildable;
         _terrain = terrain;
@@ -121,15 +118,19 @@ public sealed class TileGrid
         Width = width;
         Height = height;
         _cells = new int[width * height];
-        _deposits = new string?[width * height];
-        _frames = new bool[width * height];
-        _platforms = new bool[width * height];
-        _cables = new bool[width * height];
+        _layers = new byte[layers.Count][];
+        _layerCounts = new int[layers.Count][];
+        for (int l = 0; l < layers.Count; l++)
+        {
+            _layers[l] = new byte[width * height];
+            _layerCounts[l] = new int[layers[l].Ids.Count];
+            _layerCounts[l][0] = width * height;
+        }
         Power = new TilePower(this);
     }
 
     /// <summary>A copy of the ground alone (shape, buildability, terrain), with nothing on it: for trying out deposits.</summary>
-    internal TileGrid Blank() => new(Width, Height, _mask, _buildable, _terrain);
+    internal TileGrid Blank() => new(Width, Height, _mask, _buildable, _terrain, Layers);
 
     static T[] Filled<T>(int n, T value)
     {
@@ -177,9 +178,6 @@ public sealed class TileGrid
     /// <summary>Unit factories (UD-006), in id order.</summary>
     public IReadOnlyList<PlacedBuilding> Factories => _factories;
 
-    /// <summary>Cells carrying a unit frame (the floor a unit is built on).</summary>
-    public int FrameCount { get; private set; }
-
     /// <summary>Increments on every change so views know when to redraw.</summary>
     public int Revision { get; private set; }
 
@@ -201,8 +199,23 @@ public sealed class TileGrid
     /// <summary>A cell of this tile.</summary>
     public bool InBounds(int x, int y) => InRect(x, y) && _mask[y * Width + x];
 
-    /// <summary>A cell of this tile whose terrain, or platform (FB-017), takes buildings (FB-002).</summary>
-    public bool Buildable(int x, int y) => InBounds(x, y) && (_buildable[y * Width + x] || _platforms[y * Width + x]);
+    /// <summary>A cell of this tile whose terrain, or a floor layer on it (platforms, FB-017), takes buildings (FB-002).</summary>
+    public bool Buildable(int x, int y) => InBounds(x, y) && Ground(y * Width + x, -1);
+
+    /// <summary>Like <see cref="Buildable(int, int)"/> as if layer <paramref name="without"/> were empty there: what removing it would leave.</summary>
+    public bool BuildableWithout(int x, int y, int without) => InBounds(x, y) && Ground(y * Width + x, without);
+
+    bool Ground(int i, int without)
+    {
+        if (_buildable[i])
+            return true;
+        foreach (int l in Layers.Floors)
+        {
+            if (l != without && _layers[l][i] != 0)
+                return true;
+        }
+        return false;
+    }
 
     /// <summary>Terrain index (into <c>ContentDb.TerrainList</c>) of any cell of the box, or 0 outside it.</summary>
     public int TerrainAt(int x, int y) => InRect(x, y) ? _terrain[y * Width + x] : 0;
@@ -218,62 +231,75 @@ public sealed class TileGrid
         Revision++;
     }
 
-    // Frames and buildings only ever go on cells of the tile, so the cheaper box check is enough here.
-    public bool HasFrame(int x, int y) => InRect(x, y) && _frames[y * Width + x];
+    // ---- Cell layers (FB-022). Every layer is stored, counted and cleared the same way; behaviour code finds its
+    // layer by building kind (Layers.Of) and reads it through these. Layered cells are always cells of the tile, so
+    // the cheaper box check is enough here.
 
-    internal void SetFrame(int x, int y, bool on)
+    /// <summary>The content's layers, in stacking order.</summary>
+    public LayerSet Layers { get; }
+
+    /// <summary>The entry of <paramref name="layer"/> at a cell (0 = empty, also outside the box or for layer -1).</summary>
+    public int EntryAt(int layer, int x, int y) => (uint)layer < (uint)_layers.Length && InRect(x, y) ? _layers[layer][y * Width + x] : 0;
+
+    public bool Has(int layer, int x, int y) => EntryAt(layer, x, y) != 0;
+
+    /// <summary>Whether the layer buildings of <paramref name="kind"/> live on holds anything at a cell (frame, cable, platform).</summary>
+    public bool Has(BuildingKind kind, int x, int y) => Has(Layers.Of(kind), x, y);
+
+    /// <summary>The building laid at a cell of a building layer, or null.</summary>
+    public BuildingDef? LaidAt(int layer, int x, int y) => EntryAt(layer, x, y) is > 0 and var e ? Layers[layer].Buildings[e] : null;
+
+    /// <summary>Cells of <paramref name="layer"/> holding anything (0 for layer -1).</summary>
+    public int CountOn(int layer) => (uint)layer < (uint)_layers.Length ? _layers[layer].Length - _layerCounts[layer][0] : 0;
+
+    /// <summary>Cells of <paramref name="layer"/> holding <paramref name="entry"/>.</summary>
+    public int CountOn(int layer, int entry) => _layerCounts[layer][entry];
+
+    /// <inheritdoc cref="CountOn(int)"/>
+    public int CountOn(BuildingKind kind) => CountOn(Layers.Of(kind));
+
+    /// <summary>Puts <paramref name="entry"/> (0 clears) on a cell of a layer.</summary>
+    internal void SetEntry(int layer, int x, int y, int entry)
     {
-        if (_frames[y * Width + x] == on)
+        int i = y * Width + x;
+        int old = _layers[layer][i];
+        if (old == entry)
             return;
-        _frames[y * Width + x] = on;
-        FrameCount += on ? 1 : -1;
+        _layers[layer][i] = (byte)entry;
+        _layerCounts[layer][old]--;
+        _layerCounts[layer][entry]++;
         Revision++;
     }
 
-    /// <summary>Cells carrying a floating platform (FB-017), which makes water buildable.</summary>
-    public int PlatformCount { get; private set; }
-
-    public bool HasPlatform(int x, int y) => InRect(x, y) && _platforms[y * Width + x];
-
-    internal void SetPlatform(int x, int y, bool on)
+    /// <summary>Lays a layer building (frame, cable, platform) on a cell.</summary>
+    internal void Lay(BuildingDef def, int x, int y)
     {
-        if (_platforms[y * Width + x] == on)
-            return;
-        _platforms[y * Width + x] = on;
-        PlatformCount += on ? 1 : -1;
-        Revision++;
+        var (layer, entry) = Layers.Of(def);
+        SetEntry(layer, x, y, entry);
     }
 
-    /// <summary>Cells carrying a power cable (FB-020), a layer under buildings.</summary>
-    public int CableCount { get; private set; }
+    /// <summary>Empties a cell of the layer buildings of <paramref name="kind"/> live on.</summary>
+    internal void Clear(BuildingKind kind, int x, int y) => SetEntry(Layers.Of(kind), x, y, 0);
 
-    public bool HasCable(int x, int y) => InRect(x, y) && _cables[y * Width + x];
+    /// <summary>The raw cells of a layer, row by row, for hashing and snapshots.</summary>
+    internal ReadOnlySpan<byte> LayerCells(int layer) => _layers[layer];
 
-    internal void SetCable(int x, int y, bool on)
-    {
-        if (_cables[y * Width + x] == on)
-            return;
-        _cables[y * Width + x] = on;
-        CableCount += on ? 1 : -1;
-        Revision++;
-    }
+    // Deposits are the layer whose entries are items (RS-004 will point its cells at patches).
 
-    public string? DepositAt(int x, int y) => _deposits[y * Width + x];
+    public string? DepositAt(int x, int y) => EntryAt(Layers.Deposit, x, y) is > 0 and var e ? Layers[Layers.Deposit].Ids[e] : null;
 
-    public void SetDeposit(int x, int y, string? itemId)
-    {
-        _deposits[y * Width + x] = itemId;
-        Revision++;
-    }
+    public void SetDeposit(int x, int y, string? itemId) =>
+        SetEntry(Layers.Deposit, x, y, itemId == null ? 0 : Layers[Layers.Deposit].EntryOf(itemId));
 
     /// <summary>Cells per deposit item, for showing what a tile holds (WM-002).</summary>
     public SortedDictionary<string, int> DepositCounts()
     {
         var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
-        foreach (var item in _deposits)
+        var layer = Layers[Layers.Deposit];
+        for (int e = 1; e < layer.Ids.Count; e++)
         {
-            if (item != null)
-                counts[item] = counts.GetValueOrDefault(item) + 1;
+            if (_layerCounts[layer.Index][e] > 0)
+                counts[layer.Ids[e]] = _layerCounts[layer.Index][e];
         }
         return counts;
     }
@@ -330,7 +356,7 @@ public sealed class TileGrid
         {
             for (int cx = x; cx < x + w; cx++)
             {
-                if (!_buildable[cy * Width + cx] && !_platforms[cy * Width + cx])
+                if (!Ground(cy * Width + cx, -1))
                     return false;
             }
         }
@@ -399,14 +425,17 @@ public sealed class TileGrid
     // ---- Snapshots (NF-008): put a grid's changing state back exactly, building ids and revision included. ----
 
     /// <summary>
-    /// Removes every building, frame, platform, cable and wreck and forgets their ids, so a snapshot can add its own back.
+    /// Removes every building, wreck and layer entry (deposits too) and forgets their ids, so a snapshot can add its own back.
     /// </summary>
     internal void ClearForRestore()
     {
         Array.Clear(_cells);
-        Array.Clear(_frames);
-        Array.Clear(_platforms);
-        Array.Clear(_cables);
+        for (int l = 0; l < _layers.Length; l++)
+        {
+            Array.Clear(_layers[l]);
+            Array.Clear(_layerCounts[l]);
+            _layerCounts[l][0] = _layers[l].Length;
+        }
         _buildings.Clear();
         _buildings.Add(null);
         foreach (var list in new[] { _belts, _machines, _exportPorts, _importPorts, _combat, _suppliers, _factories, _storages, _relays, _cores })
@@ -416,9 +445,6 @@ public sealed class TileGrid
         _wreckCells = null;
         WreckCount = 0;
         BuildingCount = 0;
-        FrameCount = 0;
-        PlatformCount = 0;
-        CableCount = 0;
         Power.Dirty = true;
     }
 

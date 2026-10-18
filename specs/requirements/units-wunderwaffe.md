@@ -180,7 +180,7 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 
 **Acceptance criteria:** Frame costs 2 iron ore a cell, refunded on removal; G over a core on frame lifts off up to 64 connected cells; the core's stock and the items held by lifted buildings go with the unit as its core's cargo.
 
-**As built:** UnitAssembly.cs. Frame costs 2 iron ore a cell (Balance.FrameCost), refunded on removal; G over a core on frame flood-fills up to 64 cells (MaxCells) and lifts the group off (Launch), its core's stock and the lifted buildings' items becoming Unit.Cargo; Deploy puts the whole cargo back into the landed core. Tested (UnitTests).
+**As built:** UnitAssembly.cs. Frame is the 'frame' entry of buildings.json (kind frame, on the frame layer, FB-022): 2 iron ore a cell, refunded on removal, laid like any building or with place_frame; G over a core on frame flood-fills up to 64 cells (MaxCells) and lifts the group off (Launch), its core's stock and the lifted buildings' items becoming Unit.Cargo; Deploy puts the whole cargo back into the landed core. Tested (UnitTests).
 
 **Notes:** Added from what was built. Was: 'triggering a unit core' / 'items held by lifted buildings return to the tile inventory'. Unit core merged into the core after playtesting 2026-10-17 (WM-016). Owner, 2026-10-18: frame cost moves from Balance.FrameCost into a frame entry in buildings.json, so content sets it (NF-003).
 

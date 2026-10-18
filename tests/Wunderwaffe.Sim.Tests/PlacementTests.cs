@@ -111,7 +111,7 @@ public class PlacementTests
     {
         var sim = new Simulation(TestContent.Load());
         var tile = sim.AddStartingTile(0, 0, Player, seed: 1);
-        var core = tile.Grid.Buildings.Single(b => b.DefId == Simulation.CoreBuildingId);
+        var core = tile.Grid.Buildings.Single(b => b.DefId == "core");
         int count = tile.Grid.BuildingCount;
         sim.Enqueue(new RemoveBuildingCommand(Player, 0, core.X, core.Y));
         sim.Step();

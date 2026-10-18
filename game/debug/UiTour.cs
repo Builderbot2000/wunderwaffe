@@ -358,7 +358,11 @@ public partial class UiTour : Node
         _host.Send(new PlaceBuildingCommand(me, tile.Id, "smelter", _smelter.X, _smelter.Y, RecipeId: "smelt_iron"));
         for (int x = open.X; x < open.X + 7; x++)
             _host.Send(new PlaceBuildingCommand(me, tile.Id, "conveyor", x, open.Y + 4, 0));
-        Log($"placed a drill at {spots[0]}, a smelter and a belt");
+        // A short cable run (FB-020) under the scout, which the tile shots frame, so the cable layer shows in them.
+        var scout = tile.Grid.Cores[0];
+        for (int x = scout.X - 2; x < scout.X + 4; x++)
+            _host.Send(new PlaceBuildingCommand(me, tile.Id, "wire", x, scout.Y + 3));
+        Log($"placed a drill at {spots[0]}, a smelter, a belt and a cable");
 
         var tool = GetTree().Root.FindChild("BuildTool", true, false) as BuildTool ?? throw new InvalidOperationException("no BuildTool");
         tool.Select(0);

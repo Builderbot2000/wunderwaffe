@@ -65,7 +65,7 @@ public partial class UnitView : Node2D
         var outline = Palette.Owner(u.Owner);
         var body = new Transform2D(u.Angle * Mathf.Tau / Trig.Turn, pos);
         DrawSetTransformMatrix(body);
-        var frameTex = Sprites.Get(Sprites.Frame);
+        var frameTex = Sprites.Get(_host.Sim.Content.Frame!.Id);
         for (int i = 0; i < u.Cells.Count; i++)
         {
             var c = u.Cells[i];

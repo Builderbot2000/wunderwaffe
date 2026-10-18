@@ -16,7 +16,7 @@ static class TestContent
     /// </summary>
     public static ContentDb Unpowered(params string[] extraBuildings) => Build(power: false, extraBuildings);
 
-    static ContentDb Build(bool power, string[] extraBuildings, string? buildingsJson = null)
+    static ContentDb Build(bool power, string[] extraBuildings, string? buildingsJson = null, string? layersJson = null)
     {
         var buildings = JsonNode.Parse(buildingsJson ?? Read("buildings.json"), documentOptions: new() { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })!.AsArray();
         if (!power)
@@ -28,13 +28,14 @@ static class TestContent
             buildings.Add(JsonNode.Parse(Bank));
         foreach (var json in extraBuildings)
             buildings.Add(JsonNode.Parse(json));
-        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), buildings.ToJsonString(), Read("goals.json"), Read("terrain.json"), Prefabs());
+        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), buildings.ToJsonString(), Read("goals.json"), Read("terrain.json"),
+            layersJson ?? Read("layers.json"), Prefabs());
     }
 
     /// <summary>The real content as shipped (no test bank) with <paramref name="extra"/> prefab JSON objects added.</summary>
     public static ContentDb WithPrefabs(params string[] extra) =>
         ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"),
-            [.. Prefabs(), .. extra]);
+            Read("layers.json"), [.. Prefabs(), .. extra]);
 
     /// <summary>The texts of every shipped prefab (FB-021).</summary>
     public static IEnumerable<string> Prefabs() =>
@@ -53,15 +54,19 @@ static class TestContent
 
     /// <summary>
     /// The real content plus the test bank core, with buildings.json edited by <paramref name="editBuildings"/>, which must
-    /// change it; without power draws if not <paramref name="power"/>.
+    /// change it; without power draws if not <paramref name="power"/>. <paramref name="editLayers"/>, if given, edits
+    /// layers.json the same way.
     /// </summary>
-    public static ContentDb Load(Func<string, string> editBuildings, bool power = true)
+    public static ContentDb Load(Func<string, string> editBuildings, bool power = true, Func<string, string>? editLayers = null)
     {
         string real = Read("buildings.json").TrimEnd();
         string buildings = real[..^1].TrimEnd() + ",\n" + Bank + "\n]";
         string edited = editBuildings(buildings);
         if (edited == buildings)
             throw new InvalidOperationException("the edit changed nothing; buildings.json has moved on");
-        return Build(power, [], edited);
+        string? layers = null;
+        if (editLayers != null && (layers = editLayers(Read("layers.json"))) == Read("layers.json"))
+            throw new InvalidOperationException("the layers edit changed nothing; layers.json has moved on");
+        return Build(power, [], edited, layers);
     }
 }

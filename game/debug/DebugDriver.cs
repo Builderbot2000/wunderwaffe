@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using Godot;
 using Wunderwaffe.Game.Render;
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 
@@ -122,7 +123,7 @@ public partial class DebugDriver : Node
                 _host.Send(new PlaceBuildingCommand(me, tile.Id, "thruster", CoreX + 2, CoreY, 0));
                 break;
             case 20:
-                GD.Print($"[drive] built: {tile.Grid.BuildingCount} buildings, {tile.Grid.FrameCount} frames");
+                GD.Print($"[drive] built: {tile.Grid.BuildingCount} buildings, {tile.Grid.CountOn(BuildingKind.Frame)} frames");
                 Mouse(Screen(CoreX + 0.5, CoreY + 0.5));
                 break;
             case 22:

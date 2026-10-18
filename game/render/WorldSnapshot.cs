@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using Wunderwaffe.Sim;
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game.Render;
@@ -110,7 +111,7 @@ public sealed class WorldSnapshot
                     c = new Color(_ground[i * 3] / 255f, _ground[i * 3 + 1] / 255f, _ground[i * 3 + 2] / 255f);
                     if (g.DepositAt(x, y) is { } item)
                         c = c.Lerp(Palette.Deposit(item), DepositMix);
-                    if (g.HasFrame(x, y))
+                    if (g.Has(BuildingKind.Frame, x, y))
                         c = c.Lerp(Palette.Frame with { A = 1 }, FrameMix);
                 }
                 Put(_cells, i, c);

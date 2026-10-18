@@ -17,7 +17,7 @@ public partial class Hud
         bool show = GetViewport().GuiGetHoveredControl() == null && tile.Grid.InBounds(cell.X, cell.Y) && (
             tile.Grid.BuildingAt(cell.X, cell.Y) is { } b ? DescribeBuilding(tile, b)
             : tile.Grid.WreckAt(cell.X, cell.Y) is { } wreck ? DescribeWreck(wreck)
-            : tile.Grid.HasCable(cell.X, cell.Y) ? DescribeCable(tile, cell.X, cell.Y)
+            : tile.Grid.Has(BuildingKind.Wire, cell.X, cell.Y) ? DescribeCable(tile, cell.X, cell.Y)
             : tile.Grid.DepositAt(cell.X, cell.Y) is { } ore && DescribeDeposit(ore));
         if (!show && !BuildTool.HasTool && (_host.Selected.Count > 0 || UnitTool.Status.Contains('\n')))
             show = SetHover(UnitTool.Status);

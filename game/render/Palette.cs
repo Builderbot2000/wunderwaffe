@@ -85,6 +85,12 @@ public static class Palette
     {
         Spread(content.Items.Keys, Deposits, saturation: 0.55f, value: 0.5f);
         Spread(content.Buildings.Keys, Buildings, saturation: 0.45f, value: 0.9f);
+        // Kinds with a colour of their own, whatever their id.
+        foreach (var b in content.BuildingList)
+        {
+            if (b.Kind switch { BuildingKind.Core => Core, BuildingKind.Frame => Frame, BuildingKind.Platform => Platform, BuildingKind.Wire => Cable, _ => (Color?)null } is { } own)
+                Buildings[b.Id] = own;
+        }
         _terrain = content.TerrainList.Select(t => Color.FromHtml(t.Color)).ToArray();
     }
 
@@ -106,8 +112,7 @@ public static class Palette
 
     public static Color Deposit(string itemId) => Deposits.GetValueOrDefault(itemId, Colors.Magenta);
 
-    public static Color Building(string buildingId) =>
-        buildingId.StartsWith(Sim.Simulation.CoreBuildingId, System.StringComparison.Ordinal) ? Core : Buildings.GetValueOrDefault(buildingId, Colors.Magenta);
+    public static Color Building(string buildingId) => Buildings.GetValueOrDefault(buildingId, Colors.Magenta);
 
     static void Spread(IEnumerable<string> ids, Dictionary<string, Color> into, float saturation, float value)
     {

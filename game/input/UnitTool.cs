@@ -236,7 +236,7 @@ public partial class UnitTool : Node2D
 
         var cell = HoveredCell();
         var tile = _host.ViewedTile;
-        if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.HasFrame(core.X, core.Y))
+        if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.Has(BuildingKind.Frame, core.X, core.Y))
         {
             var check = UnitAssembly.CheckActivate(sim, tile, _host.LocalPlayer, cell.X, cell.Y, out var plan);
             line += check == AssembleResult.Ok
@@ -392,7 +392,7 @@ public partial class UnitTool : Node2D
     {
         var cell = HoveredCell();
         var tile = _host.ViewedTile;
-        if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.HasFrame(core.X, core.Y))
+        if (tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.Has(BuildingKind.Frame, core.X, core.Y))
         {
             _host.Send(new ActivateUnitCommand(_host.LocalPlayer, tile.Id, cell.X, cell.Y));
             return;

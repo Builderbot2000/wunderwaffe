@@ -48,6 +48,18 @@ public sealed class ContentDb
     /// <summary>Recipes each building can run, sorted by recipe id.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<RecipeDef>> RecipesByBuilding { get; }
 
+    /// <summary>Cell layers in stacking order (FB-022), from layers.json; without one, only a deposit layer.</summary>
+    public LayerSet Layers { get; private set; } = null!;
+
+    /// <summary>The frame blueprints, factories and landing lay (UD-010): the first <see cref="BuildingKind.Frame"/> building, or null.</summary>
+    public BuildingDef? Frame { get; }
+
+    /// <summary>The first core in buildings.json: what <c>Simulation.AddCore</c> puts down when not told which.</summary>
+    public BuildingDef? DefaultCore { get; }
+
+    /// <summary>Used when no layers file is given: deposits only.</summary>
+    static readonly LayerDef FallbackLayer = new("deposit", "Deposits", Holds: LayerDef.HoldsItems, Draw: "icon");
+
     /// <summary>Prefab blueprints by id (FB-021).</summary>
     public IReadOnlyDictionary<string, PrefabDef> Prefabs { get; private set; } = new SortedDictionary<string, PrefabDef>(StringComparer.Ordinal);
 
@@ -72,6 +84,8 @@ public sealed class ContentDb
         int catchAll = terrain.FindIndex(t => Land(t) && t.Elevation == null && t.Moisture == null);
         DefaultTerrain = catchAll >= 0 ? catchAll : Math.Max(0, terrain.FindIndex(Land));
         RiverTerrain = terrain.FindIndex(t => t.River);
+        Frame = buildingList.FirstOrDefault(b => b.Kind == BuildingKind.Frame);
+        DefaultCore = buildingList.FirstOrDefault(b => b.Kind == BuildingKind.Core);
         RecipesByBuilding = recipes.Values
             .GroupBy(r => r.Building)
             .ToDictionary(
@@ -81,28 +95,99 @@ public sealed class ContentDb
 
     /// <param name="goals">The objective chain; null for none.</param>
     /// <param name="terrain">Terrain kinds for world generation; null for a single buildable terrain.</param>
+    /// <param name="layers">Cell layers (FB-022), bottom to top; null for a deposit layer alone.</param>
     /// <param name="prefabs">Prefab blueprints (FB-021), one JSON object per text (one file each); null for none.</param>
     public static ContentDb FromJson(
-        string items, string recipes, string buildings, string? goals = null, string? terrain = null, IEnumerable<string>? prefabs = null)
+        string items, string recipes, string buildings, string? goals = null, string? terrain = null, string? layers = null,
+        IEnumerable<string>? prefabs = null)
     {
         var errors = new List<string>();
+        var itemList = Parse<ItemDef>(items, "items");
         var buildingList = Parse<BuildingDef>(buildings, "buildings");
         var goalList = goals == null ? [] : Parse<GoalDef>(goals, "goals");
         Index(goalList, x => x.Id, "goal", errors);
         var terrainList = terrain == null ? [FallbackTerrain] : Parse<TerrainDef>(terrain, "terrain");
         Index(terrainList, x => x.Id, "terrain", errors);
         var db = new ContentDb(
-            Index(Parse<ItemDef>(items, "items"), x => x.Id, "item", errors),
+            Index(itemList, x => x.Id, "item", errors),
             Index(Parse<RecipeDef>(recipes, "recipes"), x => x.Id, "recipe", errors),
             buildingList,
             Index(buildingList, x => x.Id, "building", errors),
             goalList,
             terrainList);
         db.Validate(errors);
+        db.LoadLayers(layers == null ? [FallbackLayer] : Parse<LayerDef>(layers, "layers"), itemList, buildingList, errors);
         db.LoadPrefabs(prefabs ?? [], errors);
         if (errors.Count > 0)
             throw new ContentException(errors);
         return db;
+    }
+
+    /// <summary>Resolves and checks the layers (FB-022): stacking rules, the one deposit layer, which buildings go on which.</summary>
+    void LoadLayers(List<LayerDef> defs, List<ItemDef> items, List<BuildingDef> buildings, List<string> errors)
+    {
+        Index(defs, x => x.Id, "layer", errors);
+        var list = new List<Layer>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var d in defs)
+        {
+            string at = $"layer '{d.Id}'";
+            bool holdsItems = d.Holds == LayerDef.HoldsItems;
+            if (d.Holds is not (LayerDef.HoldsBuildings or LayerDef.HoldsItems))
+                errors.Add($"{at}: holds must be '{LayerDef.HoldsBuildings}' or '{LayerDef.HoldsItems}'");
+            if (!LayerDef.DrawStyles.Contains(d.Draw))
+                errors.Add($"{at}: draw must be one of {string.Join(", ", LayerDef.DrawStyles)}");
+            foreach (var on in d.SitsOn ?? [])
+            {
+                if (on is not (LayerDef.Ground or LayerDef.Water) && !seen.Contains(on))
+                    errors.Add($"{at}: sitsOn '{on}' is not ground, water or a layer below it");
+            }
+            if (holdsItems && (d.SitsOn is { Length: > 0 } || d.Floor || d.UnderBuildings || d.BlocksBuildings))
+                errors.Add($"{at}: the item layer is filled by world generation, so it has no stacking rules");
+            if (!holdsItems && d.SitsOn is not { Length: > 0 })
+                errors.Add($"{at}: a building layer needs sitsOn");
+            seen.Add(d.Id);
+
+            var ids = new List<string> { "" };
+            var defsOn = new List<BuildingDef?> { null };
+            if (holdsItems)
+            {
+                ids.AddRange(items.Select(i => i.Id));
+                defsOn.AddRange(items.Select(_ => (BuildingDef?)null));
+            }
+            else
+            {
+                foreach (var b in buildings.Where(b => b.Layer == d.Id))
+                {
+                    ids.Add(b.Id);
+                    defsOn.Add(b);
+                }
+            }
+            if (ids.Count - 1 > Layer.MaxEntries)
+                errors.Add($"{at}: more than {Layer.MaxEntries} entries");
+            list.Add(new Layer(d, list.Count, ids, defsOn));
+        }
+        if (list.Count(l => l.HoldsItems) != 1)
+            errors.Add("layers: exactly one layer must hold items (the deposits)");
+
+        foreach (var b in buildings)
+        {
+            string at = $"building '{b.Id}'";
+            bool layerKind = LayerDef.Kinds.Contains(b.Kind);
+            if (layerKind != (b.Layer != null))
+                errors.Add($"{at}: {string.Join(", ", LayerDef.Kinds)} buildings, and only they, name a layer");
+            if (b.Layer == null)
+                continue;
+            if (list.FirstOrDefault(l => l.Id == b.Layer) is not { } layer)
+                errors.Add($"{at}: unknown layer '{b.Layer}'");
+            else if (layer.HoldsItems)
+                errors.Add($"{at}: layer '{b.Layer}' holds items, not buildings");
+            if (b.Width != 1 || b.Height != 1)
+                errors.Add($"{at}: a layer building must be 1x1");
+            if (buildings.Any(o => o.Kind == b.Kind && o.Layer != null && o.Layer != b.Layer))
+                errors.Add($"{at}: every {b.Kind} must be on one layer");
+        }
+        Layers = new LayerSet(list);
     }
 
     void LoadPrefabs(IEnumerable<string> texts, List<string> errors)
@@ -183,8 +268,6 @@ public sealed class ContentDb
             if (!BuildingDef.Menus.Contains(b.Menu))
                 errors.Add($"building '{b.Id}': menu must be one of {string.Join(", ", BuildingDef.Menus)}");
             ValidateCombat(b, errors);
-            if (b.Kind == BuildingKind.Platform && (!b.OnWater || b.Width != 1 || b.Height != 1))
-                errors.Add($"building '{b.Id}': a platform must be 1x1 and onWater");
             if (b.Kind == BuildingKind.UnitFactory && (b.Radius <= 0 || b.BlockCap <= 0))
                 errors.Add($"building '{b.Id}': a unit factory needs radius and blockCap > 0");
             foreach (var (id, n) in b.Upkeep ?? [])
@@ -200,8 +283,6 @@ public sealed class ContentDb
             if (b.Kind != BuildingKind.Core && b.Capacity != 0)
                 errors.Add($"building '{b.Id}': only cores have a capacity");
         }
-        if (Buildings.TryGetValue(Simulation.CoreBuildingId, out var startCore) && startCore.Kind != BuildingKind.Core)
-            errors.Add($"buildings: '{Simulation.CoreBuildingId}' must be a core (the starting unit's)");
 
         // A recipe with no outputs only makes sense as fuel for a generator (FB-005).
         foreach (var r in Recipes.Values)
@@ -209,8 +290,6 @@ public sealed class ContentDb
             if (r.Outputs.Count == 0 && (r.Inputs.Count == 0 || !Buildings.TryGetValue(r.Building, out var host) || host.PowerSupply <= 0))
                 errors.Add($"recipe '{r.Id}': no outputs, so it must burn inputs in a generator (a machine with powerSupply)");
         }
-        if (Buildings.Values.Count(b => b.Kind == BuildingKind.Platform) > 1)
-            errors.Add("buildings: at most one platform");
         foreach (var g in Goals)
             ValidateCondition(g.Condition, $"goal '{g.Id}'", errors);
 

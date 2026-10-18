@@ -173,7 +173,7 @@ public sealed partial class GameQuery(Simulation sim, int player)
             for (int cx = Math.Max(0, x); cx < Math.Min(g.Width, x + width); cx++)
             {
                 list.Add(new CellView(cx, cy, g.InBounds(cx, cy), g.Buildable(cx, cy), sim.Content.TerrainList[g.TerrainAt(cx, cy)].Id,
-                    g.DepositAt(cx, cy), g.ZoneAt(cx, cy), g.BuildingAt(cx, cy)?.Id ?? -1, g.HasFrame(cx, cy)));
+                    g.DepositAt(cx, cy), g.ZoneAt(cx, cy), g.BuildingAt(cx, cy)?.Id ?? -1, g.Has(BuildingKind.Frame, cx, cy)));
             }
         }
         return list;

@@ -138,7 +138,7 @@ public sealed class TilePower(TileGrid grid)
     public PowerNetwork? NetworkAtCable(int x, int y)
     {
         Refresh();
-        return grid.HasCable(x, y) && _cablePart is { } cells && cells[y * grid.Width + x] is >= 0 and var p ? PartNet[p] : null;
+        return grid.Has(BuildingKind.Wire, x, y) && _cablePart is { } cells && cells[y * grid.Width + x] is >= 0 and var p ? PartNet[p] : null;
     }
 
     /// <summary>
@@ -180,14 +180,14 @@ public sealed class TilePower(TileGrid grid)
 
         // Cable runs: cables beside each other join.
         int w = grid.Width;
-        var cables = grid.CableCount > 0 ? new int[w * grid.Height] : null;
+        var cables = grid.CountOn(BuildingKind.Wire) > 0 ? new int[w * grid.Height] : null;
         if (cables != null)
         {
             Array.Fill(cables, -1);
             var stack = new Stack<int>();
             for (int i = 0; i < cables.Length; i++)
             {
-                if (cables[i] >= 0 || !grid.HasCable(i % w, i / w))
+                if (cables[i] >= 0 || !grid.Has(BuildingKind.Wire, i % w, i / w))
                     continue;
                 int run = parent.Count;
                 parent.Add(run);
@@ -199,7 +199,7 @@ public sealed class TilePower(TileGrid grid)
                     foreach (var d in Directions.All)
                     {
                         int nx = c % w + d.Dx(), ny = c / w + d.Dy();
-                        if (grid.HasCable(nx, ny) && cables[ny * w + nx] < 0)
+                        if (grid.Has(BuildingKind.Wire, nx, ny) && cables[ny * w + nx] < 0)
                         {
                             cables[ny * w + nx] = run;
                             stack.Push(ny * w + nx);
@@ -226,7 +226,7 @@ public sealed class TilePower(TileGrid grid)
                 for (int x = b.X - 1; x <= b.X + b.Width; x++)
                 {
                     bool corner = (x < b.X || x >= b.X + b.Width) && (y < b.Y || y >= b.Y + b.Height);
-                    if (!corner && grid.HasCable(x, y))
+                    if (!corner && grid.Has(BuildingKind.Wire, x, y))
                         Union(me, cables[y * w + x]);
                 }
             }

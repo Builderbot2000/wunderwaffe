@@ -53,15 +53,16 @@ public static class Placement
         TileGrid grid = tile.Grid;
         if (!grid.InBounds(x, y, w, h))
             return PlaceResult.OutOfBounds;
-        // A cable lies under buildings (FB-020): it only clashes with another cable.
-        if (def.Kind == BuildingKind.Wire ? Any(grid.HasCable, x, y, w, h) : !grid.IsFree(x, y, w, h))
-            return PlaceResult.Blocked;
-        if (def.Kind == BuildingKind.Platform)
+        // Layer buildings (frame, cables, platforms) follow their layer's stacking rules (FB-022).
+        int layer = content.Layers.Of(def).Layer;
+        if (layer >= 0)
         {
-            if (Any(grid.HasPlatform, x, y, w, h))
-                return PlaceResult.Blocked;
-            if (!OnWater(content, grid, x, y, w, h))
-                return PlaceResult.BadTerrain;
+            if (Fits(content, grid, layer, x, y) is var fit and not PlaceResult.Ok)
+                return fit;
+        }
+        else if (!grid.IsFree(x, y, w, h) || BlockedByLayer(grid, x, y, w, h))
+        {
+            return PlaceResult.Blocked;
         }
         else if (!grid.Buildable(x, y, w, h) && !(def.OnWater && StandsOn(content, grid, x, y, w, h)))
         {
@@ -87,31 +88,71 @@ public static class Placement
         return PlaceResult.Ok;
     }
 
-    static bool Any(Func<int, int, bool> layer, int x, int y, int w, int h)
+    /// <summary>
+    /// Whether a cell of the tile takes an entry of <paramref name="layer"/> by its stacking rules (FB-022): the layer is
+    /// empty there, no building stands there unless the layer goes <see cref="LayerDef.UnderBuildings"/>, and the cell
+    /// has something the layer <see cref="LayerDef.SitsOn"/>. Presence, wrecks, circles and cost are the caller's.
+    /// </summary>
+    public static PlaceResult Fits(ContentDb content, TileGrid grid, int layer, int x, int y)
     {
-        for (int cy = y; cy < y + h; cy++)
+        if (!grid.InBounds(x, y))
+            return PlaceResult.OutOfBounds;
+        if (grid.Has(layer, x, y) || (!grid.Layers[layer].Def.UnderBuildings && grid.BuildingAt(x, y) != null))
+            return PlaceResult.Blocked;
+        return Supported(content, grid, layer, x, y, -1) ? PlaceResult.Ok : PlaceResult.BadTerrain;
+    }
+
+    /// <summary>
+    /// Whether the cell has something <paramref name="layer"/> sits on, counting layer <paramref name="without"/> as empty
+    /// (to see what removing it would leave).
+    /// </summary>
+    internal static bool Supported(ContentDb content, TileGrid grid, int layer, int x, int y, int without)
+    {
+        foreach (var on in grid.Layers[layer].Def.SitsOn ?? [])
         {
-            for (int cx = x; cx < x + w; cx++)
+            bool ok = on switch
             {
-                if (layer(cx, cy))
-                    return true;
-            }
+                LayerDef.Ground => grid.BuildableWithout(x, y, without),
+                LayerDef.Water => content.TerrainList[grid.TerrainAt(x, y)].Water,
+                _ => grid.Layers.ById(on) is { } below && below.Index != without && grid.Has(below.Index, x, y),
+            };
+            if (ok)
+                return true;
         }
         return false;
     }
 
-    /// <summary>Every cell is water terrain (FB-017): where a platform floats.</summary>
-    static bool OnWater(ContentDb content, TileGrid grid, int x, int y, int w, int h)
+    /// <summary>
+    /// Whether the entry of <paramref name="layer"/> at a cell may be taken up: no layer above it or building on it loses
+    /// what it stands on.
+    /// </summary>
+    internal static bool CanLift(ContentDb content, TileGrid grid, int layer, int x, int y)
     {
-        for (int cy = y; cy < y + h; cy++)
+        for (int above = layer + 1; above < grid.Layers.Count; above++)
         {
-            for (int cx = x; cx < x + w; cx++)
+            if (grid.Has(above, x, y) && !Supported(content, grid, above, x, y, layer))
+                return false;
+        }
+        return grid.BuildingAt(x, y) == null || grid.BuildableWithout(x, y, layer);
+    }
+
+    /// <summary>A cell of the footprint carries a layer marked <see cref="LayerDef.BlocksBuildings"/>.</summary>
+    static bool BlockedByLayer(TileGrid grid, int x, int y, int w, int h)
+    {
+        foreach (var layer in grid.Layers.All)
+        {
+            if (!layer.Def.BlocksBuildings || grid.CountOn(layer.Index) == 0)
+                continue;
+            for (int cy = y; cy < y + h; cy++)
             {
-                if (!content.TerrainList[grid.TerrainAt(cx, cy)].Water)
-                    return false;
+                for (int cx = x; cx < x + w; cx++)
+                {
+                    if (grid.Has(layer.Index, cx, cy))
+                        return true;
+                }
             }
         }
-        return true;
+        return false;
     }
 
     /// <summary>Every cell is buildable ground or water, for buildings marked <see cref="BuildingDef.OnWater"/>.</summary>

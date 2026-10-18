@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using static Wunderwaffe.Sim.Tests.Harness;
@@ -88,7 +89,7 @@ public class BlueprintTests
         foreach (var (id, n) in cost)
             Assert.Equal(before[id] - n, Items(tile, id));
         Assert.Equal("smelt_iron", tile.Grid.BuildingAt(22, 20)!.RecipeId);
-        Assert.Equal(30, tile.Grid.FrameCount);
+        Assert.Equal(30, tile.Grid.CountOn(BuildingKind.Frame));
     }
 
     [Fact]
@@ -100,7 +101,7 @@ public class BlueprintTests
         var bp = Blueprints.FromUnitCore(sim, tile, Me, 5, 5, out _)!;
         Place(sim, tile, "conveyor", 24, 21); // where the last thruster would go
         sim.Step();
-        int buildings = tile.Grid.BuildingCount, frames = tile.Grid.FrameCount;
+        int buildings = tile.Grid.BuildingCount, frames = tile.Grid.CountOn(BuildingKind.Frame);
         var inventory = Funds.Total(tile, Me).ToList();
 
         Assert.Equal(BlueprintResult.Blocked, Blueprints.Check(sim, tile, Me, bp, 20, 20, 0, false, out var plan));
@@ -110,7 +111,7 @@ public class BlueprintTests
 
         sim.Enqueue(new PlaceBlueprintCommand(Me, tile.Id, bp, 20, 20));
         sim.Step();
-        Assert.Equal((buildings, frames), (tile.Grid.BuildingCount, tile.Grid.FrameCount));
+        Assert.Equal((buildings, frames), (tile.Grid.BuildingCount, tile.Grid.CountOn(BuildingKind.Frame)));
         Assert.Equal(inventory, Funds.Total(tile, Me).ToList());
 
         // Off the tile's edge counts too.

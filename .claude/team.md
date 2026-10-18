@@ -29,6 +29,13 @@ rules on top. Branch from the Wave 0 (foundation) commit.
 - **Lift-off and landing (UD-010).** `UnitAssembly.Launch` drains the core's stock and every lifted building's items
   (`TileEntities.Drain(b, into)`) into `Unit.Cargo`; `Deploy` puts the whole cargo back into the landed core.
 - **Elimination.** `Simulation.CoreCount` / `Victory.HasCore` count cores on tiles and units (every unit has one).
+- **Cell layers (FB-022).** `game/data/layers.json` declares per-cell layers bottom to top (deposit, platform, frame,
+  cable) with stacking rules; platform/wire/frame buildings name theirs (`BuildingDef.Layer`). `TileGrid` keeps a byte per
+  cell per layer (`EntryAt`, `Has(kind, x, y)`, `CountOn`, `SetEntry`/`Lay`/`Clear`); hashing, snapshots, `Placement.Fits`/
+  `CanLift` and `TileView.DrawLayer` loop over all layers, so a new layer or a second entry needs no plumbing. Behaviour
+  finds its layer by kind (`grid.Layers.Of(BuildingKind.Wire)`). Deposits are the item layer (`Layers.Deposit`; RS-004
+  adds patches beside it). The frame is `ContentDb.Frame` (its cost in buildings.json); cores by kind (`DefaultCore`).
+  Wrecks stay their own store.
 - **Rate mode** books `FlowKind.Core` per core (`Flow.PortId` = the core's id), held to its capacity.
 - **Tests:** hand-built tiles get funds from a test-only `bank` core (1x1, no power, huge capacity) via
   `Harness.Tile`/`Bank`/`Fund`. `Simulation.AddCore` puts a core down unpaid for tests and scenes (`Harness.PutCore`).

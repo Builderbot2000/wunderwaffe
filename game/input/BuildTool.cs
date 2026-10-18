@@ -16,18 +16,17 @@ namespace Wunderwaffe.Game.Input;
 /// </summary>
 public partial class BuildTool : Node2D
 {
-    public const string FrameId = "frame";
-
     const int ZoneFontSize = 14;
 
     /// <summary>
-    /// One build-menu entry: a building, a crafter with a chosen recipe, or the unit frame. <paramref name="Short"/> is
-    /// the button text; <paramref name="Menu"/> is its tab, an index into <see cref="BuildingDef.Menus"/>.
+    /// One build-menu entry: a building (the unit frame and other layer buildings included) or a crafter with a chosen
+    /// recipe. <paramref name="Short"/> is the button text; <paramref name="Menu"/> is its tab, an index into
+    /// <see cref="BuildingDef.Menus"/>.
     /// </summary>
     public sealed record Tool(string BuildingId, string? RecipeId, string Label, string Short, int Menu)
     {
-        /// <summary>The unit frame, painted like a building but laid under them.</summary>
-        public bool IsFrame => BuildingId == FrameId;
+        /// <summary>A unit frame (UD-010), painted like a building but laid under them; right-click takes up frame, even under a building.</summary>
+        public bool IsFrame { get; init; }
 
         /// <summary>The id whose sprite stands for this entry: the recipe's output for crafters.</summary>
         public string? IconId { get; init; }
@@ -95,16 +94,16 @@ public partial class BuildTool : Node2D
     void BuildPalette(Simulation sim)
     {
         var content = sim.Content;
-        static bool Rare(BuildingDef d) => d.Kind is BuildingKind.Platform;
-        var tools = new List<Tool> { new(FrameId, null, "Unit Frame", "Unit Frame", System.Array.IndexOf(BuildingDef.Menus, "units")) { IconId = Sprites.Frame } };
-        foreach (var def in content.BuildingList.OrderBy(Rare))
+        static int Order(BuildingDef d) => d.Kind switch { BuildingKind.Frame => 0, BuildingKind.Platform => 2, _ => 1 };
+        var tools = new List<Tool>();
+        foreach (var def in content.BuildingList.OrderBy(Order))
         {
             int menu = System.Array.IndexOf(BuildingDef.Menus, def.Menu);
             var crafting = content.RecipesByBuilding.GetValueOrDefault(def.Id)?
                 .Where(r => r.Inputs.Count > 0).ToList() ?? [];
             if (crafting.Count <= 1)
             {
-                tools.Add(new Tool(def.Id, null, def.Name, def.Name, menu) { IconId = def.Id });
+                tools.Add(new Tool(def.Id, null, def.Name, def.Name, menu) { IconId = def.Id, IsFrame = def.Kind == BuildingKind.Frame });
                 continue;
             }
             foreach (var r in crafting)
@@ -177,14 +176,10 @@ public partial class BuildTool : Node2D
         {
             var (x, y, _, _) = Footprint(cell);
             var tool = _tools[_selected];
-            _preview = tool.IsFrame
-                ? UnitAssembly.CheckFrame(_host.Sim, tile, _host.LocalPlayer, x, y)
-                : Placement.Check(_host.Sim, tile, _host.LocalPlayer, tool.BuildingId, x, y, _rotation, tool.RecipeId, out _);
+            _preview = Placement.Check(_host.Sim, tile, _host.LocalPlayer, tool.BuildingId, x, y, _rotation, tool.RecipeId, out _);
             if (!overUi && Godot.Input.IsMouseButtonPressed(MouseButton.Left) && cell != _lastActionCell && _preview == PlaceResult.Ok)
             {
-                _host.Send(tool.IsFrame
-                    ? new PlaceFrameCommand(_host.LocalPlayer, tile.Id, x, y)
-                    : new PlaceBuildingCommand(_host.LocalPlayer, tile.Id, tool.BuildingId, x, y, _rotation, tool.RecipeId));
+                _host.Send(new PlaceBuildingCommand(_host.LocalPlayer, tile.Id, tool.BuildingId, x, y, _rotation, tool.RecipeId));
                 _lastActionCell = cell;
             }
         }
@@ -283,8 +278,6 @@ public partial class BuildTool : Node2D
     /// <summary>Rotated footprint centred on the hovered cell.</summary>
     (int X, int Y, int W, int H) Footprint(Vector2I cell)
     {
-        if (_tools[_selected].IsFrame)
-            return (cell.X, cell.Y, 1, 1);
         var (w, h) = _host.Sim.Content.Buildings[_tools[_selected].BuildingId].Footprint(_rotation);
         return (cell.X - (w - 1) / 2, cell.Y - (h - 1) / 2, w, h);
     }

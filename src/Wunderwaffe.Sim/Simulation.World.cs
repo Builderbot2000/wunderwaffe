@@ -231,9 +231,10 @@ public sealed partial class Simulation
     /// Puts a core straight onto a hand-built tile, unpaid and with no checks, for tests and benchmark scenes. Real
     /// play builds cores like any building.
     /// </summary>
-    public PlacedBuilding AddCore(TileState tile, int owner, int x, int y, string defId = CoreBuildingId)
+    /// <param name="defId">Which core; null for the first in buildings.json (<see cref="ContentDb.DefaultCore"/>).</param>
+    public PlacedBuilding AddCore(TileState tile, int owner, int x, int y, string? defId = null)
     {
-        var def = Content.Buildings[defId];
+        var def = defId == null ? Content.DefaultCore! : Content.Buildings[defId];
         return tile.Grid.Add(def, owner, x, y, def.Width, def.Height, 0, null);
     }
 
@@ -308,7 +309,7 @@ public sealed partial class Simulation
             }
         }
 
-        var tile = new TileState(id, ox, oy, new TileGrid(w, h, mask, buildable, terrain))
+        var tile = new TileState(id, ox, oy, new TileGrid(w, h, mask, buildable, terrain, Content.Layers))
         {
             CenterX = ox + (int)(sx / Math.Max(1, area)),
             CenterY = oy + (int)(sy / Math.Max(1, area)),
@@ -395,7 +396,7 @@ public sealed partial class Simulation
         {
             for (int cx = x; cx < x + w; cx++)
             {
-                if (grid.HasFrame(cx, cy))
+                if (grid.Has(BuildingKind.Frame, cx, cy))
                     return true;
             }
         }

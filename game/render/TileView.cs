@@ -1,13 +1,15 @@
 using System.Collections.Generic;
 using Godot;
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Game.Render;
 
 /// <summary>
-/// Draws the viewed tile's ground, deposits and buildings with one MultiMesh per layer, and per sprite within
-/// a layer, so draw cost stays flat as the building count grows (NF-001). Content without a sprite is drawn
-/// as a flat <see cref="Palette"/> colour. Rebuilds only when the grid's revision changes.
+/// Draws the viewed tile's ground, cell layers (FB-022: deposits, platforms, frame, cables, in layers.json order) and
+/// buildings with one MultiMesh per layer, and per sprite within a layer, so draw cost stays flat as the building count
+/// grows (NF-001). Content without a sprite is drawn as a flat <see cref="Palette"/> colour. Rebuilds only when the
+/// grid's revision changes.
 /// The ground is the tile's terrain, one colour per cell. The tile's bounding box also shows the land of the tiles
 /// around it, dimmed, with the border drawn over it and each I/O zone outlined in its own colour.
 /// <para>
@@ -32,13 +34,12 @@ public partial class TileView : Node2D
     Sprite2D _terrain = null!;
     Node2D _outline = null!;
     MultiMeshInstance2D _ground = null!;
-    MultiMeshInstance2D _deposits = null!;
-    MultiMeshInstance2D _frames = null!;
-    MultiMeshInstance2D _platforms = null!;
-    MultiMeshInstance2D _cables = null!;
     MultiMeshInstance2D _buildings = null!;
-    Node2D _depositIcons = null!;
     Node2D _buildingSprites = null!;
+
+    // One group per cell layer, bottom to top: a flat-colour MultiMesh, then one per sprite of its entries.
+    readonly List<Node2D> _layerGroups = [];
+    readonly List<MultiMeshInstance2D> _layerPlain = [];
     MultiMeshInstance2D _items = null!;
     Node2D _itemSprites = null!;
     readonly Dictionary<string, int> _itemCounts = [];
@@ -59,11 +60,12 @@ public partial class TileView : Node2D
         AddChild(_terrain);
         _ground = AddLayer(this, "Ground", Sprites.Get(Sprites.Ground));
         _ground.SelfModulate = Colors.White with { A = GroundDetail };
-        _deposits = AddLayer(this, "Deposits", null);
-        _depositIcons = AddGroup("DepositIcons");
-        _platforms = AddLayer(this, "Platforms", Sprites.Get(Sprites.Platform));
-        _frames = AddLayer(this, "Frames", Sprites.Get(Sprites.Frame));
-        _cables = AddLayer(this, "Cables", null);
+        foreach (var layer in _host.Sim.Content.Layers.All)
+        {
+            var group = AddGroup($"Layer_{layer.Id}");
+            _layerGroups.Add(group);
+            _layerPlain.Add(AddLayer(group, "Plain", null));
+        }
         _buildings = AddLayer(this, "Buildings", null);
         _buildingSprites = AddGroup("BuildingSprites");
         _items = AddLayer(this, "Items", null);
@@ -96,10 +98,8 @@ public partial class TileView : Node2D
             _drawnRevision = grid.Revision;
             _drawnTileId = tile.Id;
             DrawGround(grid);
-            DrawDeposits(grid);
-            DrawPlatforms(grid);
-            DrawFrames(grid);
-            DrawCables(grid);
+            for (int l = 0; l < grid.Layers.Count; l++)
+                DrawLayer(grid, grid.Layers[l]);
             DrawBuildings(grid);
         }
         DrawItems(grid);
@@ -243,29 +243,6 @@ public partial class TileView : Node2D
         _outline.DrawArc(centre, (Sim.Balance.CircleRadius + 0.5f) * px, 0, Mathf.Tau, 96, Palette.Circle, 3);
     }
 
-    /// <summary>Floating platforms (FB-017): a deck over the water that buildings stand on.</summary>
-    void DrawPlatforms(TileGrid grid)
-    {
-        var cells = new List<(int X, int Y)>();
-        for (int y = 0; grid.PlatformCount > 0 && y < grid.Height; y++)
-        {
-            for (int x = 0; x < grid.Width; x++)
-            {
-                if (grid.HasPlatform(x, y))
-                    cells.Add((x, y));
-            }
-        }
-        // With a sprite the deck tiles edge to edge, like frames.
-        bool sprite = _platforms.Texture != null;
-        var mm = _platforms.Multimesh;
-        mm.InstanceCount = cells.Count;
-        for (int i = 0; i < cells.Count; i++)
-        {
-            mm.SetInstanceTransform2D(i, Rect(cells[i].X, cells[i].Y, 1, 1, sprite ? 0 : 0.03f, 0));
-            mm.SetInstanceColor(i, sprite ? Colors.White : Palette.Platform);
-        }
-    }
-
     void DrawGround(TileGrid grid)
     {
         var mm = _ground.Multimesh;
@@ -291,99 +268,76 @@ public partial class TileView : Node2D
         mm.InstanceCount = 0;
     }
 
-    /// <summary>Deposit cells show the item's sprite on the ground, or a flat colour if the item has none.</summary>
-    void DrawDeposits(TileGrid grid)
+    /// <summary>
+    /// One cell layer (FB-022), entry by entry: its sprite if it has one, else its <see cref="Palette"/> colour. The
+    /// layer's <c>draw</c> style says how: <c>tiled</c> edge to edge (the flat fallback inset so cells read apart),
+    /// <c>icon</c> an item sprite on the ground (flat: the whole cell), <c>links</c> a dot per cell and a bar to each
+    /// neighbour east or south on the same layer.
+    /// </summary>
+    void DrawLayer(TileGrid grid, Layer layer)
     {
-        var cells = new List<(int X, int Y, string Item)>();
-        var icons = new Dictionary<string, List<(int X, int Y)>>();
+        var group = _layerGroups[layer.Index];
+        ClearLayers(group);
+        if (grid.CountOn(layer.Index) == 0)
+            return;
+        string style = layer.Def.Draw;
+        var cells = new Dictionary<int, List<(int X, int Y)>>();
         for (int y = 0; y < grid.Height; y++)
         {
             for (int x = 0; x < grid.Width; x++)
             {
-                if (grid.DepositAt(x, y) is not { } item)
+                int e = grid.EntryAt(layer.Index, x, y);
+                if (e == 0)
                     continue;
-                if (Sprites.Get(item) == null)
-                {
-                    cells.Add((x, y, item));
-                    continue;
-                }
-                if (!icons.TryGetValue(item, out var list))
-                    icons[item] = list = [];
+                if (!cells.TryGetValue(e, out var list))
+                    cells[e] = list = [];
                 list.Add((x, y));
             }
         }
 
-        var mm = _deposits.Multimesh;
-        mm.InstanceCount = cells.Count;
-        for (int i = 0; i < cells.Count; i++)
-        {
-            var (x, y, item) = cells[i];
-            mm.SetInstanceTransform2D(i, Rect(x, y, 1, 1, 0, 0));
-            mm.SetInstanceColor(i, Palette.Deposit(item));
-        }
-
-        ClearLayers(_depositIcons);
-        foreach (var (item, list) in icons)
-        {
-            var imm = SpriteLayer(_depositIcons, item)!.Multimesh;
-            imm.InstanceCount = list.Count;
-            for (int i = 0; i < list.Count; i++)
-            {
-                imm.SetInstanceTransform2D(i, Rect(list[i].X, list[i].Y, 1, 1, 0.25f, 0));
-                imm.SetInstanceColor(i, Colors.White);
-            }
-        }
-    }
-
-    /// <summary>Unit frames: a floor under the buildings, so what stands on it still shows.</summary>
-    void DrawFrames(TileGrid grid)
-    {
-        var cells = new List<(int X, int Y)>();
-        for (int y = 0; grid.FrameCount > 0 && y < grid.Height; y++)
-        {
-            for (int x = 0; x < grid.Width; x++)
-            {
-                if (grid.HasFrame(x, y))
-                    cells.Add((x, y));
-            }
-        }
-        // With a sprite the frame tiles edge to edge; the flat fallback is inset so cells read apart.
-        bool sprite = _frames.Texture != null;
-        var mm = _frames.Multimesh;
-        mm.InstanceCount = cells.Count;
-        for (int i = 0; i < cells.Count; i++)
-        {
-            mm.SetInstanceTransform2D(i, Rect(cells[i].X, cells[i].Y, 1, 1, sprite ? 0 : 0.06f, 0));
-            mm.SetInstanceColor(i, sprite ? Colors.White : Palette.Frame);
-        }
-    }
-
-    /// <summary>Power cables (FB-020): a dot per cell and a bar to each cable east or south of it, under the buildings.</summary>
-    void DrawCables(TileGrid grid)
-    {
         const float Thick = 0.22f;
         float px = Palette.CellPx;
-        var quads = new List<Transform2D>();
-        for (int y = 0; grid.CableCount > 0 && y < grid.Height; y++)
+        var plain = new List<(Transform2D At, Color Colour)>();
+        foreach (var (e, list) in cells)
         {
-            for (int x = 0; x < grid.Width; x++)
+            string id = layer.Ids[e];
+            var colour = layer.HoldsItems ? Palette.Deposit(id) : Palette.Building(id);
+            if (style == "links")
             {
-                if (!grid.HasCable(x, y))
-                    continue;
-                var centre = new Vector2(x + 0.5f, y + 0.5f) * px;
-                quads.Add(new Transform2D(0, new Vector2(Thick * 1.6f * px, -Thick * 1.6f * px), 0, centre));
-                if (grid.HasCable(x + 1, y))
-                    quads.Add(new Transform2D(0, new Vector2(px, -Thick * px), 0, centre + new Vector2(px / 2, 0)));
-                if (grid.HasCable(x, y + 1))
-                    quads.Add(new Transform2D(0, new Vector2(Thick * px, -px), 0, centre + new Vector2(0, px / 2)));
+                foreach (var (x, y) in list)
+                {
+                    var centre = new Vector2(x + 0.5f, y + 0.5f) * px;
+                    plain.Add((new Transform2D(0, new Vector2(Thick * 1.6f * px, -Thick * 1.6f * px), 0, centre), colour));
+                    if (grid.Has(layer.Index, x + 1, y))
+                        plain.Add((new Transform2D(0, new Vector2(px, -Thick * px), 0, centre + new Vector2(px / 2, 0)), colour));
+                    if (grid.Has(layer.Index, x, y + 1))
+                        plain.Add((new Transform2D(0, new Vector2(Thick * px, -px), 0, centre + new Vector2(0, px / 2)), colour));
+                }
+                continue;
             }
+            if (SpriteLayer(group, id) is { } sprite)
+            {
+                float inset = style == "icon" ? 0.25f : 0;
+                var smm = sprite.Multimesh;
+                smm.InstanceCount = list.Count;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    smm.SetInstanceTransform2D(i, Rect(list[i].X, list[i].Y, 1, 1, inset, 0));
+                    smm.SetInstanceColor(i, Colors.White);
+                }
+                continue;
+            }
+            float flatInset = style == "icon" ? 0 : 0.06f;
+            foreach (var (x, y) in list)
+                plain.Add((Rect(x, y, 1, 1, flatInset, 0), colour));
         }
-        var mm = _cables.Multimesh;
-        mm.InstanceCount = quads.Count;
-        for (int i = 0; i < quads.Count; i++)
+
+        var mm = _layerPlain[layer.Index].Multimesh;
+        mm.InstanceCount = plain.Count;
+        for (int i = 0; i < plain.Count; i++)
         {
-            mm.SetInstanceTransform2D(i, quads[i]);
-            mm.SetInstanceColor(i, Palette.Cable);
+            mm.SetInstanceTransform2D(i, plain[i].At);
+            mm.SetInstanceColor(i, plain[i].Colour);
         }
     }
 

@@ -132,7 +132,7 @@ public static class Planner
             for (int yy = y - 1; yy <= y + height && clear; yy++)
             {
                 for (int xx = x - 1; xx <= x + width && clear; xx++)
-                    clear = g.InRect(xx, yy) && g.BuildingAt(xx, yy) == null && !g.HasFrame(xx, yy);
+                    clear = g.InRect(xx, yy) && g.BuildingAt(xx, yy) == null && !g.Has(BuildingKind.Frame, xx, yy);
             }
             if (clear)
                 return new Spot(x, y, 0, null);
@@ -274,7 +274,7 @@ public static class Planner
             return _g.BuildingAt(x, y) is { } b ? Wrap(b) : null;
         }
 
-        bool Free(int x, int y) => _g.InBounds(x, y) && _g.Buildable(x, y) && !_g.HasFrame(x, y) && At(x, y) == null;
+        bool Free(int x, int y) => _g.InBounds(x, y) && _g.Buildable(x, y) && !_g.Has(BuildingKind.Frame, x, y) && At(x, y) == null;
 
         /// <summary>Top-left positions worth trying for <paramref name="def"/>, best first.</summary>
         public IEnumerable<(int X, int Y)> Candidates(BuildingDef def, string? onDeposit, Node? touching, int nearX, int nearY)
@@ -338,7 +338,7 @@ public static class Planner
             {
                 for (int cx = x; cx < x + plan.Width; cx++)
                 {
-                    if (At(cx, cy) != null || _g.HasFrame(cx, cy))
+                    if (At(cx, cy) != null || _g.Has(BuildingKind.Frame, cx, cy))
                         return null;
                 }
             }
@@ -414,7 +414,7 @@ public static class Planner
             var wires = new List<(int X, int Y)>();
             // A core supplies power whatever its network looks like yet: networks are rebuilt only when a full-sim tile
             // steps, so a core just placed on a rate-mode tile has none.
-            var sources = _g.Buildings.Where(b => (Supplied(b) || b is { Kind: BuildingKind.Core, Def.PowerSupply: > 0 }) && !_g.HasFrame(b.X, b.Y)).ToList();
+            var sources = _g.Buildings.Where(b => (Supplied(b) || b is { Kind: BuildingKind.Core, Def.PowerSupply: > 0 }) && !_g.Has(BuildingKind.Frame, b.X, b.Y)).ToList();
             bool offFrame = sources.Count > 0;
             if (!offFrame)
                 sources = _g.Buildings.Where(Supplied).ToList();
@@ -482,7 +482,7 @@ public static class Planner
                 var n = stack.Pop();
                 foreach (var (x, y) in Perimeter(n.X, n.Y, n.W, n.H))
                 {
-                    if (At(x, y) is { } next && next.Def.IsPower && !(offFrame && next.Real is { } r && _g.HasFrame(r.X, r.Y)) && joined.Add(next))
+                    if (At(x, y) is { } next && next.Def.IsPower && !(offFrame && next.Real is { } r && _g.Has(BuildingKind.Frame, r.X, r.Y)) && joined.Add(next))
                         stack.Push(next);
                 }
             }

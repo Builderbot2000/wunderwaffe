@@ -254,8 +254,9 @@ public static class UnitFactory
     /// <summary>The build order for a projection; snapshots rebuild <see cref="FactoryState.Steps"/> with it.</summary>
     internal static List<FactoryStep> StepsOf(ContentDb content, Blueprint bp, int ox, int oy)
     {
+        var frame = UnitAssembly.FrameCost(content);
         var steps = bp.Frames
-            .Select(c => new FactoryStep(BuildStage.Frame, -1, ox + c.X, oy + c.Y, Balance.FrameCost, UnitStats.BuildTicksOf(Balance.FrameCost)))
+            .Select(c => new FactoryStep(BuildStage.Frame, -1, ox + c.X, oy + c.Y, frame, UnitStats.BuildTicksOf(frame)))
             .ToList();
         foreach (var stage in new[] { BuildStage.Systems, BuildStage.Armament })
         {
@@ -353,7 +354,7 @@ public static class UnitFactory
 
         if (!f.Working)
         {
-            if (step.Block < 0 && tile.Grid.HasFrame(step.X, step.Y))
+            if (step.Block < 0 && tile.Grid.Has(BuildingKind.Frame, step.X, step.Y))
             {
                 f.Next++; // already framed: nothing to pay or place
                 return;
@@ -392,7 +393,7 @@ public static class UnitFactory
         }
         if (step.Block < 0)
         {
-            tile.Grid.SetFrame(step.X, step.Y, true);
+            tile.Grid.Lay(sim.Content.Frame!, step.X, step.Y);
         }
         else
         {
@@ -408,7 +409,7 @@ public static class UnitFactory
 
     static bool CanPlace(Simulation sim, TileState tile, PlacedBuilding factory, Blueprint bp, FactoryStep step) =>
         step.Block < 0
-            ? tile.Grid.HasFrame(step.X, step.Y)
+            ? tile.Grid.Has(BuildingKind.Frame, step.X, step.Y)
               || (tile.Grid.BuildingAt(step.X, step.Y) == null && UnitAssembly.CheckFrame(sim, tile, factory.Owner, step.X, step.Y, ignoreCost: true) == PlaceResult.Ok)
             : Blueprints.CheckBlock(sim, tile, factory.Owner, bp.Blocks[step.Block], step.X, step.Y, out _, ignoreCost: true) == PlaceResult.Ok;
 

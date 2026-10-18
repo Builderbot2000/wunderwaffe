@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Sim.Tests;
@@ -209,7 +210,7 @@ public class WorldGenTests
         // WM-005: no free core, but a landed starting unit whose core stands in the circle and holds the starting items.
         var core = Assert.Single(home.Grid.Buildings, b => b.DefId == "core");
         Assert.True(home.InCircle(core.X + 1, core.Y + 1), "the core stands in the start's victory circle");
-        Assert.True(home.Grid.HasFrame(core.X, core.Y));
+        Assert.True(home.Grid.Has(BuildingKind.Frame, core.X, core.Y));
         Assert.Equal(Harness.StartItems(sim)["iron_ore"], core.Stock!.Get("iron_ore"));
         Assert.Equal(["thruster", "core", "thruster"], home.Grid.Buildings.Select(b => b.DefId));
     }
@@ -242,7 +243,7 @@ public class WorldGenTests
         {
             var home = a.Tiles[a.StartTileIds[p]];
             Assert.Equal(p, home.Owner);
-            Assert.Equal(p, home.Grid.Buildings.Single(x => x.DefId == Simulation.CoreBuildingId).Owner);
+            Assert.Equal(p, home.Grid.Buildings.Single(x => x.DefId == "core").Owner);
             Assert.False(Has(home, "coal"));
         }
         Assert.DoesNotContain(a.StartTileIds[1], a.Tiles[a.StartTileIds[0]].Neighbors);

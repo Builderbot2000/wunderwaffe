@@ -74,7 +74,7 @@ public sealed record RemoveBuildingCommand(int Player, int TileId, int X, int Y)
     }
 }
 
-/// <summary>Lays a unit frame on a cell, paying <see cref="Balance.FrameCost"/> from the player's cores there (<see cref="Funds"/>). Frames go under buildings too.</summary>
+/// <summary>Lays the content's frame (<see cref="Content.ContentDb.Frame"/>) on a cell, paying its cost from the player's cores there (<see cref="Funds"/>). Frames go under buildings too; <see cref="PlaceBuildingCommand"/> with the frame's id does the same.</summary>
 public sealed record PlaceFrameCommand(int Player, int TileId, int X, int Y) : Command(Player)
 {
     internal override void Apply(Simulation sim)

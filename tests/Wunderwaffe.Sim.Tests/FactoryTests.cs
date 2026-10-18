@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using static Wunderwaffe.Sim.Tests.Harness;
@@ -59,7 +60,7 @@ public class FactoryTests
         var seen = new List<int>();
         for (int i = 0; i < 6000 && sim.Units.Count == 0; i++)
         {
-            int placed = tile.Grid.FrameCount * 10 + tile.Grid.Buildings.Count(b => b.X >= 14 && b.DefId != "bank");
+            int placed = tile.Grid.CountOn(BuildingKind.Frame) * 10 + tile.Grid.Buildings.Count(b => b.X >= 14 && b.DefId != "bank");
             if (seen.Count == 0 || seen[^1] != placed)
                 seen.Add(placed);
             sim.Step();
@@ -71,7 +72,7 @@ public class FactoryTests
         Assert.Equal(2, unit.Thrusters.Count);
         Assert.Equal(8, unit.Cells.Count);
         Assert.Equal(1, f.Built);
-        Assert.Equal(0, tile.Grid.FrameCount);
+        Assert.Equal(0, tile.Grid.CountOn(BuildingKind.Frame));
         Assert.Equal(1, sim.PlayerOrNull(Me)!.Launched);
         // And it starts on the next copy.
         Assert.Equal(0, f.Next);
@@ -91,7 +92,7 @@ public class FactoryTests
         Project(sim, tile, Scout, 14, 11);
         Run(sim, 100);
         Assert.Equal(FactoryStatus.Waiting, f.Status);
-        Assert.Equal(0, tile.Grid.FrameCount);
+        Assert.Equal(0, tile.Grid.CountOn(BuildingKind.Frame));
         Assert.Equal(new SortedDictionary<string, int> { ["copper_ore"] = 10, ["iron_ore"] = 29 }, UnitFactory.Missing(f));
         Assert.Equal([(BuildStage.Frame, 0, 8), (BuildStage.Systems, 0, 3), (BuildStage.Armament, 0, 0)], UnitFactory.StageProgress(f));
     }
@@ -272,7 +273,7 @@ public class FactoryTests
         var factory = FedFactory(sim, tile);
         var f = factory.Factory!;
         Project(sim, tile, Scout, 14, 11);
-        Assert.True(RunUntil(sim, () => tile.Grid.FrameCount == 8, 6000));
+        Assert.True(RunUntil(sim, () => tile.Grid.CountOn(BuildingKind.Frame) == 8, 6000));
         // A second core half on the frame: the finished scout can't lift off.
         Place(sim, tile, "core", 17, 12);
         Assert.True(RunUntil(sim, () => f.Status == FactoryStatus.Stopped, 6000));

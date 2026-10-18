@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using static Wunderwaffe.Sim.Tests.Harness;
@@ -86,12 +87,12 @@ public class UnitTests
         sim.Enqueue(new PlaceFrameCommand(Me, tile.Id, 4, 4));
         sim.Enqueue(new PlaceFrameCommand(Me, tile.Id, 4, 4)); // already framed: no second charge
         sim.Step();
-        Assert.True(tile.Grid.HasFrame(4, 4));
+        Assert.True(tile.Grid.Has(BuildingKind.Frame, 4, 4));
         Assert.Equal(iron - 2, Items(tile, "iron_ore"));
 
         sim.Enqueue(new RemoveFrameCommand(Me, tile.Id, 4, 4));
         sim.Step();
-        Assert.False(tile.Grid.HasFrame(4, 4));
+        Assert.False(tile.Grid.Has(BuildingKind.Frame, 4, 4));
         Assert.Equal(iron, Items(tile, "iron_ore"));
     }
 
@@ -112,7 +113,7 @@ public class UnitTests
         Place(sim, tile, "thruster", 5, 5);
         Frame(sim, tile, 5, 5);
         sim.Step();
-        Assert.True(tile.Grid.HasFrame(5, 5));
+        Assert.True(tile.Grid.Has(BuildingKind.Frame, 5, 5));
         Assert.NotNull(tile.Grid.BuildingAt(5, 5));
     }
 
@@ -126,7 +127,7 @@ public class UnitTests
         var unit = Scout(sim, tile);
 
         Assert.Equal(1, tile.Grid.BuildingCount); // the bank
-        Assert.Equal(0, tile.Grid.FrameCount);
+        Assert.Equal(0, tile.Grid.CountOn(BuildingKind.Frame));
         Assert.Equal(8, unit.Cells.Count);
         Assert.Equal(2, unit.Thrusters.Count);
         Assert.Equal(3, unit.Blocks.Count);
@@ -544,7 +545,7 @@ public class UnitTests
         Assert.Equal("core", tile.Grid.BuildingAt(10, 10)!.DefId);
         Assert.Equal("thruster", tile.Grid.BuildingAt(9, 10)!.DefId);
         Assert.Equal("thruster", tile.Grid.BuildingAt(12, 10)!.DefId);
-        Assert.Equal(8, tile.Grid.FrameCount);
+        Assert.Equal(8, tile.Grid.CountOn(BuildingKind.Frame));
     }
 
     [Fact]

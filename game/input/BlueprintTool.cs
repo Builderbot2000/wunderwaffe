@@ -322,7 +322,7 @@ public partial class BlueprintTool : Node2D
             DrawGhosts(_plan, px, bad: _plan.Problems.Count > 0 || !Status.Good);
         }
         else if (Mode == BlueprintMode.None && !BuildTool.HasTool && HoveredCell() is var cell
-                 && tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.HasFrame(core.X, core.Y))
+                 && tile.Grid.BuildingAt(cell.X, cell.Y) is { Kind: BuildingKind.Core } core && tile.Grid.Has(BuildingKind.Frame, core.X, core.Y))
         {
             // UD-003: point at the blocks that stop a lift-off.
             UnitAssembly.CheckActivate(_host.Sim, tile, _host.LocalPlayer, cell.X, cell.Y, UnitAssembly.MaxCells, out _, out var offending);

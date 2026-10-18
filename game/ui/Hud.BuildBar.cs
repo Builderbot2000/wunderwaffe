@@ -109,7 +109,7 @@ public partial class Hud
     }
 
     IReadOnlyDictionary<string, int> ToolCost(BuildTool.Tool tool) =>
-        tool.IsFrame ? Balance.FrameCost : Content.Buildings[tool.BuildingId].Cost;
+        Content.Buildings[tool.BuildingId].Cost;
 
     string ToolTooltip(BuildTool.Tool tool)
     {

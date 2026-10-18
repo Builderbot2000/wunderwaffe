@@ -63,7 +63,7 @@ public static class Blueprints
         {
             for (int cx = Math.Max(0, x); cx < Math.Min(grid.Width, x + w); cx++)
             {
-                if (grid.HasFrame(cx, cy))
+                if (grid.Has(BuildingKind.Frame, cx, cy))
                     frames.Add(new BlueprintCell(cx, cy));
             }
         }
@@ -171,7 +171,7 @@ public static class Blueprints
         foreach (var f in bp.Frames)
         {
             int fx = x + f.X, fy = y + f.Y;
-            if (tile.Grid.InBounds(fx, fy) && tile.Grid.HasFrame(fx, fy))
+            if (tile.Grid.InBounds(fx, fy) && tile.Grid.Has(BuildingKind.Frame, fx, fy))
                 continue;
             var result = UnitAssembly.CheckFrame(sim, tile, player, fx, fy, ignoreCost: true);
             if (result != PlaceResult.Ok)
@@ -180,7 +180,7 @@ public static class Blueprints
                 continue;
             }
             newFrames.Add((fx, fy));
-            Add(cost, Balance.FrameCost);
+            Add(cost, sim.Content.Frame!.Cost);
         }
 
         if (problems.Count > 0)
@@ -239,7 +239,7 @@ public static class Blueprints
     static List<PlacedBuilding> Build(Simulation sim, TileState tile, int player, BlueprintPlan plan)
     {
         foreach (var (fx, fy) in plan.NewFrames)
-            tile.Grid.SetFrame(fx, fy, true);
+            tile.Grid.Lay(sim.Content.Frame!, fx, fy);
         var placed = new List<PlacedBuilding>(plan.Blocks.Count);
         foreach (var p in plan.Blocks)
         {

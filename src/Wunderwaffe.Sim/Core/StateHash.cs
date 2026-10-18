@@ -71,15 +71,7 @@ internal sealed class StateHash
         Mix(t.OriginY);
         Mix(t.Owner);
         var g = t.Grid;
-        Mix(g.FrameCount);
-        for (int y = 0; g.FrameCount > 0 && y < g.Height; y++)
-        {
-            for (int x = 0; x < g.Width; x++)
-            {
-                if (g.HasFrame(x, y))
-                    Mix(y * g.Width + x);
-            }
-        }
+        MixLayers(g);
         foreach (var b in g.Buildings)
         {
             Mix(b.Id);
@@ -107,15 +99,6 @@ internal sealed class StateHash
             Mix(p);
             Mix(ticks);
         }
-        Mix(g.PlatformCount);
-        for (int y = 0; g.PlatformCount > 0 && y < g.Height; y++)
-        {
-            for (int x = 0; x < g.Width; x++)
-            {
-                if (g.HasPlatform(x, y))
-                    Mix(y * g.Width + x);
-            }
-        }
         foreach (var (item, n) in t.Stats.TotalMade.Concat(t.Stats.TotalUsed))
         {
             Mix(item);
@@ -126,13 +109,21 @@ internal sealed class StateHash
             Mix(partner);
             Mix(n);
         }
-        Mix(g.CableCount);
-        for (int y = 0; g.CableCount > 0 && y < g.Height; y++)
+    }
+
+    /// <summary>Every cell layer (FB-022), deposits included: per layer its filled count, then each filled cell and its entry.</summary>
+    void MixLayers(TileGrid g)
+    {
+        for (int l = 0; l < g.Layers.Count; l++)
         {
-            for (int x = 0; x < g.Width; x++)
+            Mix(g.CountOn(l));
+            if (g.CountOn(l) == 0)
+                continue;
+            var cells = g.LayerCells(l);
+            for (int i = 0; i < cells.Length; i++)
             {
-                if (g.HasCable(x, y))
-                    Mix(y * g.Width + x);
+                if (cells[i] != 0)
+                    Mix(((long)i << 8) | cells[i]);
             }
         }
     }

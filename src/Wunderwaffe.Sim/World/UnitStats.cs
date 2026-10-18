@@ -8,7 +8,7 @@ namespace Wunderwaffe.Sim.World;
 /// <list type="bullet">
 /// <item>Mass: <see cref="Unit.FrameMass"/> per frame cell plus each block's total cost (at least 1).</item>
 /// <item>Power: draw is the sum of <see cref="BuildingDef.Power"/>; supply is what batteries and generators give on board.</item>
-/// <item>Cost: every block's cost plus <see cref="Balance.FrameCost"/> per frame cell.</item>
+/// <item>Cost: every block's cost plus the frame's (<see cref="ContentDb.Frame"/>) per frame cell.</item>
 /// <item>Build time: <see cref="Balance.BuildTicksPerItem"/> per item of cost, block by block, frame included.</item>
 /// <item>Upkeep: the sum of the blocks' <see cref="BuildingDef.Upkeep"/>, items a minute (UD-013).</item>
 /// </list>
@@ -45,11 +45,12 @@ public sealed record UnitStats(
     public static UnitStats Of(ContentDb content, IEnumerable<(string DefId, int Hp)> blocks, int cells)
     {
         int count = 0, mass = cells * Unit.FrameMass, hp = 0, maxHp = 0, draw = 0, supply = 0, dps = 0;
-        int ticks = cells * BuildTicksOf(Balance.FrameCost);
+        var frame = UnitAssembly.FrameCost(content);
+        int ticks = cells * BuildTicksOf(frame);
         var cost = new SortedDictionary<string, int>(StringComparer.Ordinal);
         var upkeep = new SortedDictionary<string, int>(StringComparer.Ordinal);
         for (int i = 0; i < cells; i++)
-            Blueprints.Add(cost, Balance.FrameCost);
+            Blueprints.Add(cost, frame);
         foreach (var (id, blockHp) in blocks)
         {
             var def = content.Buildings[id];

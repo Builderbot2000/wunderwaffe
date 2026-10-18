@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using Xunit.Abstractions;
@@ -110,7 +111,7 @@ public class DemoLoopTests(ITestOutputHelper output)
             Place(home, "conveyor", x, 48, West);
         sim.Step();
         Assert.Equal(5, coal.Grid.BuildingCount);
-        Assert.Equal(wires.Count, coal.Grid.CableCount);
+        Assert.Equal(wires.Count, coal.Grid.CountOn(BuildingKind.Wire));
         Assert.Same(coal.Grid.Power.NetworkOf(landed), coal.Grid.Power.NetworkOf(coal.Grid.BuildingAt(1, 46)!));
 
         // Goal 6: the steel mill, once affordable; it needs plates from its own smelter and coal from the port. It
@@ -136,7 +137,7 @@ public class DemoLoopTests(ITestOutputHelper output)
 
         // Goal 7: a core on frame, lifted off once the steel goal is met and the core is affordable.
         var unitCost = sim.Content.Buildings["core"].Cost.ToDictionary(kv => kv.Key, kv => kv.Value);
-        foreach (var (id, n) in Balance.FrameCost)
+        foreach (var (id, n) in sim.Content.Frame!.Cost)
             unitCost[id] = unitCost.GetValueOrDefault(id) + 6 * n;
         Assert.True(RunUntil(() => me().ProducedOf("steel") >= 20 && Funds.CanPay(home, Me, unitCost), 900),
             $"unit not reached: mill {home.Grid.BuildingAt(92, 46)!.Machine!.Status} {home.Grid.BuildingAt(92, 46)!.Machine!.MissingInput}, gen {home.Grid.BuildingAt(92, 44)!.Machine!.Status}, press {home.Grid.BuildingAt(94, 44)!.Machine!.Status} {home.Grid.BuildingAt(94, 44)!.Machine!.PowerPermille}, nets {string.Join(";", home.Grid.Power.Networks.Select(n => $"{n.Members.Count}:{n.Supply}/{n.Demand}"))}; {me().ProducedOf("steel")} steel, shipped {me().Shipped}, inventory {Inv(home)}");

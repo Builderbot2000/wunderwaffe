@@ -61,43 +61,31 @@ public static class UnitAssembly
     public const int MaxCells = 64;
 
     /// <summary>
-    /// Laying a frame cell needs presence on the tile (WM-015), stays out of a blocked enemy circle, and is paid by the
-    /// player's cores on the tile (<see cref="Funds"/>).
+    /// Laying a cell of the content's frame (<see cref="ContentDb.Frame"/>, a building on the frame layer, FB-022): the
+    /// ordinary placement check, so it needs presence on the tile (WM-015), stays out of a blocked enemy circle, and is
+    /// paid by the player's cores on the tile (<see cref="Funds"/>).
     /// </summary>
     /// <param name="ignoreCost">Skip the cost check, for callers that pay a total themselves.</param>
-    public static PlaceResult CheckFrame(Simulation sim, TileState tile, int player, int x, int y, bool ignoreCost = false)
-    {
-        if (!Territory.HasPresence(sim, player, tile))
-            return PlaceResult.NoPresence;
-        if (!tile.Grid.InBounds(x, y))
-            return PlaceResult.OutOfBounds;
-        if (tile.Grid.HasFrame(x, y))
-            return PlaceResult.Blocked;
-        if (!tile.Grid.Buildable(x, y))
-            return PlaceResult.BadTerrain;
-        if (tile.Grid.WreckAt(x, y) != null)
-            return PlaceResult.Wreck;
-        if (Territory.EnemyCircleBlocks(tile, player, x, y, 1, 1))
-            return PlaceResult.EnemyCircle;
-        return ignoreCost || Funds.CanPay(tile, player, Balance.FrameCost) ? PlaceResult.Ok : PlaceResult.CannotAfford;
-    }
+    public static PlaceResult CheckFrame(Simulation sim, TileState tile, int player, int x, int y, bool ignoreCost = false) =>
+        sim.Content.Frame is { } frame
+            ? Placement.Check(sim, tile, player, frame.Id, x, y, 0, null, out _, ignoreCost)
+            : PlaceResult.NoSuchBuilding;
 
     internal static void PlaceFrame(Simulation sim, TileState tile, int player, int x, int y)
     {
         if (CheckFrame(sim, tile, player, x, y) != PlaceResult.Ok)
             return;
-        Funds.TryPay(tile, player, Balance.FrameCost);
-        tile.Grid.SetFrame(x, y, true);
+        Funds.TryPay(tile, player, sim.Content.Frame!.Cost);
+        tile.Grid.Lay(sim.Content.Frame, x, y);
     }
 
-    /// <summary>Frames are ownerless: anyone with presence may take one up; the refund goes to their nearest core there, if any.</summary>
-    internal static void RemoveFrame(Simulation sim, TileState tile, int player, int x, int y)
-    {
-        if (!tile.Grid.HasFrame(x, y) || !Territory.HasPresence(sim, player, tile))
-            return;
-        tile.Grid.SetFrame(x, y, false);
-        Funds.Refund(tile, player, x, y, 1, 1, Balance.FrameCost);
-    }
+    /// <summary>Frames are ownerless: anyone with presence may take one up, even under a building; the refund goes to their nearest core there, if any.</summary>
+    internal static void RemoveFrame(Simulation sim, TileState tile, int player, int x, int y) =>
+        sim.TryLift(tile, player, tile.Grid.Layers.Of(BuildingKind.Frame), x, y);
+
+    /// <summary>What one cell of frame costs (the content's <see cref="ContentDb.Frame"/>), for unit stats and factories.</summary>
+    public static IReadOnlyDictionary<string, int> FrameCost(ContentDb content) =>
+        content.Frame?.Cost ?? (IReadOnlyDictionary<string, int>)new Dictionary<string, int>();
 
     /// <summary>Everything an activation would take, found by walking the frame out from the core.</summary>
     public sealed record Plan(List<(int X, int Y)> Cells, List<PlacedBuilding> Buildings, PlacedBuilding Core);
@@ -124,7 +112,7 @@ public static class UnitAssembly
             return AssembleResult.NoCore;
         if (core.Owner != player)
             return AssembleResult.NotOwner;
-        if (!grid.HasFrame(core.X, core.Y))
+        if (!grid.Has(BuildingKind.Frame, core.X, core.Y))
             return AssembleResult.NoFrame;
 
         // Flood fill over frame cells, 4-connected.
@@ -135,7 +123,7 @@ public static class UnitAssembly
             foreach (var d in Directions.All)
             {
                 var next = (cells[i].X + d.Dx(), cells[i].Y + d.Dy());
-                if (!grid.HasFrame(next.Item1, next.Item2) || !seen.Add(next))
+                if (!grid.Has(BuildingKind.Frame, next.Item1, next.Item2) || !seen.Add(next))
                     continue;
                 if (cells.Count == cap)
                     return AssembleResult.TooLarge;
@@ -259,7 +247,7 @@ public static class UnitAssembly
             TileEntities.Drain(b, unit.Cargo);
         }
         foreach (var (cx, cy) in cells)
-            tile.Grid.SetFrame(cx, cy, false);
+            tile.Grid.Clear(BuildingKind.Frame, cx, cy);
         Built(sim, unit, tile, factory ?? core);
         return AssembleResult.Ok;
     }
@@ -299,7 +287,8 @@ public static class UnitAssembly
         {
             var (dx, dy) = Turn(c.GX - unit.CoreGX, c.GY - unit.CoreGY, q);
             int cx = coreX + dx, cy = coreY + dy;
-            if (!grid.Buildable(cx, cy) || grid.BuildingAt(cx, cy) != null || grid.HasFrame(cx, cy) || grid.WreckAt(cx, cy) != null)
+            if (sim.Content.Frame is not { } frame || grid.BuildingAt(cx, cy) != null || grid.WreckAt(cx, cy) != null
+                || Placement.Fits(sim.Content, grid, grid.Layers.Of(frame).Layer, cx, cy) != PlaceResult.Ok)
                 return DeployResult.Blocked;
             cells.Add((cx, cy));
         }
@@ -330,7 +319,7 @@ public static class UnitAssembly
         var unit = sim.UnitById(unitId)!;
         var tile = sim.Tiles[unit.TileId];
         foreach (var (x, y) in plan!.Cells)
-            tile.Grid.SetFrame(x, y, true);
+            tile.Grid.Lay(sim.Content.Frame!, x, y);
         for (int i = 0; i < plan.Blocks.Count; i++)
         {
             var (block, x, y, w, h, rotation) = plan.Blocks[i];

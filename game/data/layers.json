@@ -1,0 +1,15 @@
+// Cell layers (FB-022), bottom to top: the order they stack, are drawn and are taken up (topmost first).
+// Each cell of a layer holds one entry or nothing. Building layers hold the buildings that name them in buildings.json
+// ("layer"); the one item layer holds deposits. Behaviour comes from the buildings' kind (platform, wire, frame).
+//   sitsOn: what a cell needs for the layer to go there, any one of "ground" (buildable terrain or a floor), "water",
+//           or the id of a layer below. A layer entry can't be taken up while something on it would lose its footing.
+//   floor: buildings (and layers on "ground") may stand on it where the terrain alone wouldn't take them.
+//   underBuildings: may be laid under a building already standing there.
+//   blocksBuildings: no building may be placed over it.
+//   draw: "tiled" (edge to edge), "icon" (item sprite on the ground), "links" (joined to its neighbours).
+[
+  { "id": "deposit",  "name": "Deposits",          "holds": "items", "draw": "icon" },
+  { "id": "platform", "name": "Floating platforms", "sitsOn": ["water"], "floor": true, "draw": "tiled" },
+  { "id": "frame",    "name": "Unit frame",        "sitsOn": ["ground"], "underBuildings": true, "draw": "tiled" },
+  { "id": "cable",    "name": "Power cables",      "sitsOn": ["ground"], "underBuildings": true, "draw": "links" }
+]

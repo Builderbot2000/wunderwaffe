@@ -16,7 +16,7 @@ public sealed class SaveException(string message) : Exception(message);
 public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Hash, string Label, List<LoggedCommand> Commands, Snapshot? Snapshot = null)
 {
     /// <summary>3: rate mode, view commands and snapshots. No compatibility with older saves (OQ-34).</summary>
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 

@@ -5,7 +5,7 @@ namespace Wunderwaffe.Sim.Core;
 
 /// <summary>
 /// The whole changing state of a match at the start of a tick (NF-008), so a load can start here and replay only the
-/// commands after it. What never changes after generation (terrain, tile shapes, zones, deposits, names, circles) is
+/// commands after it. What never changes after generation (terrain, tile shapes, zones, names, circles) is
 /// rebuilt from the <see cref="GameSetup"/> instead, and derived caches (power networks, boosts, nav regions, paths'
 /// region tables) rebuild themselves. Anything new that is sim state must be captured and restored here as well as
 /// hashed in <see cref="StateHash"/>; <c>SnapshotTests</c> check the two agree.
@@ -62,34 +62,59 @@ public sealed record StatsSnap(long Bucket, List<SeriesSnap> Made, List<SeriesSn
 
 public sealed record ClaimSnap(int Player, int Ticks);
 
+/// <summary>
+/// One cell layer of a tile (FB-022), by layer id: runs of equal entries as (first cell, length, entry) triples, empty
+/// cells left out. Deposits are a layer too, so they survive depletion (RS-004) without code here.
+/// </summary>
+public sealed record LayerSnap(string Layer, List<int> Runs)
+{
+    internal static List<LayerSnap> Of(TileGrid g)
+    {
+        var list = new List<LayerSnap>();
+        for (int l = 0; l < g.Layers.Count; l++)
+        {
+            if (g.CountOn(l) == 0)
+                continue;
+            var cells = g.LayerCells(l);
+            var runs = new List<int>();
+            for (int i = 0; i < cells.Length;)
+            {
+                int j = i;
+                while (j < cells.Length && cells[j] == cells[i])
+                    j++;
+                if (cells[i] != 0)
+                    runs.AddRange([i, j - i, cells[i]]);
+                i = j;
+            }
+            list.Add(new LayerSnap(g.Layers[l].Id, runs));
+        }
+        return list;
+    }
+
+    internal void Restore(TileGrid g)
+    {
+        int l = g.Layers.ById(Layer)!.Index;
+        for (int r = 0; r < Runs.Count; r += 3)
+        {
+            for (int i = Runs[r]; i < Runs[r] + Runs[r + 1]; i++)
+                g.SetEntry(l, i % g.Width, i / g.Width, Runs[r + 2]);
+        }
+    }
+}
+
 public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingId, int NextWreckId,
-    List<int> Frames, List<int> Platforms, List<BuildingSnap> Buildings, List<Wreck> Wrecks, List<ClaimSnap> Claims, StatsSnap Stats,
-    bool Full, List<AccSnap> Rates, List<int> Cables)
+    List<LayerSnap> Layers, List<BuildingSnap> Buildings, List<Wreck> Wrecks, List<ClaimSnap> Claims, StatsSnap Stats,
+    bool Full, List<AccSnap> Rates)
 {
     internal static TileSnap Of(Simulation sim, TileState t)
     {
         var g = t.Grid;
-        var frames = new List<int>();
-        var platforms = new List<int>();
-        for (int i = 0; (g.FrameCount > 0 || g.PlatformCount > 0) && i < g.Width * g.Height; i++)
-        {
-            if (g.HasFrame(i % g.Width, i / g.Width))
-                frames.Add(i);
-            if (g.HasPlatform(i % g.Width, i / g.Width))
-                platforms.Add(i);
-        }
-        var cables = new List<int>();
-        for (int i = 0; g.CableCount > 0 && i < g.Width * g.Height; i++)
-        {
-            if (g.HasCable(i % g.Width, i / g.Width))
-                cables.Add(i);
-        }
         var rs = sim.RateState(t.Id);
         var acc = rs.Acc.Select((a, i) => (a, i)).Where(e => e.a != 0)
             .Select(e => new AccSnap(rs.AccKeys[e.i].Kind, rs.AccKeys[e.i].PortId, rs.AccKeys[e.i].Item, e.a)).ToList();
-        return new TileSnap(t.Id, t.Owner, g.Revision, g.NextBuildingId, g.NextWreckId, frames, platforms,
+        return new TileSnap(t.Id, t.Owner, g.Revision, g.NextBuildingId, g.NextWreckId, LayerSnap.Of(g),
             g.Buildings.Select(BuildingSnap.Of).ToList(), [.. g.Wrecks],
-            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc, cables);
+            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc);
     }
 
     internal void Restore(Simulation sim, TileState t)
@@ -102,12 +127,8 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
 
         var g = t.Grid;
         g.ClearForRestore();
-        foreach (int i in Frames)
-            g.SetFrame(i % g.Width, i / g.Width, true);
-        foreach (int i in Platforms)
-            g.SetPlatform(i % g.Width, i / g.Width, true);
-        foreach (int i in Cables)
-            g.SetCable(i % g.Width, i / g.Width, true);
+        foreach (var layer in Layers)
+            layer.Restore(g);
         foreach (var b in Buildings)
             b.Restore(sim.Content, g);
         foreach (var w in Wrecks)

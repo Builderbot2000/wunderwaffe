@@ -1,4 +1,5 @@
 using Wunderwaffe.Sim.Api;
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using static Wunderwaffe.Sim.Tests.Harness;
@@ -37,7 +38,7 @@ public class PowerLayerTests
         Place(sim, tile, "conveyor", 17, 10);
         Run(sim, 61);
 
-        Assert.Equal(9, grid.CableCount);
+        Assert.Equal(9, grid.CountOn(BuildingKind.Wire));
         Assert.Null(grid.BuildingAt(12, 10));
         Assert.Equal("container", grid.BuildingAt(14, 10)!.DefId);
         Assert.Equal(PlaceResult.Blocked, Placement.Check(sim, tile, Me, "wire", 12, 10, 0, null, out _));
@@ -50,10 +51,10 @@ public class PowerLayerTests
         // Removing on the belt's cell takes the belt; again, the cable under it, which cuts the drill off.
         Remove(sim, tile, 17, 10);
         Assert.Null(grid.BuildingAt(17, 10));
-        Assert.Equal(9, grid.CableCount);
+        Assert.Equal(9, grid.CountOn(BuildingKind.Wire));
         Assert.Same(grid.Power.NetworkOf(drill), grid.Power.NetworkOf(grid.BuildingAt(20, 10)!));
         Remove(sim, tile, 17, 10);
-        Assert.Equal(8, grid.CableCount);
+        Assert.Equal(8, grid.CountOn(BuildingKind.Wire));
         Assert.NotSame(grid.Power.NetworkOf(drill), grid.Power.NetworkOf(grid.BuildingAt(20, 10)!));
         Run(sim, 120);
         Assert.Equal(MachineStatus.NoPower, drill.Machine!.Status);

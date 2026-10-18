@@ -65,8 +65,9 @@ public enum BuildingKind
     Storage,
 
     /// <summary>
-    /// A floor laid on water (FB-017): not a building on the tile but a layer under its cells, like frame, that makes
-    /// them buildable ground. Ownerless; removed (and refunded) from an empty cell.
+    /// A floor laid on water (FB-017): not a building on the tile but an entry of a cell layer (FB-022, its
+    /// <see cref="BuildingDef.Layer"/>), marked <see cref="LayerDef.Floor"/> so buildings stand on it. Ownerless; removed
+    /// (and refunded) from an empty cell.
     /// </summary>
     Platform,
     /// <summary>Builds a library blueprint block by block within its radius, fed by belts, and lifts units off (UD-006).</summary>
@@ -76,8 +77,8 @@ public enum BuildingKind
     Locomotor,
 
     /// <summary>
-    /// Power cable (FB-005, FB-020): not a building on the tile but a layer under its cells, like frame. Buildings and
-    /// belts may stand on it; it joins every power building standing on or beside it, and the cables beside it, into one
+    /// Power cable (FB-005, FB-020): an entry of a cell layer (FB-022) under buildings, like frame. Every entry of its
+    /// layer is a cable: it joins every power building standing on or beside it, and the cables beside it, into one
     /// network. Ownerless; removed (and refunded) once nothing stands on the cell.
     /// </summary>
     Wire,
@@ -105,6 +106,13 @@ public enum BuildingKind
     /// into its network, besides what it touches.
     /// </summary>
     PowerNode,
+
+    /// <summary>
+    /// Unit frame (UD-010): an entry of a cell layer (FB-022) that buildings stand on; a core on frame lifts the
+    /// connected frame and what stands on it off as a unit. Ownerless. Blueprints, factories and landing lay the first
+    /// frame in buildings.json (<see cref="ContentDb.Frame"/>).
+    /// </summary>
+    Frame,
 }
 
 /// <summary>
@@ -167,6 +175,9 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// <param name="Menu">Build menu tab, one of <see cref="BuildingDef.Menus"/>.</param>
 /// <param name="PowerRadius">Power nodes only: cells from its footprint to the footprints it joins (FB-020).</param>
 /// <param name="Capacity">Cores only: most of each item its stock holds from deliveries (OQ-38, OQ-39); belts back up past it.</param>
+/// <param name="Layer">
+/// Platforms, cables and frames: the cell layer (layers.json, FB-022) the building is laid on instead of the building grid.
+/// </param>
 public sealed record BuildingDef(
     string Id,
     string Name,
@@ -197,7 +208,8 @@ public sealed record BuildingDef(
     BoosterDef? Booster = null,
     string Menu = "",
     int Capacity = 0,
-    int PowerRadius = 0)
+    int PowerRadius = 0,
+    string? Layer = null)
 {
     /// <summary>Build menu tabs, in the order the HUD shows them (and Shift+1.. picks them).</summary>
     public static readonly string[] Menus = ["production", "logistics", "power", "units", "combat", "boosters"];

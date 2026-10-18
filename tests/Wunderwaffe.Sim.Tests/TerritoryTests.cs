@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using static Wunderwaffe.Sim.Tests.Harness;
@@ -402,7 +403,7 @@ public class TerritoryTests
         long iron = Items(tile, "iron_ore");
         Place(sim, tile, "platform", x, y);
         sim.Step();
-        Assert.True(tile.Grid.HasPlatform(x, y));
+        Assert.True(tile.Grid.Has(BuildingKind.Platform, x, y));
         Assert.Null(tile.Grid.BuildingAt(x, y));
         Assert.Equal(iron - 2, Items(tile, "iron_ore"));
         Assert.Equal(PlaceResult.Blocked, Placement.Check(sim, tile, Me, "platform", x, y, 0, null, out _));
@@ -416,10 +417,10 @@ public class TerritoryTests
         // Removing takes the building first, then the platform, which is refunded.
         sim.Enqueue(new RemoveBuildingCommand(Me, tile.Id, x, y));
         sim.Step();
-        Assert.True(tile.Grid.HasPlatform(x, y));
+        Assert.True(tile.Grid.Has(BuildingKind.Platform, x, y));
         sim.Enqueue(new RemoveBuildingCommand(Me, tile.Id, x, y));
         sim.Step();
-        Assert.False(tile.Grid.HasPlatform(x, y));
+        Assert.False(tile.Grid.Has(BuildingKind.Platform, x, y));
         Assert.Equal(iron, Items(tile, "iron_ore"));
     }
 
@@ -490,7 +491,7 @@ public class TerritoryTests
             Assert.False(s.Grid.DepositCounts().ContainsKey("coal"));
             // Regional deposits one claim away (RS-003), so within two hops (OQ-22).
             Assert.Contains(sim.Neighbors(s), n => n.Grid.DepositCounts().ContainsKey("coal"));
-            var core = s.Grid.Buildings.Single(b => b.DefId == Simulation.CoreBuildingId);
+            var core = s.Grid.Buildings.Single(b => b.DefId == "core");
             Assert.True(s.InCircle(core.X + 1, core.Y + 1));
         }
         Assert.Equal(sim.StartTileIds, Simulation.NewGame(TestContent.Load(), setup).StartTileIds);
@@ -547,11 +548,11 @@ public class TerritoryTests
         Assert.Equal(PlaceResult.Ok, UnitAssembly.CheckFrame(sim, east, Me, 5, 5));
         sim.Enqueue(new PlaceFrameCommand(Me, east.Id, 5, 5));
         sim.Step();
-        Assert.True(east.Grid.HasFrame(5, 5));
-        Assert.Equal(10 - Balance.FrameCost["iron_ore"], mine.Stock!.Get("iron_ore"));
+        Assert.True(east.Grid.Has(BuildingKind.Frame, 5, 5));
+        Assert.Equal(10 - sim.Content.Frame!.Cost["iron_ore"], mine.Stock!.Get("iron_ore"));
         sim.Enqueue(new RemoveFrameCommand(Me, east.Id, 5, 5));
         sim.Step();
-        Assert.False(east.Grid.HasFrame(5, 5));
+        Assert.False(east.Grid.Has(BuildingKind.Frame, 5, 5));
         Assert.Equal(10, mine.Stock!.Get("iron_ore"));
         Assert.Equal(iron, Items(home, "iron_ore"));
     }

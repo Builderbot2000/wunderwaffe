@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 
@@ -58,7 +59,7 @@ static class Harness
         {
             for (int x = g.Width - 1; x >= 0; x--)
             {
-                if (g.InBounds(x, y) && g.Buildable(x, y) && g.IsFree(x, y, 1, 1) && !g.HasFrame(x, y))
+                if (g.InBounds(x, y) && g.Buildable(x, y) && g.IsFree(x, y, 1, 1) && !g.Has(BuildingKind.Frame, x, y))
                     return sim.AddCore(tile, player, x, y, "bank");
             }
         }
@@ -82,7 +83,7 @@ static class Harness
     }
 
     /// <summary>A core of <paramref name="player"/>'s at (x, y), put down unpaid and empty (see <see cref="Stock"/>).</summary>
-    public static PlacedBuilding PutCore(Simulation sim, TileState tile, int player, int x, int y, string defId = Simulation.CoreBuildingId) =>
+    public static PlacedBuilding PutCore(Simulation sim, TileState tile, int player, int x, int y, string? defId = null) =>
         sim.AddCore(tile, player, x, y, defId);
 
     /// <summary>
@@ -99,7 +100,7 @@ static class Harness
             for (int cx = x - 1; cx < end; cx++)
                 sim.Enqueue(new PlaceFrameCommand(player, tile.Id, cx, cy));
         sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "thruster", x - 1, y));
-        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, Simulation.CoreBuildingId, x, y));
+        sim.Enqueue(new PlaceBuildingCommand(player, tile.Id, "core", x, y));
         int bx = x + 2;
         foreach (var d in defs)
         {
