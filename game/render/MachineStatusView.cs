@@ -5,7 +5,7 @@ namespace Wunderwaffe.Game.Render;
 
 /// <summary>
 /// Marks machines on the viewed tile that have stopped (FB-006): amber when waiting for input, red when nothing takes
-/// their output, blue when its power network gives it nothing (FB-005). A machine only counts as stopped after <see cref="GraceTicks"/>, so the short gap between batches
+/// their output, blue when its power network gives it nothing (FB-005), grey when its deposit ran out (RS-004). A machine only counts as stopped after <see cref="GraceTicks"/>, so the short gap between batches
 /// doesn't flicker. Only machines in view are drawn.
 /// </summary>
 public partial class MachineStatusView : Node2D
@@ -15,6 +15,7 @@ public partial class MachineStatusView : Node2D
     static readonly Color Starved = new(1f, 0.72f, 0.2f);
     static readonly Color Blocked = new(1f, 0.3f, 0.28f);
     static readonly Color NoPower = new(0.45f, 0.65f, 1f);
+    static readonly Color Depleted = new(0.6f, 0.6f, 0.6f);
 
     SimHost _host = null!;
 
@@ -28,7 +29,7 @@ public partial class MachineStatusView : Node2D
 
     /// <summary>Why a machine is stopped, once it has been stopped long enough to matter; null if it's fine.</summary>
     public static MachineStatus? Stopped(MachineState m) =>
-        m.IdleTicks >= GraceTicks && m.Status is MachineStatus.Starved or MachineStatus.OutputFull or MachineStatus.NoPower ? m.Status : null;
+        m.IdleTicks >= GraceTicks && m.Status is MachineStatus.Starved or MachineStatus.OutputFull or MachineStatus.NoPower or MachineStatus.Depleted ? m.Status : null;
 
     public override void _Draw()
     {
@@ -45,7 +46,7 @@ public partial class MachineStatusView : Node2D
             var corner = new Vector2((b.X + b.Width) * px - 4, b.Y * px + 4);
             if (!visible.HasPoint(corner))
                 continue;
-            var color = why switch { MachineStatus.Starved => Starved, MachineStatus.NoPower => NoPower, _ => Blocked };
+            var color = why switch { MachineStatus.Starved => Starved, MachineStatus.NoPower => NoPower, MachineStatus.Depleted => Depleted, _ => Blocked };
             DrawCircle(corner, 4.5f, Colors.Black);
             DrawCircle(corner, 3.5f, color with { A = pulse });
         }

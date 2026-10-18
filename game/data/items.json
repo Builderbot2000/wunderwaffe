@@ -1,7 +1,7 @@
 [
-  { "id": "copper_ore",   "name": "Copper Ore",   "tier": 1 },
-  { "id": "iron_ore",     "name": "Iron Ore",     "tier": 1 },
-  { "id": "coal",         "name": "Coal",         "tier": 1, "regional": true },
+  { "id": "copper_ore",   "name": "Copper Ore",   "tier": 1, "deposit": { "perCell": 200, "levels": [50, 120] } },
+  { "id": "iron_ore",     "name": "Iron Ore",     "tier": 1, "deposit": { "perCell": 200, "levels": [50, 120] } },
+  { "id": "coal",         "name": "Coal",         "tier": 1, "regional": true, "deposit": { "perCell": 200, "levels": [50, 120] } },
   { "id": "copper_plate", "name": "Copper Plate", "tier": 2 },
   { "id": "iron_plate",   "name": "Iron Plate",   "tier": 2 },
   { "id": "steel",        "name": "Steel",        "tier": 3 },

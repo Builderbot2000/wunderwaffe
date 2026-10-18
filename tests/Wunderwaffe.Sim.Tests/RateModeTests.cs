@@ -170,7 +170,7 @@ public class RateModeTests(ITestOutputHelper output)
     {
         // FB-013: full sim while a player views the tile, rate mode otherwise.
         var (sim, home, east) = Factory();
-        Run(sim, 2);
+        Run(sim, Simulation.TicksPerSecond * 3 / 2);
         Assert.False(RateMode.IsFullSim(sim, home));
         View(sim, 0, home);
         Assert.True(RateMode.IsFullSim(sim, home));
@@ -438,5 +438,69 @@ public class RateModeTests(ITestOutputHelper output)
             ("fuel made", t => t.Stats.MadeTotal("fuel")),
             ("fuel used", t => t.Stats.UsedTotal("fuel")),
             ("ore used", t => t.Stats.UsedTotal("copper_ore")));
+    }
+
+    /// <summary>Total taken out of the tile's deposit patches so far (RS-004).</summary>
+    static long Mined(TileState t) => t.Grid.Patches.All.Sum(p => p.Start - p.Amount);
+
+    [Fact]
+    public void RateModeDrainsPatchesAsTheFullSimDoes()
+    {
+        // RS-004: what rate mode mines is a rate too, booster output included, and it is exactly what the drill makes.
+        TileState Build(Simulation sim)
+        {
+            var t = BoostedDrill(sim);
+            FindPatches(sim, t);
+            return t;
+        }
+        MatchesTheFullSim(Build, ("mined", Mined), ("made", t => t.Stats.MadeTotal("copper_ore")));
+    }
+
+    [Fact]
+    public void SwitchingModesLosesNoMinedOre()
+    {
+        // RS-004: viewed, left, viewed again: every ore made came out of a patch, none twice, none for free.
+        var (sim, home, east) = Factory();
+        FindPatches(sim, home);
+        FindPatches(sim, east);
+        for (int i = 0; i < 6; i++)
+        {
+            View(sim, 0, i % 2 == 0 ? home : null);
+            Run(sim, Minute / 2 + 17 * i);
+        }
+        foreach (var t in new[] { home, east })
+        {
+            long made = t.Stats.MadeTotal("copper_ore") + t.Stats.MadeTotal("iron_ore");
+            output.WriteLine($"tile {t.Id}: mined {Mined(t)}, made {made}");
+            Assert.True(made > 0);
+            Assert.InRange(Mined(t), made - 2, made);
+        }
+    }
+
+    [Fact]
+    public void APatchEmptyingInRateModeStopsItsDrills()
+    {
+        // RS-004: the patch runs out while nobody watches; its cells stop being deposits, the rates are solved again
+        // without the drill, and opening the tile shows the drill stopped.
+        var sim = RateSim();
+        var t = Tile(sim);
+        var patch = Patch(sim, t, "copper_ore", 2, 2, 30);
+        Place(sim, t, "drill", 2, 2);
+        Place(sim, t, "core_large", 4, 2);
+        sim.Step();
+        View(sim, 0, null);
+        Assert.False(RateMode.IsFullSim(sim, t));
+        Assert.True(RateMode.RatesOf(sim, t).RateOf(FlowKind.Mined, "copper_ore", patch.Id) > 0);
+
+        Run(sim, Minute);
+        Assert.True(patch.Empty);
+        Assert.Null(t.Grid.DepositAt(2, 2));
+        Assert.Equal(0, RateMode.RatesOf(sim, t).Total(FlowKind.Produced, "copper_ore"));
+        var core = t.Grid.BuildingAt(4, 2)!;
+        Assert.InRange(core.Stock!.Get("copper_ore") + t.Grid.BuildingAt(2, 2)!.Machine!.OutputCount, 30, 31);
+
+        View(sim, 0, t);                                    // It finishes the batch it froze in, from nothing.
+        Run(sim, Simulation.TicksPerSecond * 3 / 2);
+        Assert.Equal(MachineStatus.Depleted, t.Grid.BuildingAt(2, 2)!.Machine!.Status);
     }
 }
