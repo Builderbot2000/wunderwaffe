@@ -124,25 +124,47 @@ public class AiModuleTests
         var c = AiContext.Observe(sim, 0);
         Assert.Contains(new EconomyModule().Propose(c), p => p.Key == $"base@{c.Home}");
         Assert.Empty(new ExpansionModule().Propose(c));     // no ore lines yet
-        Assert.Empty(new ProductionModule().Propose(c));    // no home core off the frame yet, no coal tile
+        Assert.Empty(new ProductionModule().Propose(c));    // no home core off the frame yet, no tile with the missing deposit
         Assert.Equal("scout", c.Design?.Name);
     }
 
     [Fact]
-    public void TheFirstScoutCarriesWhatTheCoalTileNeeds()
+    public void ThePlanChainsWhatTheDesignNeedsBackToDeposits()
+    {
+        // MP-007: the scout's thrusters want steel; steel wants plates and coal; the buildings on the way want ores and
+        // plates. Home has no coal, so the steel chain misses it.
+        var sim = Simulation.NewGame(TestContent.Load(), new GameSetup(5, 5, 3037));
+        var plan = AiContext.Observe(sim, 0).Plan;
+        var steel = plan.Of("steel")!.Chain;
+        Assert.False(steel.IsLinear);
+        Assert.Equal(["coal", "iron_ore"], steel.Leaves);
+        Assert.Equal(["coal"], plan.Missing);
+        var plate = plan.Of("iron_plate")!.Chain;
+        Assert.True(plate.IsLinear);
+        Assert.Equal("iron_ore", plate.Deposit);
+        Assert.Equal("smelter", Assert.Single(plate.Stages).BuildingId);
+        Assert.Equal(["copper_ore", "iron_ore"], plan.Raw.Select(d => d.Item).Order(StringComparer.Ordinal));
+        Assert.Equal("drill", plan.Of("copper_ore")!.Chain.Building.Id);
+        Assert.Null(plan.Of("coal"));     // only the mill wants it, not the core
+    }
+
+    [Fact]
+    public void TheFirstScoutCarriesWhatTheMissingDepositsTileNeeds()
     {
         var sim = Simulation.NewGame(TestContent.Load(), new GameSetup(5, 5, 3037));
         var c = AiContext.Observe(sim, 0);
-        int coal = ExpansionModule.CoalTarget(c);
-        Assert.True(coal >= 0);
-        Assert.Contains(coal, c.Tiles[c.Home].Neighbors);
-        Assert.True(c.HasDeposit(coal, AiContext.Coal));
+        var (target, item) = ExpansionModule.Target(c);
+        Assert.True(target >= 0);
+        Assert.Equal("coal", item);
+        Assert.Contains(target, c.Tiles[c.Home].Neighbors);
+        Assert.True(c.HasDeposit(target, item!));
 
-        var (belt, wire, x, y) = ProductionModule.CoalRun(c, coal, c.Home);
+        var (belt, wire, x, y) = ProductionModule.ExportRun(c, target, c.Home, item!);
         Assert.True(x >= 0 && belt >= 0 && wire >= 0);
         var carry = ProductionModule.Carry(c);
         var defs = sim.Content.Buildings;
-        Assert.True(carry[AiContext.CopperOre] >= ProductionModule.MinCarry[AiContext.CopperOre]);
-        Assert.True(carry[AiContext.CopperOre] >= defs["export_port"].Cost["copper_ore"] + defs["drill"].Cost["copper_ore"] + belt + wire);
+        foreach (var (id, n) in ProductionModule.MinCarry(c))
+            Assert.True(carry[id] >= n);
+        Assert.True(carry["copper_ore"] >= defs["export_port"].Cost["copper_ore"] + defs["drill"].Cost["copper_ore"] + belt + wire);
     }
 }

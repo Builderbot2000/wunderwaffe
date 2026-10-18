@@ -94,9 +94,7 @@ public static class Planner
             return null;
         }
 
-        var drill = sim.Content.Buildings.Values.FirstOrDefault(d =>
-            sim.Content.RecipesByBuilding.GetValueOrDefault(d.Id)?.Any(r => r.Inputs.Count == 0 && r.Outputs.ContainsKey(depositItem)) == true);
-        if (drill == null)
+        if (Roles.Extractor(sim.Content, depositItem) is not { Building: var drill })
             return null;
         int tries = 0;
         foreach (var (x, y) in layout.Candidates(drill, depositItem, null, sx, sy))
@@ -142,7 +140,8 @@ public static class Planner
 
     /// <summary>
     /// Where building <paramref name="id"/>'s output ends up: itself if nothing takes it, the building it feeds
-    /// directly, or the building at the end of the belt it feeds. Lets drivers tell what a line is for.
+    /// directly (an import port: the machine beside it), or the building at the end of the belt it feeds. Lets drivers
+    /// tell what a line is for.
     /// </summary>
     public static PlacedBuilding? OutletOf(TileState tile, PlacedBuilding b)
     {
@@ -159,6 +158,7 @@ public static class Planner
                 return EndOfBelt(g, next);
             }
             if (next.Kind is BuildingKind.Core or BuildingKind.ExportPort
+                || (b.Kind == BuildingKind.ImportPort && next.Machine?.Recipe is { Inputs.Count: > 0 })
                 || (next.Machine?.Recipe is { } r && b.Machine?.Recipe is { } mine && mine.Outputs.Keys.Any(r.Inputs.ContainsKey)))
                 return next;
         }
@@ -380,11 +380,10 @@ public static class Planner
                     plan.Add(new PlannedBuilding(def.Id, node.X, node.Y, 0, stage.RecipeId));
                     prev = node;
                 }
-                if (Route(prev, target) is not { } belt)
+                if (Route(prev, target) is not { } belt || Roles.Cheapest(sim.Content, BuildingKind.Conveyor) is not { } conveyor)
                     return null;
-                plan.AddRange(belt.Select(s => new PlannedBuilding("conveyor", s.X, s.Y, s.Rotation, null)));
                 // The belt's cells are taken too, for the wiring.
-                var conveyor = sim.Content.Buildings["conveyor"];
+                plan.AddRange(belt.Select(s => new PlannedBuilding(conveyor.Id, s.X, s.Y, s.Rotation, null)));
                 foreach (var s in belt)
                 {
                     Push(new Node(s.X, s.Y, 1, 1, conveyor, null, null));
@@ -393,7 +392,7 @@ public static class Planner
                 var machines = _planned.Skip(_planned.Count - pushed).Prepend(start).Where(n => n.Real == null && n.Def.Power > 0).ToList();
                 if (Wire(player, machines) is not { } wires)
                     return null;
-                plan.AddRange(wires.Select(w => new PlannedBuilding("wire", w.X, w.Y, 0, null)));
+                plan.AddRange(wires.Select(w => new PlannedBuilding(Roles.Cheapest(sim.Content, BuildingKind.Wire)!.Id, w.X, w.Y, 0, null)));
                 return plan;
             }
             finally
@@ -418,7 +417,7 @@ public static class Planner
             bool offFrame = sources.Count > 0;
             if (!offFrame)
                 sources = _g.Buildings.Where(Supplied).ToList();
-            if (!sim.Content.Buildings.TryGetValue("wire", out var wire) || sources.Count == 0)
+            if (Roles.Cheapest(sim.Content, BuildingKind.Wire) is not { } wire || sources.Count == 0)
                 return wires;
             int added = 0;
             try

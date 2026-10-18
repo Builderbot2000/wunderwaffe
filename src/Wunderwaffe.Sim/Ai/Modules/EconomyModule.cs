@@ -1,13 +1,13 @@
-using Wunderwaffe.Sim.Api;
 using Wunderwaffe.Sim.Core;
-using static Wunderwaffe.Sim.Ai.AiContext;
+using Wunderwaffe.Sim.World;
 
 namespace Wunderwaffe.Sim.Ai.Modules;
 
 /// <summary>
-/// Economy (MP-006): clears machines whose output goes nowhere, keeps a home core off the frame, runs ore and plate
-/// lines into the home core and a copper and iron line into each outpost's core. Outposts the strategic layer marks
-/// Reinforce (under threat) come after everything else.
+/// Economy (MP-006, MP-007): clears machines whose output goes nowhere, keeps a home core off the frame, and runs a line
+/// into the home core for every wanted item the home can make in one line (<see cref="AiContext.IsHomeLine"/>), heaviest
+/// demand first, as many as <see cref="AiContext.Want"/>; each outpost gets a line of every raw wanted item it holds into
+/// its own core. Outposts the strategic layer marks Reinforce (under threat) come after everything else.
 /// </summary>
 public sealed class EconomyModule : IAiModule
 {
@@ -17,13 +17,13 @@ public sealed class EconomyModule : IAiModule
 
     public IEnumerable<Proposal> Propose(AiContext c)
     {
-        // A drill or smelter whose output goes nowhere (a line cut short) comes away: a full refund.
+        // A machine whose output goes nowhere (a line cut short) comes away: a full refund.
         foreach (int t in c.Owned)
         {
             foreach (var (id, outlet) in c.Outlets[t])
             {
                 var b = c.Buildings[t][id];
-                if (outlet < 0)
+                if (outlet < 0 && c.IsProducer(b))
                     yield return new Proposal($"clean@{t}:{id}", CleanScore, [new RemoveBuildingCommand(c.Player, t, b.X, b.Y)],
                         $"{b.DefId} feeds nothing", Locks: [Proposal.Layout(t)]);
             }
@@ -33,36 +33,32 @@ public sealed class EconomyModule : IAiModule
         // A home core off the frame, so the home keeps funds when the starting unit lifts off (FB-019).
         if (c.BaseCore(h) is not { } core)
         {
-            if (c.Place("base", BaseScore, h, CoreDef, c.Q.FindSpot(h, CoreDef)) is { } p)
+            if (c.Place("base", BaseScore, h, c.CoreDef.Id, c.Q.FindSpot(h, c.CoreDef.Id)) is { } p)
                 yield return p;
         }
         else
         {
-            int extra = c.Find(h, Mill) != null ? 1 : 0;
-            Proposal?[] lines =
-            [
-                c.Line("copper", HomeScore, h, CopperOre, [], core, "mine_copper_ore", 2 + extra),
-                c.Line("iron_plate", HomeScore - 1, h, IronOre, [new Stage(Smelter, "smelt_iron")], core, "smelt_iron", 2 + extra),
-                c.Line("iron", HomeScore - 2, h, IronOre, [], core, "mine_iron_ore", 1 + extra),
-                c.Line("copper_plate", HomeScore - 3, h, CopperOre, [new Stage(Smelter, "smelt_copper")], core, "smelt_copper", 1 + extra),
-            ];
-            foreach (var line in lines)
+            int score = HomeScore;
+            foreach (var d in c.Plan.Items.Where(c.IsHomeLine))
             {
-                if (line != null)
+                if (c.Lines(h, d.Chain.Recipe.Id, core.Id) < c.Want(d) && c.Line(d.Item, score, h, d.Chain.Deposit, d.Chain.Stages, core) is { } line)
                     yield return line;
+                score--;
             }
         }
 
-        // Every other tile: a copper and an iron ore line into its first core, paid from what the landed unit brought.
+        // Every other tile: a line of each raw wanted item into its first core, paid from what the landed unit brought.
         foreach (int t in c.Owned)
         {
             if (t == h || c.Cores(t).FirstOrDefault() is not { } outpost)
                 continue;
             int score = c.GoalOf(t) == TileGoal.Reinforce ? ThreatenedScore : OutpostScore;
-            if (c.Line("outpost_copper", score, t, CopperOre, [], outpost, "mine_copper_ore", 1) is { } copper)
-                yield return copper;
-            if (c.Line("outpost_iron", score - 1, t, IronOre, [], outpost, "mine_iron_ore", 1) is { } iron)
-                yield return iron;
+            foreach (var d in c.Plan.Raw)
+            {
+                if (c.Lines(t, d.Chain.Recipe.Id, outpost.Id) < 1 && c.Line($"outpost_{d.Item}", score, t, d.Item, [], outpost) is { } line)
+                    yield return line;
+                score--;
+            }
         }
     }
 }

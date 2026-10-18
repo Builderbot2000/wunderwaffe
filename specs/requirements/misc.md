@@ -92,7 +92,7 @@ Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HU
 
 **Acceptance criteria:** Designers can add content without recompiling.
 
-**As built:** Items, recipes, buildings, goals, terrain, cell layers (layers.json, FB-022) and prefabs are JSON in game/data, validated at load. The unit frame is a buildings.json entry (kind frame, its cost there; no Balance.FrameCost) and the core is found by kind (ContentDb.DefaultCore, no Simulation.CoreBuildingId). New building behaviours still need code, and the AI and planner still name some ids (MP-007).
+**As built:** Items, recipes, buildings, goals, terrain, cell layers (layers.json, FB-022) and prefabs are JSON in game/data, validated at load. The unit frame is a buildings.json entry (kind frame, its cost there; no Balance.FrameCost) and the core is found by kind (ContentDb.DefaultCore, no Simulation.CoreBuildingId). New building behaviours still need code. The AI and planner name no content id: buildings by role, production planned from the recipe graph (MP-007).
 
 **Notes:** Owner, 2026-10-18: content ids still in code move to data: the frame cost (Balance.FrameCost, into a frame entry in buildings.json), the core found by kind instead of Simulation.CoreBuildingId, and the AI's ids (MP-007).
 

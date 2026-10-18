@@ -14,7 +14,7 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 | [MP-004](#mp-004-diplomacy) | Diplomacy | Could | Proposed | No | Beta | Functional | P8 | MP-003, IO-002 |  |  |
 | [MP-005](#mp-005-match-settings) | Match settings | Should | Done | Yes | Alpha | Functional | P8 | MP-001 | Updated |  |
 | [MP-006](#mp-006-ai-framework) | AI framework | Must | Done | Yes | MVP | Non-Functional | P8 | MP-002, NF-009, FB-021 | New |  |
-| [MP-007](#mp-007-content-agnostic-ai) | Content-agnostic AI | Must | Approved | No | MVP | Non-Functional | P8 | MP-006, RS-002 |  |  |
+| [MP-007](#mp-007-content-agnostic-ai) | Content-agnostic AI | Must | Done | Yes | MVP | Non-Functional | P8 | MP-006, RS-002 |  |  |
 | [MP-008](#mp-008-ai-head-starts) | AI head starts | Should | Approved | No | Alpha | Functional | P8 | FB-021, MP-005, WM-017 |  |  |
 
 ### MP-001 Domination victory
@@ -81,7 +81,7 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 
 **Acceptance criteria:** Buildings are found by role (BuildingKind and recipe: the cheapest conveyor, an extractor for an item, a crafter for a recipe), not by id. Demand comes from what the AI wants to build (its chosen unit design, turrets, the next goal); a chain planner expands each needed item backwards through the recipe graph (recipe, building, inputs) down to extraction and deposits. An input with no deposit on an owned tile makes tiles holding it expansion targets, replacing any fixed 'coal first' rule. Unit and turret value comes from stats (UnitStats, Combat.Dps), as today. Content may add optional AI hints (such as a priority) where the derived plan is wrong; none are required. Test: with the item, recipe and building ids renamed in the test content, the AI still plays the goal chain (AiTests).
 
-**As built:** Not built: AiContext names drill, smelter, steel_mill, core, conveyor, wire, copper_ore, iron_ore and coal; EconomyModule builds fixed ore and plate lines, ProductionModule the steel chain, ExpansionModule takes coal first.
+**As built:** Ai/* and Api/Planner.cs name no item, recipe or building id. Api/Roles.cs finds buildings by role: the cheapest building of a kind (conveyor, wire, ports), the cheapest machine with an extraction recipe for an item, the crafting recipes making an item; the core is ContentDb.DefaultCore. Ai/AiPlan.cs is the chain planner: demand starts from the chosen design's cost (AiDesigns.Pick) and the current produce goal's item and grows by the cost of every building the plan needs; each item is chained backwards (recipe, machine, inputs) to deposits, preferring fewest missing deposits, then fewest steps. EconomyModule runs a line per one-line home item into the home core (count from demand weight) and raw lines into outposts; ProductionModule places machines of several inputs beside an import port and feeds each input (local lines, or export lines on an owned neighbour); ExpansionModule targets home neighbours holding a missing deposit (replaces coal first), and the first scout's carry is sized for that tile's export run. Units from the design as before. No turret demand yet (the AI builds no turrets) and no content hints were needed. Test: AiTests plays the goal chain with every id renamed (TestContent.Renamed).
 
 **Notes:** Owner, 2026-10-18: do this before the content and balance update (OQ-50).
 

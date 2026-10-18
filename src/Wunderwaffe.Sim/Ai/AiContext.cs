@@ -7,17 +7,22 @@ namespace Wunderwaffe.Sim.Ai;
 
 /// <summary>
 /// What one think observes (MP-006), built fresh from <see cref="GameQuery"/> each time: the seat's tiles, their
-/// buildings and machine outlets, the tile goals of the strategic layer, and the proposal helpers modules share.
-/// Nothing in it outlives the think except the layout cache, which only remembers what the state gives.
+/// buildings and machine outlets, the tile goals of the strategic layer, the economy's <see cref="AiPlan"/> and the
+/// proposal helpers modules share. It names no item, recipe or building (MP-007): buildings come by role
+/// (<see cref="Roles"/>). Nothing in it outlives the think except the layout cache, which only remembers what the state gives.
 /// </summary>
 public sealed class AiContext
 {
-    public const string Drill = "drill", Smelter = "smelter", Mill = "steel_mill", CoreDef = "core", Conveyor = "conveyor", Wire = "wire";
-    public const string ExportPort = "export_port", ImportPort = "import_port";
-    public const string CopperOre = "copper_ore", IronOre = "iron_ore", Coal = "coal";
+    /// <summary>Demand weight per extra line of an item into the base core (<see cref="Want"/>).</summary>
+    public const int WeightPerLine = 40;
+
+    /// <summary>Most lines of one item into the base core before the seat's machines all stand (<see cref="Want"/>).</summary>
+    public const int MaxLines = 2;
 
     readonly PlanCache _plans;
     readonly Dictionary<int, TileInfo> _tiles = [];
+    AiPlan? _plan;
+    bool? _advanced;
 
     internal AiContext(GameQuery q, PlanCache plans, AiDesign? design)
     {
@@ -31,12 +36,15 @@ public sealed class AiContext
         {
             var all = q.Buildings(t);
             Buildings[t] = all.ToDictionary(b => b.Id);
-            Outlets[t] = all.Where(b => b.Owner == Player && b.DefId is Drill or Smelter or Mill)
+            Outlets[t] = all.Where(b => b.Owner == Player && (IsProducer(b) || Kind(b) == BuildingKind.ImportPort))
                 .ToDictionary(b => b.Id, b => q.OutletOf(t, b.Id));
         }
         int start = q.StartTile();
         Home = Owned.Contains(start) ? start : Owned.FirstOrDefault(t => Cores(t).Any(), -1);
         Units = q.Units(Player);
+        CoreDef = q.Content.DefaultCore!;
+        ExportPort = Roles.Cheapest(q.Content, BuildingKind.ExportPort);
+        ImportPort = Roles.Cheapest(q.Content, BuildingKind.ImportPort);
     }
 
     /// <summary>A context for <paramref name="player"/> with the strategic layer run: what a think sees, for tests and tools.</summary>
@@ -59,7 +67,16 @@ public sealed class AiContext
 
     public IReadOnlyList<UnitInfo> Units { get; }
     public Dictionary<int, Dictionary<int, BuildingView>> Buildings { get; } = [];
+
+    /// <summary>Per tile, the seat's machines with outputs and its import ports, and the building each one's output ends in (-1: none).</summary>
     public Dictionary<int, Dictionary<int, int>> Outlets { get; } = [];
+
+    /// <summary>The core the seat builds (<see cref="ContentDb.DefaultCore"/>).</summary>
+    public BuildingDef CoreDef { get; }
+
+    /// <summary>The cheapest export and import ports, or null if the content has none.</summary>
+    public BuildingDef? ExportPort { get; }
+    public BuildingDef? ImportPort { get; }
 
     /// <summary>The unit design picked from the prefabs at <see cref="AiPlayer.Init"/>; null if there is none.</summary>
     public AiDesign? Design { get; }
@@ -73,14 +90,17 @@ public sealed class AiContext
     public IEnumerable<TileInfluence> WithGoal(TileGoal goal) =>
         Influence.Where(i => i.Goal == goal).OrderByDescending(i => i.Priority).ThenBy(i => i.Tile);
 
-    public BuildingView? Find(int tile, string defId) => Buildings[tile].Values.FirstOrDefault(b => b.DefId == defId);
+    public BuildingKind Kind(BuildingView b) => Q.Content.Buildings[b.DefId].Kind;
+
+    /// <summary>A machine running a recipe that makes something (not a generator burning fuel).</summary>
+    public bool IsProducer(BuildingView b) => b.RecipeId is { } r && Q.Content.Recipes[r].Outputs.Count > 0;
 
     /// <summary>True if the building stands on frame: a core there is a unit waiting to lift off.</summary>
     public bool OnFrame(int tile, BuildingView b) => Q.Cells(tile, b.X, b.Y, 1, 1)[0].Frame;
 
     /// <summary>The seat's cores on the tile, in id order (the order they pay in, FB-019).</summary>
     public IEnumerable<BuildingView> Cores(int tile) =>
-        Buildings[tile].Values.Where(b => b.Owner == Player && Q.Content.Buildings[b.DefId].Kind == BuildingKind.Core).OrderBy(b => b.Id);
+        Buildings[tile].Values.Where(b => b.Owner == Player && Kind(b) == BuildingKind.Core).OrderBy(b => b.Id);
 
     /// <summary>The core the tile's lines feed: the first of the seat's cores not on frame, so it stays when units lift off.</summary>
     public BuildingView? BaseCore(int tile) => Cores(tile).FirstOrDefault(b => !OnFrame(tile, b));
@@ -88,6 +108,59 @@ public sealed class AiContext
     /// <summary>Machines on the tile making <paramref name="recipe"/> whose output ends in <paramref name="sink"/>.</summary>
     public int Lines(int tile, string recipe, int sink) =>
         Outlets[tile].Count(kv => Buildings[tile][kv.Key].RecipeId == recipe && kv.Value == sink);
+
+    /// <summary>The seat's machine on the tile making <paramref name="recipe"/> whose output ends in <paramref name="sink"/>.</summary>
+    public BuildingView? MachineInto(int tile, string recipe, int sink) =>
+        Outlets[tile].Where(kv => kv.Value == sink && Buildings[tile][kv.Key].RecipeId == recipe).Select(kv => Buildings[tile][kv.Key]).FirstOrDefault();
+
+    /// <summary>True if one of the seat's import ports on <paramref name="tile"/>, paired with <paramref name="from"/>, feeds <paramref name="sink"/>.</summary>
+    public bool ImportsInto(int tile, int from, int sink) =>
+        Outlets[tile].Any(kv => kv.Value == sink && Buildings[tile][kv.Key] is var b && Kind(b) == BuildingKind.ImportPort && b.Partner == from);
+
+    // ---- The economy plan (MP-007) ----
+
+    /// <summary>
+    /// The economy plan (<see cref="AiPlan"/>): demand from the design's cost and the current goal's item, chained
+    /// through the recipes, with deposits on home and on owned neighbours of home counted as minable.
+    /// </summary>
+    public AiPlan Plan => _plan ??= AiPlan.Build(Q.Content, Design?.Cost ?? new Dictionary<string, int>(),
+        Q.Goal() is { Type: "produce", Item: { } item } ? [item] : [], Available);
+
+    /// <summary>True if home or an owned neighbour of home holds a deposit of <paramref name="item"/>.</summary>
+    public bool Available(string item)
+    {
+        if (!_available.TryGetValue(item, out bool yes))
+            _available[item] = yes = Home >= 0 && (HasDeposit(Home, item) || ImportTile(item) >= 0);
+        return yes;
+    }
+
+    readonly Dictionary<string, bool> _available = [];
+
+    /// <summary>
+    /// The owned neighbour of home that ships <paramref name="item"/> from its deposits: one already linked to home by an
+    /// import port first, then by id; -1 if none.
+    /// </summary>
+    public int ImportTile(string item)
+    {
+        var linked = Buildings[Home].Values.Where(b => b.Owner == Player && Kind(b) == BuildingKind.ImportPort).Select(b => b.Partner).ToHashSet();
+        return Owned.Where(t => t != Home && Tiles[Home].Neighbors.Contains(t) && HasDeposit(t, item))
+            .OrderBy(t => linked.Contains(t) ? 0 : 1).ThenBy(t => t).DefaultIfEmpty(-1).First();
+    }
+
+    /// <summary>A wanted item made at home by one line straight into the base core: the economy module's part.</summary>
+    public bool IsHomeLine(Demand d) => d.Chain.IsLinear && HasDeposit(Home, d.Chain.Deposit);
+
+    /// <summary>
+    /// Lines of <paramref name="d"/> wanted into the base core: one plus one per <see cref="WeightPerLine"/> of demand, at
+    /// most <see cref="MaxLines"/>, and one more once <see cref="Advanced"/>.
+    /// </summary>
+    public int Want(Demand d) => Math.Clamp(1 + d.Weight / WeightPerLine, 1, MaxLines) + (Advanced ? 1 : 0);
+
+    /// <summary>True once every wanted item that needs a machine of several inputs has one feeding the base core at home.</summary>
+    public bool Advanced => _advanced ??= BaseCore(Home) is { } core
+        && Plan.Items.Where(d => !d.Chain.IsLinear).All(d => Lines(Home, d.Chain.Recipe.Id, core.Id) > 0);
+
+    // ---- Tile facts ----
 
     /// <summary>The tile's full view, fetched once per think.</summary>
     public TileInfo Tile(int tile)
@@ -116,22 +189,23 @@ public sealed class AiContext
     // ---- Proposal helpers ----
 
     /// <summary>
-    /// A line on <paramref name="tile"/> from a <paramref name="deposit"/> through <paramref name="stages"/> into
-    /// <paramref name="sink"/>, if fewer than <paramref name="want"/> feed it already and the planner finds room.
+    /// A line on <paramref name="tile"/> from a <paramref name="deposit"/> (with none: from the existing building
+    /// <paramref name="source"/>, or the first stage placed anywhere, inside the I/O zone facing tile <paramref name="zone"/>
+    /// if given) through <paramref name="stages"/> into <paramref name="sink"/>, if the planner finds room. Whether one is
+    /// wanted is the caller's question.
     /// </summary>
-    public Proposal? Line(string key, int score, int tile, string? deposit, IReadOnlyList<Stage> stages, BuildingView? sink, string recipe,
-        int want, int source = -1, int zone = -1)
+    public Proposal? Line(string key, int score, int tile, string? deposit, IReadOnlyList<Stage> stages, BuildingView? sink,
+        int source = -1, int zone = -1)
     {
-        if (sink == null || Lines(tile, recipe, sink.Id) >= want)
-            return null;
-        if (deposit != null && !HasDeposit(tile, deposit))
+        if (sink == null || (deposit != null && !HasDeposit(tile, deposit)))
             return null;
         string planKey = $"{deposit}/{source}/{zone}/{string.Join(",", stages.Select(s => s.BuildingId + s.RecipeId))}/{sink.Id}";
         if (_plans.Get(Q, tile, "line:" + planKey, () => Q.PlanLine(tile, deposit, source, stages, sink.Id, zone)) is not { } plan)
             return null;
         var commands = plan.Select(p => (Command)new PlaceBuildingCommand(Player, tile, p.BuildingId, p.X, p.Y, p.Rotation, p.RecipeId)).ToList();
         var cost = Sum(plan.Select(p => Q.Content.Buildings[p.BuildingId].Cost));
-        return new Proposal($"{key}@{tile}", score, commands, $"{recipe} line, {plan.Count} buildings", tile, cost, [Proposal.Layout(tile)]);
+        string what = stages.Count > 0 ? stages[^1].RecipeId ?? stages[^1].BuildingId : deposit ?? "";
+        return new Proposal($"{key}@{tile}", score, commands, $"{what} line into {sink.DefId}, {plan.Count} buildings", tile, cost, [Proposal.Layout(tile)]);
     }
 
     /// <summary>One building at <paramref name="spot"/>, if the sim's placement check passes (affordability is the framework's).</summary>

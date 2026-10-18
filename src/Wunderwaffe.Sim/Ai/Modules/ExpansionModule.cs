@@ -1,27 +1,30 @@
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
-using static Wunderwaffe.Sim.Ai.AiContext;
 
 namespace Wunderwaffe.Sim.Ai.Modules;
 
 /// <summary>
-/// Expansion (MP-006): claims tiles the way a player does (WM-006). A unit flies to the victory circle of the best
-/// tile the strategic layer marks Expand and lands there; its blocks hold the circle until the timer fills. The coal
-/// tile first, then, once steel flows, any Expand tile by its priority. One claim at a time.
+/// Expansion (MP-006, MP-007): claims tiles the way a player does (WM-006). A unit flies to the victory circle of the best
+/// tile the strategic layer marks Expand and lands there; its blocks hold the circle until the timer fills. While the
+/// plan misses a deposit (<see cref="AiPlan.Missing"/>), only home's neighbours holding one are targets (an import
+/// needs a port pair with home); once nothing is missing and the machines stand (<see cref="AiContext.Advanced"/>), any
+/// Expand tile by its priority. One claim at a time, and only once every home line runs.
 /// </summary>
 public sealed class ExpansionModule : IAiModule
 {
     public const int LandScore = 950, SendScore = 400;
 
-    /// <summary>Added to a home neighbour with coal while the seat has none: steel needs it.</summary>
-    public const int CoalBonus = 1000;
-
     public string Name => "expansion";
 
-    /// <summary>The first claim's likely target: the best Expand tile next to home with coal, or -1.</summary>
-    public static int CoalTarget(AiContext c) =>
-        c.WithGoal(TileGoal.Expand).Where(g => c.Tiles[c.Home].Neighbors.Contains(g.Tile) && c.HasDeposit(g.Tile, Coal))
-            .Select(g => g.Tile).DefaultIfEmpty(-1).First();
+    /// <summary>The Expand tiles next to home holding a deposit the plan misses, best first.</summary>
+    public static IEnumerable<int> MissingTargets(AiContext c) =>
+        c.WithGoal(TileGoal.Expand)
+            .Where(g => c.Tiles[c.Home].Neighbors.Contains(g.Tile) && c.Plan.Missing.Any(m => c.HasDeposit(g.Tile, m)))
+            .Select(g => g.Tile);
+
+    /// <summary>The first claim's likely target and the missing deposit it is for, or (-1, null).</summary>
+    public static (int Tile, string? Item) Target(AiContext c) =>
+        MissingTargets(c).Select(t => (t, (string?)c.Plan.Missing.First(m => c.HasDeposit(t, m)))).DefaultIfEmpty((-1, null)).First();
 
     public IEnumerable<Proposal> Propose(AiContext c)
     {
@@ -37,11 +40,9 @@ public sealed class ExpansionModule : IAiModule
         }
 
         int h = c.Home;
-        bool haveCoal = c.Owned.Any(t => t != h && c.HasDeposit(t, Coal));
-        bool steel = c.Find(h, Mill) != null;
-        int baseCore = c.BaseCore(h)?.Id ?? -1;
-        bool basics = c.Lines(h, "mine_copper_ore", baseCore) >= 2 && c.Lines(h, "smelt_iron", baseCore) >= 1;
-        if (!basics || (haveCoal && !steel))
+        var missing = c.Plan.Missing;
+        bool basics = c.BaseCore(h) is { } core && c.Plan.Items.Where(c.IsHomeLine).All(d => c.Lines(h, d.Chain.Recipe.Id, core.Id) > 0);
+        if (!basics || (missing.Count == 0 && !c.Advanced))
             yield break;
         // One claim at a time: a unit on its way to a circle, or a circle being held, waits for the outcome.
         var tiles = c.Tiles;
@@ -51,15 +52,10 @@ public sealed class ExpansionModule : IAiModule
         if (units.Where(u => !u.Moving).OrderBy(u => u.Id).FirstOrDefault() is not { } scout)
             yield break;
 
-        var homeNeighbors = c.Tiles[h].Neighbors;
-        var best = c.WithGoal(TileGoal.Expand)
-            .Select(g => (g.Tile, g.Priority))
-            .Where(t => haveCoal || (homeNeighbors.Contains(t.Tile) && c.HasDeposit(t.Tile, Coal)))
-            .OrderByDescending(t => (!haveCoal && c.HasDeposit(t.Tile, Coal) ? CoalBonus : 0) + t.Priority)
-            .ThenBy(t => t.Tile)
-            .Select(t => c.Tile(t.Tile))
-            .FirstOrDefault(t => c.Q.Travel(scout.Id, t.Id, t.CircleX, t.CircleY) != null);
-        if (best is { } target)
+        // Missing deposits first; with none next to home, any tile rather than none.
+        var wanted = MissingTargets(c).ToList();
+        var targets = wanted.Count > 0 ? wanted : c.WithGoal(TileGoal.Expand).Select(g => g.Tile);
+        if (targets.Select(c.Tile).FirstOrDefault(t => c.Q.Travel(scout.Id, t.Id, t.CircleX, t.CircleY) != null) is { } target)
             yield return new Proposal($"claim:{target.Id}", SendScore, [new MoveUnitsCommand(c.Player, [scout.Id], target.Id, target.CircleX, target.CircleY)],
                 $"unit {scout.Id} to the circle of {target.Id}", Locks: [Proposal.UnitLock(scout.Id)]);
     }

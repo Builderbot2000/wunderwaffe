@@ -42,6 +42,22 @@ public class AiTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void AnAiPlaysTheGoalChainWithEveryContentIdRenamed()
+    {
+        // MP-007: the AI works out what to build from the content itself, so opaque ids change nothing about its play.
+        var content = TestContent.Renamed();
+        Assert.DoesNotContain(content.Buildings.Keys, id => id is "drill" or "core" or "conveyor" or "wire" or "steel_mill");
+        Assert.DoesNotContain(content.Items.Keys, id => id is "coal" or "copper_ore" or "steel");
+        var sim = Simulation.NewGame(content, new GameSetup(5, 5, 3037, Players: 1, AiPlayers: 1));
+        var me = () => sim.PlayerOrNull(0)!;
+        var director = new AiDirector(sim.Setup!);
+        Play(sim, 40 * 60, () => me().GoalsDone == sim.Content.Goals.Count, director);
+        output.WriteLine($"goals {me().GoalsDone} at {string.Join(", ", me().GoalTicks.Select(t => t / 60))} s");
+        output.WriteLine(director.For(0)!.Last?.Describe());
+        Assert.Equal(sim.Content.Goals.Count, me().GoalsDone);
+    }
+
+    [Fact]
     public void TwoAisPlayDeterministicallyAndReplayFromTheLog()
     {
         GameSetup setup = new(5, 5, 7, Players: 2, AiPlayers: 2);
