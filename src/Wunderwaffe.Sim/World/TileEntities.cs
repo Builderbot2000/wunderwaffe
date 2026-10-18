@@ -85,7 +85,7 @@ internal static class TileEntities
         for (; m.OutputCredit >= 100; m.OutputCredit -= 100)
             batches++;
         IReadOnlyDictionary<string, int> made = batches == 1 ? recipe.Outputs : recipe.Outputs.ToDictionary(kv => kv.Key, kv => kv.Value * batches);
-        if (m.Mines is { } ore && tile.Grid.Patches.Extract(b, ore, made) is { } mined)
+        if (m.Mines is { } ore && tile.Grid.Patches.Extract(b, m, ore, made) is { } mined)
             made = mined;
         foreach (var (id, n) in made)
         {
@@ -101,7 +101,7 @@ internal static class TileEntities
             return false;
         if (m.Mines is { } ore)
         {
-            m.Depleted = tile.Grid.Patches.SourceOf(b, ore) < 0;
+            m.Depleted = tile.Grid.Patches.SourceOf(b, m, ore) < 0;
             if (m.Depleted)
                 return false;
         }

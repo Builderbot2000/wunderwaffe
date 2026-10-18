@@ -170,6 +170,10 @@ public sealed class MachineState(RecipeDef? recipe) : OutputBuffer
     /// </summary>
     public bool Depleted { get; internal set; }
 
+    // DepositPatches.SourceOf cache for an extractor and the grid/patch-map version it was found at. Derived, not hashed.
+    internal int Source;
+    internal long SourceKey = -1;
+
     public MachineStatus Status =>
         Recipe == null ? MachineStatus.Idle
         : Working ? (PowerPermille == 0 ? MachineStatus.NoPower : MachineStatus.Working)

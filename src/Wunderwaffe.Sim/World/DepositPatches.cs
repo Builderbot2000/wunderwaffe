@@ -53,6 +53,9 @@ public sealed class DepositPatch
 public sealed class DepositPatches(TileGrid grid)
 {
     ushort[]? _cells;
+
+    // Bumped whenever the patch map changes (Find, Restore, Detach), so cached extractor sources know to look again.
+    int _cellsVersion;
     readonly List<DepositPatch> _list = [];
 
     /// <summary>Every patch, emptied ones too, by <see cref="DepositPatch.Id"/> - 1.</summary>
@@ -91,6 +94,21 @@ public sealed class DepositPatches(TileGrid grid)
     }
 
     /// <summary>
+    /// <see cref="SourceOf(PlacedBuilding, string)"/> for an extractor's machine, cached on it until the grid or the
+    /// patch map changes: the full sim asks on every batch, and a footprint scan per batch cost ~10% of the NF-001 tick.
+    /// </summary>
+    internal int SourceOf(PlacedBuilding b, MachineState m, string item)
+    {
+        long key = ((long)grid.Revision << 32) | (uint)_cellsVersion;
+        if (m.SourceKey != key)
+        {
+            m.Source = SourceOf(b, item);
+            m.SourceKey = key;
+        }
+        return m.Source;
+    }
+
+    /// <summary>
     /// Groups the grid's deposit cells into patches, replacing any found before: connected cells of one item that has a
     /// <see cref="ItemDef.Deposit"/>, each holding its per-cell amount times its cells times <paramref name="richnessPercent"/>.
     /// </summary>
@@ -98,6 +116,7 @@ public sealed class DepositPatches(TileGrid grid)
     {
         _list.Clear();
         _cells = new ushort[grid.Width * grid.Height];
+        _cellsVersion++;
         var queue = new Queue<int>();
         for (int start = 0; start < _cells.Length; start++)
         {
@@ -143,9 +162,9 @@ public sealed class DepositPatches(TileGrid grid)
     /// makes when the patch (or every deposit under it) ran out first, so a drill never mines more than was there; null
     /// when it all came out.
     /// </summary>
-    internal IReadOnlyDictionary<string, int>? Extract(PlacedBuilding b, string item, IReadOnlyDictionary<string, int> made)
+    internal IReadOnlyDictionary<string, int>? Extract(PlacedBuilding b, MachineState m, string item, IReadOnlyDictionary<string, int> made)
     {
-        int want = made.GetValueOrDefault(item), source = SourceOf(b, item);
+        int want = made.GetValueOrDefault(item), source = SourceOf(b, m, item);
         if (source == 0)
             return null;
         long got = ById(source) is { } p ? Take(p, want) : 0;
@@ -192,7 +211,10 @@ public sealed class DepositPatches(TileGrid grid)
     internal void Detach(int x, int y)
     {
         if (_cells != null && grid.InRect(x, y))
+        {
             _cells[y * grid.Width + x] = 0;
+            _cellsVersion++;
+        }
     }
 
     // ---- Hashing and snapshots (NF-008). ----
@@ -205,6 +227,7 @@ public sealed class DepositPatches(TileGrid grid)
     {
         _list.Clear();
         _cells = patches.Count == 0 ? null : new ushort[grid.Width * grid.Height];
+        _cellsVersion++;
         foreach (var (item, cells, start, amount) in patches)
         {
             var p = new DepositPatch(_list.Count + 1, item, content.Items[item].Deposit!, cells, start, amount)
