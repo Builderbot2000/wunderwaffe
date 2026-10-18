@@ -96,6 +96,7 @@ public class CombatTests
         Put(sim, mine, Me, "supply_depot", 20, 14);
         Put(sim, mine, Me, "gun_turret", 25, 15);
         var enemy = Gunship(sim, theirs, Them, 3, 15);
+        sim.Enqueue(new SetStanceCommand(Them, [enemy.Id], Stance.HoldFire)); // a sitting target
         int enemyId = enemy.Id;
 
         Assert.True(RunUntil(sim, () => sim.UnitById(enemyId) == null, 3000), "the enemy unit should be destroyed");
@@ -252,6 +253,7 @@ public class CombatTests
         Put(sim, mine, Me, "supply_depot", 10, 14);
         var unit = Gunship(sim, mine, Me, 12, 17, rack: true);
         var enemy = Gunship(sim, theirs, Them, 15, 5);
+        sim.Enqueue(new SetStanceCommand(Them, [enemy.Id], Stance.HoldFire)); // a sitting target
         Run(sim, 61);
 
         sim.Enqueue(new AttackCommand(Me, [unit.Id], enemy.Id));
@@ -286,8 +288,8 @@ public class CombatTests
         Run(sim, 61);
 
         sim.Enqueue(new AttackMoveCommand(Me, [unit.Id], theirs.Id, 10, 4));
-        Assert.True(RunUntil(sim, () => theirs.Grid.BuildingAt(2, 2) == null, 12000), "it fights what it passes");
-        Assert.True(RunUntil(sim, () => unit.Order == null, 6000), "then finishes the move");
+        Assert.True(RunUntil(sim, () => theirs.Grid.BuildingAt(2, 2) == null, 5000), "it fights what it passes");
+        Assert.True(RunUntil(sim, () => unit.Order == null, 2000), "then finishes the move");
         Assert.Equal(theirs.Id, unit.TileId);
     }
 

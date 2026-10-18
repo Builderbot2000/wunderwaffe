@@ -17,7 +17,7 @@ public sealed partial class GameQuery
     /// <summary>Squads of a player (default <see cref="Player"/>), in id order.</summary>
     public IReadOnlyList<SquadView> Squads(int? owner = null) =>
         Sim.Squads.OwnedBy(owner ?? Player).OrderBy(s => s.Id)
-            .Select(s => new SquadView(s.Id, s.Owner, s.Name, [.. s.Members], s.Formation, s.Stance, s.Order?.Kind, s.TargetId)).ToList();
+            .Select(s => new SquadView(s.Id, s.Owner, s.Name, [.. s.Members], s.Formation, s.Stance, s.Order?.Kind, s.TargetId, s.Targeting)).ToList();
 
     public SquadResult CheckCreateSquad(string? name, int[] unitIds) => UnitSim.CheckCreateSquad(Sim, Player, name, unitIds);
 
@@ -32,6 +32,6 @@ public sealed partial class GameQuery
     /// <summary>A unit's command state: current order, stance, squad, locomotion and upkeep (UD-013), or null.</summary>
     public UnitOrderView? UnitOrders(int unitId) =>
         Sim.UnitById(unitId) is { } u
-            ? new UnitOrderView(u.Id, u.Order?.Kind, u.Stance, u.SquadId, u.Locomotion, u.Unsupplied)
+            ? new UnitOrderView(u.Id, u.Order?.Kind, u.Stance, u.SquadId, u.Locomotion, u.Unsupplied, u.Targeting)
             : null;
 }

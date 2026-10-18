@@ -20,7 +20,7 @@ Where it stands (2026-10-17): Real-time combat with turrets, unit weapons, damag
 | [NR-005](#nr-005-expansion-tile-protection) | Expansion tile protection | Could | Rejected | No | Beta | Functional | P6 | WM-006 |  |  |
 | [NR-006](#nr-006-defenceoffence-balance) | Defence/offence balance | Must | Proposed | No | MVP | Non-Functional | P6 | FB-010, CB-001 | New |  |
 | [CB-006](#cb-006-wrecks) | Wrecks | Must | Done | Yes | MVP | Functional | P8 | CB-001 | New |  |
-| [CB-007](#cb-007-targeting-modes) | Targeting modes | Should | Approved | No | Alpha | Functional | P5 | CB-001, UC-004 | New |  |
+| [CB-007](#cb-007-targeting-modes) | Targeting modes | Should | Done | Yes | Alpha | Functional | P5 | CB-001, UC-004 | New |  |
 
 ### CB-001 Real-time combat
 
@@ -144,7 +144,7 @@ Where it stands (2026-10-17): Real-time combat with turrets, unit weapons, damag
 
 **Acceptance criteria:** The player switches a unit's or squad's mode with one key or button, as with stances; the mode is sim state and goes through the command log; with several enemies in range, weapons pick by the mode (ties broken by distance, then id); an attack order on a target overrides the mode; squad focus fire uses the squad's mode.
 
-**As built:** Not built: weapons fire at the nearest target in range (Combat, Targets.Nearest), or at the ordered or squad target.
+**As built:** TargetMode (nearest, most blocks, most weapons) on Unit.Targeting and Squad.Targeting, set by SetTargetingCommand / SetSquadTargetingCommand (set_targeting, set_squad_targeting); E cycles it like V the stance. Unit weapons pick among enemy units in range by the mode, ties to the nearer, then the lowest id (Combat TargetIndex.Pick); an attack order's target comes first; a squad without an attack target picks one focus (Squad.FocusId) by its mode among enemies its members have in range, ties to the nearest its centre. Turrets keep nearest. Tested (StanceTests).
 
 **Notes:** Owner, 2026-10-17: a simple mode switch for now (OQ-41). Not decided: whether turrets get modes too; today they pick the nearest.
 

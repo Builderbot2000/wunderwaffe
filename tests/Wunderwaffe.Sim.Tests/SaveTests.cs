@@ -46,6 +46,7 @@ public class SaveTests(ITestOutputHelper output)
             new CreateSquadCommand(Me, "Alpha", [1]), new RenameSquadCommand(Me, 1, "Bravo"),
             new SetFormationCommand(Me, 1, Formation.Wedge), new SetFormationCommand(Me, 1, Formation.Custom, [0, 0]),
             new SetSquadStanceCommand(Me, 1, Stance.Defensive), new SetStanceCommand(Me, [1], Stance.Aggressive),
+            new SetTargetingCommand(Me, [1], TargetMode.MostWeapons), new SetSquadTargetingCommand(Me, 1, TargetMode.MostBlocks),
             new AssignSquadCommand(Me, 0, [1]), new DisbandSquadCommand(Me, 1));
         At(8, new PatrolUnitsCommand(Me, [1], home.Id, home.CenterX - home.OriginX, home.CenterY - home.OriginY),
             new HoldUnitsCommand(Me, [1]), new RetreatUnitsCommand(Me, [1]));

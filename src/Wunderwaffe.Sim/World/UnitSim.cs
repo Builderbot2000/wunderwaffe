@@ -320,7 +320,7 @@ public static class UnitSim
 
     // ---------------------------------------------------------------- stances and combat hooks
 
-    /// <summary>Gives units a stance (UC-004). Anchors them where they stand.</summary>
+    /// <summary>Gives units a stance (UC-004). Anchors them where they stand; a chase the old stance began ends.</summary>
     internal static void SetStance(Simulation sim, int player, IReadOnlyList<int> unitIds, Stance stance)
     {
         if (!Enum.IsDefined(stance))
@@ -329,7 +329,28 @@ public static class UnitSim
         {
             u.Stance = stance;
             (u.AnchorX, u.AnchorY) = (u.X, u.Y);
+            if (u.Chasing && u.Order?.Kind is not (OrderKind.Attack or OrderKind.AttackMove))
+            {
+                if (u.Order == null)
+                {
+                    u.Chasing = false;
+                    u.Route = null;
+                }
+                else
+                {
+                    Resume(sim, u);
+                }
+            }
         }
+    }
+
+    /// <summary>Gives units a targeting mode (CB-007).</summary>
+    internal static void SetTargeting(Simulation sim, int player, IReadOnlyList<int> unitIds, TargetMode mode)
+    {
+        if (!Enum.IsDefined(mode))
+            return;
+        foreach (var u in Owned(sim, player, unitIds))
+            u.Targeting = mode;
     }
 
     /// <summary>
@@ -338,24 +359,18 @@ public static class UnitSim
     /// </summary>
     public static bool StopsToFight(Unit u) => u.Stance is Stance.Aggressive or Stance.Defensive;
 
-    /// <summary>Whether a unit may fire on its own: not on hold-fire stance and not retreating.</summary>
-    public static bool CanFire(Unit u) => u.Stance != Stance.HoldFire && u.Order?.Kind != OrderKind.Retreat;
+    /// <summary>
+    /// Whether a unit's weapons fire: always on an attack or attack-move order; otherwise not on hold-fire stance and
+    /// not while retreating.
+    /// </summary>
+    public static bool CanFire(Unit u) =>
+        u.Order?.Kind is OrderKind.Attack or OrderKind.AttackMove || (u.Stance != Stance.HoldFire && u.Order?.Kind != OrderKind.Retreat);
 
     /// <summary>
-    /// Whether combat may send the unit after something at world sub-cell (x, y): never on hold, retreat or hold-fire;
-    /// a defensive unit only within <see cref="LeashCells"/> of its anchor; a passive one never.
+    /// Whether combat may send the unit after the target of an attack order at world sub-cell (x, y). An order is the
+    /// player's, so any stance carries it out (UC-004); only a unit that can't move can't.
     /// </summary>
-    public static bool MayChase(Simulation sim, Unit u, long x, long y)
-    {
-        if (u.Stance == Stance.HoldFire || u.Order?.Kind is OrderKind.Hold or OrderKind.Retreat || u.MaxSpeed <= 0)
-            return false;
-        return u.Stance switch
-        {
-            Stance.Defensive => Within(x, y, u.AnchorX, u.AnchorY, LeashCells),
-            Stance.Passive => false,
-            _ => true,
-        };
-    }
+    public static bool MayChase(Simulation sim, Unit u, long x, long y) => u.MaxSpeed > 0;
 
     /// <summary>Sends the unit toward world sub-cell (x, y) without dropping its order (combat chasing a target).</summary>
     public static void Chase(Simulation sim, Unit u, long x, long y)
@@ -414,10 +429,13 @@ public static class UnitSim
         return dx * dx + dy * dy <= r * r;
     }
 
-    /// <summary>
-    /// Start of the unit phase: drops squad members that are gone, walks defensive units that strayed past their leash
-    /// back to their anchor.
-    /// </summary>
+    /// <summary>How often, in ticks, each unit's stance looks for something to fight (staggered by unit id).</summary>
+    const int EngageTicks = 10;
+
+    /// <summary>A unit stops closing in once its target is this share of its weapon range away.</summary>
+    const int EngagePercent = 85;
+
+    /// <summary>Start of the unit phase: drops squad members that are gone, then runs the stances.</summary>
     internal static void Step(Simulation sim)
     {
         foreach (var s in sim.Squads.All)
@@ -425,14 +443,123 @@ public static class UnitSim
 
         foreach (var u in sim.Units)
         {
-            if (u.MaxSpeed <= 0)
-                continue;
-            if (u.Stance == Stance.Defensive && (u.Order == null || u.Chasing) && !Within(u.X, u.Y, u.AnchorX, u.AnchorY, LeashCells))
-            {
-                u.Chasing = false;
-                ReturnToAnchor(sim, u);
-            }
+            if ((sim.Tick + u.Id) % EngageTicks == 0)
+                Engage(sim, u);
         }
+    }
+
+    /// <summary>
+    /// What a unit's stance does on its own (UC-004). Aggressive: with no order, or once stopped to fight, goes for the
+    /// nearest enemy anywhere on its tile; on its way somewhere, stops for enemies in weapon range. Defensive: goes for
+    /// enemies it can reach within <see cref="LeashCells"/> of its anchor (where it stood, or where it left its course),
+    /// never further, then returns or carries on. Passive and hold fire never move on their own. Attack orders are
+    /// combat's, and hold and retreat orders don't fight.
+    /// </summary>
+    static void Engage(Simulation sim, Unit u)
+    {
+        if (u.MaxSpeed <= 0 || u.Stance is Stance.Passive or Stance.HoldFire || sim.IsAbstract(u)
+            || u.Order?.Kind is OrderKind.Hold or OrderKind.Retreat or OrderKind.Attack or OrderKind.AttackMove)
+            return;
+        int range = Combat.WeaponRange(sim, u);
+        if (range <= 0)
+            return;
+        long reach = (long)range * S * EngagePercent / 100;
+
+        (long X, long Y)? target;
+        if (u.Stance == Stance.Aggressive)
+        {
+            bool wide = u.Order == null || u.Route == null || u.Chasing;
+            target = wide ? NearestOnTile(sim, u, buildings: u.Order == null) : NearestUnit(sim, u, u.X, u.Y, (long)range * S);
+        }
+        else
+        {
+            if (u.Order != null && !u.Chasing)
+                (u.AnchorX, u.AnchorY) = (u.X, u.Y);
+            target = NearestUnit(sim, u, u.AnchorX, u.AnchorY, ((long)LeashCells + range) * S);
+        }
+
+        if (target is not { } at)
+        {
+            if (!u.Chasing)
+                return;
+            if (u.Stance == Stance.Aggressive && u.Order == null)
+            {
+                // Nothing left on the tile: it stays where the fight ended.
+                u.Chasing = false;
+                u.Route = null;
+                (u.AnchorX, u.AnchorY) = (u.X, u.Y);
+            }
+            else
+            {
+                Resume(sim, u);
+            }
+            return;
+        }
+
+        long dx = at.X - u.X, dy = at.Y - u.Y, dist = ISqrt(dx * dx + dy * dy);
+        if (dist <= reach)
+        {
+            Halt(u);
+            u.Chasing = true;
+            return;
+        }
+        // Close in to just inside weapon range; a defensive unit no further than its leash from its anchor.
+        long gx = at.X - dx * reach / dist, gy = at.Y - dy * reach / dist;
+        if (u.Stance == Stance.Defensive)
+        {
+            long ax = gx - u.AnchorX, ay = gy - u.AnchorY, ad = ISqrt(ax * ax + ay * ay), leash = (long)LeashCells * S;
+            if (ad > leash)
+                (gx, gy) = (u.AnchorX + ax * leash / ad, u.AnchorY + ay * leash / ad);
+        }
+        Chase(sim, u, gx, gy);
+        u.Chasing = true;
+    }
+
+    /// <summary>Centre of the nearest live enemy unit within <paramref name="radius"/> sub-cells of (x, y), ties to the lowest id.</summary>
+    static (long X, long Y)? NearestUnit(Simulation sim, Unit u, long x, long y, long radius)
+    {
+        (long X, long Y)? best = null;
+        long bestD = radius * radius + 1;
+        foreach (var e in sim.Units)
+        {
+            if (e.Owner == u.Owner || sim.IsAbstract(e))
+                continue;
+            long dx = e.X - x, dy = e.Y - y, d = dx * dx + dy * dy;
+            if (d < bestD)
+                (best, bestD) = ((e.X, e.Y), d);
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// The nearest enemy unit on the unit's tile, else, if <paramref name="buildings"/>, the nearest enemy building there
+    /// (UC-004 aggressive: an idle unit goes for anything; one stopped on its way fights units, then carries on).
+    /// </summary>
+    static (long X, long Y)? NearestOnTile(Simulation sim, Unit u, bool buildings)
+    {
+        (long X, long Y)? best = null;
+        long bestD = long.MaxValue;
+        foreach (var e in sim.Units)
+        {
+            if (e.Owner == u.Owner || e.TileId != u.TileId || sim.IsAbstract(e))
+                continue;
+            long dx = e.X - (long)u.X, dy = e.Y - (long)u.Y, d = dx * dx + dy * dy;
+            if (d < bestD)
+                (best, bestD) = ((e.X, e.Y), d);
+        }
+        if (best != null || !buildings)
+            return best;
+        var tile = sim.Tiles[u.TileId];
+        foreach (var b in tile.Grid.Buildings)
+        {
+            if (b.Owner == u.Owner)
+                continue;
+            long bx = (long)(tile.OriginX + b.X) * S + (long)b.Width * S / 2, by = (long)(tile.OriginY + b.Y) * S + (long)b.Height * S / 2;
+            long dx = bx - u.X, dy = by - u.Y, d = dx * dx + dy * dy;
+            if (d < bestD)
+                (best, bestD) = ((bx, by), d);
+        }
+        return best;
     }
 
     // ---------------------------------------------------------------- squads
@@ -451,6 +578,7 @@ public static class UnitSim
         var units = Owned(sim, player, unitIds);
         var squad = sim.Squads.Create(player, name.Trim());
         squad.Stance = units[0].Stance;
+        squad.Targeting = units[0].Targeting;
         foreach (var u in units)
             Join(sim, squad, u);
     }
@@ -496,6 +624,7 @@ public static class UnitSim
         Leave(sim, u);
         u.SquadId = squad.Id;
         u.Stance = squad.Stance;
+        u.Targeting = squad.Targeting;
         (u.AnchorX, u.AnchorY) = (u.X, u.Y);
         squad.MemberList.Add(u.Id);
     }
@@ -554,6 +683,15 @@ public static class UnitSim
         var squad = sim.Squads.ById(squadId)!;
         squad.Stance = stance;
         SetStance(sim, player, squad.MemberList, stance);
+    }
+
+    internal static void SetSquadTargeting(Simulation sim, int player, int squadId, TargetMode mode)
+    {
+        if (CheckSquad(sim, player, squadId) != SquadResult.Ok || !Enum.IsDefined(mode))
+            return;
+        var squad = sim.Squads.ById(squadId)!;
+        squad.Targeting = mode;
+        SetTargeting(sim, player, squad.MemberList, mode);
     }
 
     // ---------------------------------------------------------------- factory rally (UC-006)

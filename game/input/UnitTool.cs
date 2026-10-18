@@ -12,8 +12,8 @@ namespace Wunderwaffe.Game.Input;
 /// Unit control (UC-001 to UC-006). Tile view, with no building picked: left-click or drag a box selects your units
 /// (Shift adds), right-click sends the selection to that cell, and a cell past the tile's border sends it into the tile
 /// there. World map: right-click sends the selection to the clicked spot. H holds, P then right-click patrols, X
-/// retreats, Q makes the selection a squad, T cycles its formation, V cycles the stance, E escorts the unit under the
-/// cursor, Y over a unit core then right-click sets its rally point. Ctrl+1-9 stores the selection as a control group,
+/// retreats, Q makes the selection a squad, T cycles its formation, V cycles the stance, E cycles the targeting mode,
+/// Y over a unit core then right-click sets its rally point. Ctrl+1-9 stores the selection as a control group,
 /// Alt+1-9 recalls it. G over a unit core lifts the framed blocks around it off as a unit; G with units selected lands
 /// them. The selection is shared between both views, in <see cref="SimHost.Selected"/>. Combat (CB-001): right-click on
 /// an enemy unit or building attacks it, and Z arms an attack-move for the next right-click.
@@ -26,7 +26,8 @@ public partial class UnitTool : Node2D
     static readonly Color BoxLine = new(1f, 1f, 1f, 0.8f);
 
     static readonly Formation[] Formations = [Formation.Box, Formation.Line, Formation.Column, Formation.Wedge];
-    static readonly Stance[] Stances = [Stance.Aggressive, Stance.Defensive, Stance.HoldFire];
+    static readonly Stance[] Stances = [Stance.Aggressive, Stance.Defensive, Stance.Passive, Stance.HoldFire];
+    static readonly TargetMode[] TargetModes = [TargetMode.Nearest, TargetMode.MostBlocks, TargetMode.MostWeapons];
 
     [Export] public BuildTool BuildTool = null!;
 
@@ -162,6 +163,15 @@ public partial class UnitTool : Node2D
             else
                 _host.Send(new SetStanceCommand(me, ids, Stances[next]));
         }
+        else if (e.IsActionPressed(InputActions.UnitTargeting))
+        {
+            var first = sim.UnitById(ids[0]);
+            int next = first == null ? 0 : (System.Array.IndexOf(TargetModes, first.Targeting) + 1) % TargetModes.Length;
+            if (SelectedSquad() is { } s)
+                _host.Send(new SetSquadTargetingCommand(me, s.Id, TargetModes[next]));
+            else
+                _host.Send(new SetTargetingCommand(me, ids, TargetModes[next]));
+        }
         else
             return false;
         GetViewport().SetInputAsHandled();
@@ -240,7 +250,7 @@ public partial class UnitTool : Node2D
         {
             var landing = UnitAssembly.CheckDeploy(sim, _host.LocalPlayer, _host.Selected.Min(), out _);
             line += landing == DeployResult.Ok ? "\nG: land" : $"\nCan't land here: {landing}";
-            line += " · H hold · P patrol · Z attack-move · X retreat · Q squad · T formation · V stance · E escort";
+            line += " · H hold · P patrol · Z attack-move · X retreat · Q squad · T formation · V stance · E targeting";
             int stuck = _host.Selected.Count(id => sim.UnitById(id) is { MaxSpeed: <= 0 });
             if (stuck > 0)
                 line += $"\n{stuck} selected can't move: no thruster";
@@ -248,14 +258,14 @@ public partial class UnitTool : Node2D
         return line;
     }
 
-    /// <summary>Order, stance, locomotion and squad of the selection, when they agree.</summary>
+    /// <summary>Order, stance, targeting mode, locomotion and squad of the selection, when they agree.</summary>
     string SelectionDetail()
     {
         var units = _host.Selected.Select(_host.Sim.UnitById).Where(u => u != null).Select(u => u!).ToList();
         if (units.Count == 0)
             return "";
         static string Same<T>(IEnumerable<T> xs, string mixed) => xs.Distinct().ToList() is [var one] ? $"{one}" : mixed;
-        string text = $"\n{Same(units.Select(u => u.Locomotion), "mixed")} · {Same(units.Select(u => u.Order?.Kind.ToString() ?? "idle"), "mixed orders")} · {Same(units.Select(u => u.Stance), "mixed stances")}";
+        string text = $"\n{Same(units.Select(u => u.Locomotion), "mixed")} · {Same(units.Select(u => u.Order?.Kind.ToString() ?? "idle"), "mixed orders")} · {Same(units.Select(u => u.Stance), "mixed stances")} · targets {Same(units.Select(u => u.Targeting), "mixed")}";
         if (SelectedSquad() is { } squad)
             text += $" · {squad.Name} ({squad.Formation})";
         return text;

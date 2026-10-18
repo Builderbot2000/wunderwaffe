@@ -39,6 +39,8 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(SetFactoryModeCommand), "set_factory_mode")]
 [JsonDerivedType(typeof(TriggerFactoryCommand), "trigger_factory")]
 [JsonDerivedType(typeof(ResumeFactoryCommand), "resume_factory")]
+[JsonDerivedType(typeof(SetTargetingCommand), "set_targeting")]
+[JsonDerivedType(typeof(SetSquadTargetingCommand), "set_squad_targeting")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -337,4 +339,16 @@ public sealed record ResumeFactoryCommand(int Player, int TileId, int X, int Y) 
         if (sim.TryGetTile(TileId) is { } tile)
             UnitFactory.Resume(tile, Player, X, Y);
     }
+}
+
+/// <summary>Sets units' targeting mode (CB-007).</summary>
+public sealed record SetTargetingCommand(int Player, int[] UnitIds, TargetMode Mode) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.SetTargeting(sim, Player, UnitIds, Mode);
+}
+
+/// <summary>Sets a squad's targeting mode, and its members' (CB-007).</summary>
+public sealed record SetSquadTargetingCommand(int Player, int SquadId, TargetMode Mode) : Command(Player)
+{
+    internal override void Apply(Simulation sim) => UnitSim.SetSquadTargeting(sim, Player, SquadId, Mode);
 }

@@ -58,11 +58,20 @@ public sealed class Squad(int id, int owner, string name)
 
     public Stance Stance { get; internal set; }
 
+    /// <summary>The members' targeting mode, and how the squad picks its focus (CB-007).</summary>
+    public TargetMode Targeting { get; internal set; }
+
     /// <summary>The order last given to the squad as a whole, so a formation change can re-form it (UC-003).</summary>
     public UnitOrder? Order { get; internal set; }
 
     /// <summary>The unit the squad focuses fire on, or -1. Set and read by combat (UC-002).</summary>
     public int TargetId { get; set; } = -1;
+
+    /// <summary>
+    /// With no <see cref="TargetId"/>, the enemy unit the squad picked by <see cref="Targeting"/> among those its members
+    /// have in range, or -1. Set by combat every few ticks.
+    /// </summary>
+    public int FocusId { get; internal set; } = -1;
 }
 
 /// <summary>
@@ -132,7 +141,7 @@ public sealed class Squads
         _squads.Clear();
         foreach (var s in other._squads.Values)
         {
-            var c = new Squad(s.Id, s.Owner, s.Name) { Formation = s.Formation, Custom = s.Custom, Stance = s.Stance, Order = s.Order, TargetId = s.TargetId };
+            var c = new Squad(s.Id, s.Owner, s.Name) { Formation = s.Formation, Custom = s.Custom, Stance = s.Stance, Order = s.Order, TargetId = s.TargetId, Targeting = s.Targeting, FocusId = s.FocusId };
             c.MemberList.AddRange(s.MemberList);
             _squads.Add(c.Id, c);
         }
