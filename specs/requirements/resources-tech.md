@@ -11,7 +11,7 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 | [RS-001](#rs-001-resource-tiers) | Resource tiers | Must | Done | Yes | MVP | Functional | P7 |  |  |  |
 | [RS-002](#rs-002-recipe-graph) | Recipe graph | Must | Done | Yes | MVP | Non-Functional | P7 | RS-001 |  |  |
 | [RS-003](#rs-003-regional-scarcity) | Regional scarcity | Must | Done | Yes | MVP | Functional | P1 | WM-002, RS-001 | Review |  |
-| [RS-004](#rs-004-deposit-depletion) | Deposit depletion | Could | Proposed | No | Beta | Functional | P2 | FB-003 |  |  |
+| [RS-004](#rs-004-deposit-depletion) | Deposit depletion | Should | Approved | No | Alpha | Functional | P2 | FB-003, WM-009, FB-012 | Updated |  |
 | [TT-001](#tt-001-resource-gated-progression) | Resource-gated progression | Must | Done | Yes | MVP | Functional | P7 | RS-001 | Updated |  |
 | [TT-002](#tt-002-unlock-conditions) | Unlock conditions | Must | Rejected | No | MVP | Functional | P7 | TT-001 |  |  |
 | [TT-003](#tt-003-tech-tree-viewer) | Tech tree viewer | Must | Rejected | No | MVP | Functional | P7 | TT-002 |  |  |
@@ -47,11 +47,13 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 
 ### RS-004 Deposit depletion
 
-**Requirement:** Deposits may be finite or have diminishing yield to encourage expansion.
+**Requirement:** Deposits shall be finite, to encourage expansion. Each patch (a group of connected deposit cells of one item, found at world generation) holds one shared amount that every extractor on the patch draws from; when it reaches zero the patch's cells stop being deposits.
 
-**Acceptance criteria:** Configurable per deposit type; UI shows remaining amount.
+**Acceptance criteria:** Patches are found during generation and each gets a starting amount from content (per item, scaled by patch size and match richness); every extraction takes one unit per item made from the patch under the extractor; an emptied patch stops its extractors (shown as a machine status) and its cells no longer count as deposits for placement. Patch amounts are sim state: hashed, in snapshots, deterministic. Rate mode drains patches at the extraction rates it computes, so a tile that is opened again shows exactly what was mined while nobody watched, and a patch that empties during rate mode stops its extractors there too (the rates are solved again). Rendering steps through density levels: content sets amount thresholds per item, each level has its own deposit sprite (denser when full), and the tile redraws only when a patch crosses a threshold, never on each extraction. The hover panel shows a patch's remaining amount.
 
-**As built:** Not built: deposits are infinite.
+**As built:** Not built: deposits are infinite and fixed after generation (a per-cell item id, not hashed).
+
+**Notes:** Was: 'Deposits may be finite or have diminishing yield to encourage expansion' (Could, Beta). Owner, 2026-10-18: approved as one amount per patch (OQ-49).
 
 ### TT-001 Resource-gated progression
 
@@ -119,6 +121,7 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 |---|---|---|---|---|---|
 | [OQ-6](#oq-6-is-tech-per-player-empire-wide-or-per-tile) | Is tech per player (empire-wide) or per tile? | TT-005 | Decided | Owner | 2026-10-10 |
 | [OQ-7](#oq-7-can-captured-enemy-tilesresources-grant-tech-unlocks) | Can captured enemy tiles/resources grant tech unlocks? | TT-002 | Decided | Owner | 2026-10-10 |
+| [OQ-49](#oq-49-how-do-deposits-deplete-and-how-is-it-shown) | How do deposits deplete, and how is it shown? | RS-004, FB-012, WM-009 | Decided | Owner | 2026-10-18 |
 
 ### OQ-6 Is tech per player (empire-wide) or per tile?
 
@@ -131,3 +134,9 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 **Options / notes:** Would reward aggression and enable catch-up.
 
 **Decision:** Defunct: there are no tech unlocks. Later, salvage units may take apart destroyed units for resources (RS-005).
+
+### OQ-49 How do deposits deplete, and how is it shown?
+
+**Options / notes:** An amount per cell (Factorio) costs about 256 KB of hashed, snapshotted state per 256x256 tile; one pool per patch is a few hundred numbers per tile. Extraction itself costs one subtraction per craft cycle either way. Rate mode is the main work: it must drain amounts exactly so switching modes stays lossless.
+
+**Decision:** One amount per patch of connected deposit cells, with patches found at generation. Deposit cells render at stepped density levels, a sprite per level, redrawn only when a patch crosses a threshold. Rate mode drains patches by its computed rates, so depletion while abstracted is accounted for when the tile is opened (RS-004).

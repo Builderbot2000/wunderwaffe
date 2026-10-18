@@ -29,6 +29,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [FB-019](#fb-019-build-funds-from-cores) | Build funds from cores | Must | Done | Yes | MVP | Functional | P2 | WM-016, FB-007 | Review |  |
 | [FB-020](#fb-020-power-layer-nodes-and-cross-tile-power) | Power layer, nodes and cross-tile power | Must | Done | Yes | MVP | Functional | P3 | FB-005, IO-002 | New |  |
 | [FB-021](#fb-021-prefab-blueprints) | Prefab blueprints | Must | Done | Yes | MVP | Functional | P2 | FB-009, WM-005 | New |  |
+| [FB-022](#fb-022-generic-cell-layers) | Generic cell layers | Should | Approved | No | Alpha | Non-Functional | P2 | FB-001, FB-017, FB-020, UD-010 |  |  |
 
 ### FB-001 Tile local map
 
@@ -236,6 +237,16 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Notes:** Owner, 2026-10-17: define the system first; which prefabs ship is a later content and balance update. Saves already store the setup, so a save replays with the prefabs it was started with only while content doesn't change (OQ-34).
 
+### FB-022 Generic cell layers
+
+**Requirement:** A tile's per-cell layers (buildings, deposits, frame, platforms, cables, and any added later) shall be declared in content and stored, hashed, snapshotted, checked and drawn by one generic mechanism, instead of each layer having its own hand-written code path.
+
+**Acceptance criteria:** Each layer is declared in content with an id and stacking rules (what it must sit on, what may stand on it, whether it blocks buildings); each layer-placed building names its layer in buildings.json. Every cell of a layer stores which definition it holds (0 = empty), with a side table only for layers needing per-cell state (owner, HP). Set/has/count, clearing, StateHash, Snapshot, the placement check (from the stacking rules) and the tile renderer each loop over the layers once, with no per-layer code. Behaviour stays in code keyed by kind and reads the generic layer: cables joining power networks, platforms as buildable floor, frame flood-filled at lift-off. Frame becomes a building entry on the frame layer with its cost in buildings.json (no Balance.FrameCost); deposits become a layer whose cells point at their patch (RS-004); scenarios save and load layers through one serialiser (WM-017). Two definitions on the same layer (say two cable tiers) need no code change. Wrecks stay their own store: they carry entity data and aren't placed by players.
+
+**As built:** Not built: TileGrid has a hand-written array per layer (bool frame, platform and cable arrays; a string deposit array) with its own Has/Set/Count, hash, snapshot, placement and render code. Platform and wire are buildings in JSON but stored as one bool, so only one definition of each can exist.
+
+**Notes:** Owner, 2026-10-18 (OQ-52). Do before deposit depletion (RS-004) and scenarios (WM-017), alongside MP-007.
+
 ## Decisions & open questions
 
 | # | Question | Related IDs | State | Decided By | Date |
@@ -249,6 +260,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [OQ-38](#oq-38-with-several-cores-on-a-tile-which-pays-and-how-much-can-a-core-hold) | With several cores on a tile, which pays, and how much can a core hold? | FB-019, WM-016, FB-007 | Decided | Owner | 2026-10-17 |
 | [OQ-39](#oq-39-where-do-refunds-go-and-what-happens-to-a-lost-cores-items) | Where do refunds go, and what happens to a lost core's items? | FB-019, WM-016, FB-002 | Decided | Owner | 2026-10-17 |
 | [OQ-42](#oq-42-can-power-cross-tiles-and-do-cables-share-the-building-layer) | Can power cross tiles, and do cables share the building layer? | FB-005, FB-020, IO-002 | Decided | Owner | 2026-10-17 |
+| [OQ-52](#oq-52-are-cell-layers-hand-coded-or-generic) | Are cell layers hand-coded or generic? | FB-022, FB-017, FB-020, RS-004, WM-017 | Decided | Owner | 2026-10-18 |
 
 ### OQ-11 Are unvisited tiles fully simulated or abstracted to rates?
 
@@ -303,3 +315,9 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 **Options / notes:** Built: wire is a building block, and networks stay inside one tile.
 
 **Decision:** Port links carry power as well as items. Cables go on their own layer. Add a power node building that joins all generators, batteries and other nodes within its radius, like Mindustry (FB-020).
+
+### OQ-52 Are cell layers hand-coded or generic?
+
+**Options / notes:** Built: each layer (frame, platform, cable, deposits, wrecks) has its own array and repeats the same code across hashing, snapshots, placement and rendering, in about 15 files; platform and cable store only a bool. Common practice: content-declared layers (Mindustry's floor, overlay and block per cell; Factorio's tiles and entities) with shared plumbing and behaviour keyed by kind.
+
+**Decision:** Generic layers declared in content with stacking rules, one store per layer by definition index, shared plumbing, behaviour in code by kind; frame and deposits move onto it, wrecks stay separate (FB-022).

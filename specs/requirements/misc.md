@@ -94,6 +94,8 @@ Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HU
 
 **As built:** Items, recipes, buildings, goals and terrain are JSON in game/data, validated at load. New building behaviours still need code.
 
+**Notes:** Owner, 2026-10-18: content ids still in code move to data: the frame cost (Balance.FrameCost, into a frame entry in buildings.json), the core found by kind instead of Simulation.CoreBuildingId, and the AI's ids (MP-007).
+
 ### NF-004 Deterministic simulation
 
 **Requirement:** Simulation shall be deterministic to support lockstep multiplayer and replays.

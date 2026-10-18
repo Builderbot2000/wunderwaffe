@@ -105,3 +105,15 @@ A unit travelling outside rendered tiles: an icon on the world map with recorded
 ### Locomotion
 
 Ground, naval or air. Decides which terrain a unit can cross.
+
+### Cell Layer
+
+One of the stacked per-cell maps of a tile (deposits, platforms, cables, frame, buildings), declared in content with rules for what may stand on what (FB-022).
+
+### Patch
+
+A group of connected deposit cells of one item, found at world generation. It holds one amount that all extractors on it share and that runs out (RS-004).
+
+### Scenario
+
+A map plus what stands on it at the start: the world (hand-authored, or generated and saved) and each seat's starting tiles, buildings, units and stock (WM-017).

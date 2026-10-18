@@ -14,6 +14,8 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 | [MP-004](#mp-004-diplomacy) | Diplomacy | Could | Proposed | No | Beta | Functional | P8 | MP-003, IO-002 |  |  |
 | [MP-005](#mp-005-match-settings) | Match settings | Should | Done | Yes | Alpha | Functional | P8 | MP-001 | Updated |  |
 | [MP-006](#mp-006-ai-framework) | AI framework | Must | Done | Yes | MVP | Non-Functional | P8 | MP-002, NF-009, FB-021 | New |  |
+| [MP-007](#mp-007-content-agnostic-ai) | Content-agnostic AI | Must | Approved | No | MVP | Non-Functional | P8 | MP-006, RS-002 |  |  |
+| [MP-008](#mp-008-ai-head-starts) | AI head starts | Should | Approved | No | Alpha | Functional | P8 | FB-021, MP-005, WM-017 |  |  |
 
 ### MP-001 Domination victory
 
@@ -73,6 +75,26 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 
 **Notes:** Owner, 2026-10-17: set up the system the AI initialises and loops on before refining its logic. MP-002 is what the AI plays; this is how it is built. Design follows OQ-48. References: UAlbertaBot (D. Churchill; one manager per concern), 0 A.D.'s Petra AI (headquarters, attack, defence and queue managers), Beyond All Reason / Spring skirmish AIs (factory-driven economies), Ontanon et al. 2013, 'A Survey of Real-Time Strategy Game AI Research and Competition in StarCraft' (strategy / tactics / reactive control), D. Mark and K. Dill, 'Improving AI Decision Modeling Through Utility Theory' (GDC 2010), and Game AI Pro (gameaipro.com) on utility systems and influence maps.
 
+### MP-007 Content-agnostic AI
+
+**Requirement:** The AI shall know no item, recipe or building by id. It shall work out what to build from the content itself, so a content or balance update needs no AI code change.
+
+**Acceptance criteria:** Buildings are found by role (BuildingKind and recipe: the cheapest conveyor, an extractor for an item, a crafter for a recipe), not by id. Demand comes from what the AI wants to build (its chosen unit design, turrets, the next goal); a chain planner expands each needed item backwards through the recipe graph (recipe, building, inputs) down to extraction and deposits. An input with no deposit on an owned tile makes tiles holding it expansion targets, replacing any fixed 'coal first' rule. Unit and turret value comes from stats (UnitStats, Combat.Dps), as today. Content may add optional AI hints (such as a priority) where the derived plan is wrong; none are required. Test: with the item, recipe and building ids renamed in the test content, the AI still plays the goal chain (AiTests).
+
+**As built:** Not built: AiContext names drill, smelter, steel_mill, core, conveyor, wire, copper_ore, iron_ore and coal; EconomyModule builds fixed ore and plate lines, ProductionModule the steel chain, ExpansionModule takes coal first.
+
+**Notes:** Owner, 2026-10-18: do this before the content and balance update (OQ-50).
+
+### MP-008 AI head starts
+
+**Requirement:** An AI seat's head start (OQ-47) shall be set in one of two ways: as part of a scenario, where AI assets already placed on the map are handed to the AI at the start (WM-017), or as a generic head start of prefabs placed beside its starting core.
+
+**Acceptance criteria:** A scenario's per-seat assets (buildings, units, owned tiles, core stock) belong to that seat, and an AI seat runs them from the first think like anything else it owns. Generic head starts are named presets in content, each a list of prefabs (FB-021) with optional extra items, stamped beside the seat's first start prefab; the match settings let the host pick a preset per AI seat (MP-005). Both are part of the setup, so saves replay them.
+
+**As built:** Not built. Groundwork: GameSetup.StartPrefabs stamps extra prefabs beside the first (FB-021), but nothing in the menu sets it, there are no presets, and scenarios don't exist.
+
+**Notes:** Owner, 2026-10-18.
+
 ## Decisions & open questions
 
 | # | Question | Related IDs | State | Decided By | Date |
@@ -83,6 +105,7 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 | [OQ-46](#oq-46-what-happens-when-a-player-leaves-an-online-match) | What happens when a player leaves an online match? | MP-003, MP-002 | Decided | Owner | 2026-10-17 |
 | [OQ-47](#oq-47-how-is-ai-difficulty-set) | How is AI difficulty set? | MP-002, MP-005 | Decided | Owner | 2026-10-17 |
 | [OQ-48](#oq-48-how-should-the-ai-choose-what-to-do) | How should the AI choose what to do? | MP-006, MP-002 | Decided | Owner | 2026-10-17 |
+| [OQ-50](#oq-50-how-does-the-ai-cope-with-content-changes) | How does the AI cope with content changes? | MP-007, MP-006, RS-002 | Decided | Owner | 2026-10-18 |
 
 ### OQ-12 Real-time for all players at once, or async/turn-based on the world layer?
 
@@ -112,10 +135,16 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 
 **Options / notes:** Options: difficulty levels (smarter play, resource bonuses), handicaps per map.
 
-**Decision:** No difficulty levels for now; difficulty is tuned by giving the AI a head start on certain maps.
+**Decision:** No difficulty levels for now; difficulty is tuned by giving the AI a head start on certain maps. 2026-10-18: the head start comes from a scenario or from a generic preset (MP-008).
 
 ### OQ-48 How should the AI choose what to do?
 
 **Options / notes:** Built: the first possible step on a fixed priority list. Options: priority list, behaviour trees, utility scoring, planners (GOAP, HTN). Common RTS bot practice (UAlbertaBot, Petra) is one manager per concern; utility scoring weighs competing goals better than a fixed order.
 
 **Decision:** Per-concern modules proposing integer-scored actions, best scores first within a command budget; a strategic layer with an influence map over the tile graph sets tile goals, and a tactical layer acts inside tiles; units are commanded as squads through orders, stances and targeting modes (MP-006).
+
+### OQ-50 How does the AI cope with content changes?
+
+**Options / notes:** Built: modules name items, recipes and buildings by id, so every content change means AI code changes. Common practice in data-driven strategy games: find buildings by role, plan production backwards through the recipe graph from what is wanted, and let content carry optional AI weights (Paradox, Civilization).
+
+**Decision:** Roles instead of ids, demand from the wanted designs and goals, backward chaining over the recipe graph, expansion towards missing deposits, value from stats, optional hints in content; the module framework stays (MP-007).

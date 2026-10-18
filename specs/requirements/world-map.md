@@ -24,6 +24,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-014](#wm-014-victory-circles) | Victory circles | Must | Done | Yes | MVP | Functional | P1 | WM-009 | New |  |
 | [WM-015](#wm-015-building-presence) | Building presence | Must | Done | Yes | MVP | Functional | P1 | WM-014 | New |  |
 | [WM-016](#wm-016-cores-and-elimination) | Cores and elimination | Must | Done | Yes | MVP | Functional | P8 | WM-005, CB-001, UD-010 | Review |  |
+| [WM-017](#wm-017-scenarios) | Scenarios | Should | Approved | No | Alpha | Functional | P1 | WM-009, FB-021, NF-002 |  |  |
 
 ### WM-001 Tiled world map
 
@@ -179,6 +180,16 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Notes:** Was: 'The tile core is the first building in a player's starting victory circle and keeps their control of that tile. Players can build more cores; a player who loses their last core is eliminated.' Decided 2026-10-10. Core and unit core unified after playtesting 2026-10-17, as they do the same jobs. Footprint, cost and tiers: OQ-37.
 
+### WM-017 Scenarios
+
+**Requirement:** A match shall be able to start from a scenario: a map plus what stands on it at the start. A map may be hand-authored or generated; a generated map can be saved as a scenario and then changed in its data.
+
+**Acceptance criteria:** A scenario is a content file holding the world (terrain, tile shapes and names, zones, deposits and patch amounts, victory circles) and per-seat starting state (owned tiles, buildings, units, core stock), validated on load like other content. A generated map saved as a scenario reloads to the same world, and editing the file (terrain, deposits, tile ownership, placed assets) changes that world. A match setup names either a seed (generated, as today) or a scenario; the save records which, with the scenario's content hash, so it replays the same. AI seats take over their seat's scenario assets at the start (MP-008).
+
+**As built:** Not built: every world is generated from the setup's seed, and the only pre-placed state is the start prefabs (FB-021).
+
+**Notes:** Owner, 2026-10-18 (OQ-51).
+
 ## Decisions & open questions
 
 | # | Question | Related IDs | State | Decided By | Date |
@@ -193,6 +204,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [OQ-36](#oq-36-with-continuous-zoom-where-is-the-threshold-and-which-tiles-count-as-viewed) | With continuous zoom, where is the threshold and which tiles count as viewed? | WM-007, FB-013, UC-005, NF-001 | Decided | Owner | 2026-10-17 |
 | [OQ-37](#oq-37-what-does-the-unified-core-look-like) | What does the unified core look like? | WM-016, UD-010, UD-003, FB-005, WM-005 | Decided | Owner | 2026-10-17 |
 | [OQ-45](#oq-45-does-holding-more-tiles-cost-anything-and-what-does-owning-a-tile-give) | Does holding more tiles cost anything, and what does owning a tile give? | WM-004, WM-006, MP-001, IO-001 | Decided | Owner | 2026-10-17 |
+| [OQ-51](#oq-51-are-maps-hand-authored-or-generated) | Are maps hand-authored or generated? | WM-017, WM-009, MP-008 | Decided | Owner | 2026-10-18 |
 
 ### OQ-1 Square or hex tiles on the world map?
 
@@ -253,3 +265,9 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 **Options / notes:** No upkeep or rising cost for tiles; only units have upkeep (UD-013). Anti-snowball options: tile upkeep, rising claim time, catch-up.
 
 **Decision:** No cost: owning more tiles means defending more tiles, and a tile gives little without infrastructure built in it. Owning a tile gives the owner's colour on the world map, counts towards domination (MP-001), and stops enemies building in its circle while the owner's buildings stand there (WM-015). After a capture the loser's buildings outside the circle stay. Port links don't need either tile to be owned.
+
+### OQ-51 Are maps hand-authored or generated?
+
+**Options / notes:** A seed plus an overlay of placements anchored to generated features is small; a full map file format (terrain, shapes, deposits, circles saved instead of generated) is larger but lets maps be edited.
+
+**Decision:** Both, through scenarios with a full map file: maps can be hand-authored or generated, a generated map can be saved as a scenario and edited in its data, and scenarios carry per-seat starting assets that an AI seat takes over (WM-017, MP-008).
