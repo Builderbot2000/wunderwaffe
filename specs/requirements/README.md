@@ -61,22 +61,22 @@ See also the [glossary](glossary.md).
 | Mechanic | Must | Should | Could | Won't | Total | Done | In Progress | % Done | Conflict | Review |
 |---|---|---|---|---|---|---|---|---|---|---|
 | [World Map](world-map.md) | 11 | 2 | 2 | 1 | 16 | 14 | 0 | 88% | 0 | 2 |
-| [Factory & Logistics](factory-logistics.md) | 17 | 3 | 1 | 0 | 21 | 18 | 1 | 86% | 0 | 2 |
+| [Factory & Logistics](factory-logistics.md) | 17 | 3 | 1 | 0 | 21 | 19 | 0 | 90% | 0 | 2 |
 | [Resources & Tech](resources-tech.md) | 7 | 1 | 2 | 0 | 10 | 4 | 0 | 40% | 0 | 1 |
 | [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
 | [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 14 | 0 | 74% | 0 | 2 |
 | [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 9 | 0 | 100% | 0 | 0 |
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 7 | 0 | 54% | 0 | 0 |
-| [Multiplayer & Victory](multiplayer-victory.md) | 3 | 2 | 1 | 0 | 6 | 3 | 2 | 50% | 0 | 0 |
+| [Multiplayer & Victory](multiplayer-victory.md) | 3 | 2 | 1 | 0 | 6 | 4 | 1 | 67% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 13 | 1 | 87% | 0 | 2 |
-| **Total** | 74 | 29 | 11 | 1 | 115 | 87 | 4 | 76% | 0 | 9 |
+| **Total** | 74 | 29 | 11 | 1 | 115 | 89 | 2 | 77% | 0 | 9 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 87 | 76% |
-| In Progress | 4 | 3% |
+| Done | 89 | 77% |
+| In Progress | 2 | 2% |
 | Approved | 0 | 0% |
 | Proposed | 9 | 8% |
 | Deferred | 2 | 2% |
@@ -96,13 +96,13 @@ See also the [glossary](glossary.md).
 | Pillar | Name | Reqs | Must | Done |
 |---|---|---|---|---|
 | P1 | World map of tiles | 18 | 13 | 16 |
-| P2 | Tile = RTS factory map | 21 | 17 | 17 |
+| P2 | Tile = RTS factory map | 21 | 17 | 18 |
 | P3 | Inter-tile I/O | 10 | 5 | 8 |
 | P4 | Block-by-block unit design | 15 | 10 | 13 |
 | P5 | Squad command | 10 | 5 | 10 |
 | P6 | No Rush | 6 | 4 | 0 |
 | P7 | Resource-gated tech | 8 | 6 | 3 |
-| P8 | World domination | 16 | 9 | 11 |
+| P8 | World domination | 16 | 9 | 12 |
 
 <!-- END generated summary -->
 
