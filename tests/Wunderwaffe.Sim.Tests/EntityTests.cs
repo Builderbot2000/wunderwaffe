@@ -1,3 +1,4 @@
+using Wunderwaffe.Sim.Ai;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
 using static Wunderwaffe.Sim.Tests.Harness;
@@ -291,5 +292,73 @@ public class EntityTests
 
         Assert.Equal(Build(3), Build(3));
         Assert.NotEqual(Build(3), Build(4));
+    }
+
+    [Fact]
+    public void SleepingMachinesChangeNothing()
+    {
+        // NF-001: idle machines are skipped until something changes around them, but every tick must come out as if
+        // all were stepped. Two AIs build, starve, power and feed machines in full sim, once with sleeping off.
+        GameSetup setup = new(5, 5, 7, Players: 2, AiPlayers: 2);
+        var sims = new[] { Simulation.NewGame(TestContent.Load(), setup), Simulation.NewGame(TestContent.Load(), setup) };
+        foreach (var s in sims)
+            s.RateModeEnabled = false;
+        foreach (var tile in sims[1].Tiles)
+            tile.Grid.Sleep.Off = true;
+        var ais = sims.Select(s => new AiDirector(s.Setup!)).ToArray();
+        int mostAsleep = 0;
+        for (int t = 0; t < 3 * 60 * Simulation.TicksPerSecond; t++)
+        {
+            for (int k = 0; k < 2; k++)
+            {
+                ais[k].BeforeStep(sims[k]);
+                sims[k].Step();
+            }
+            if (t % Simulation.TicksPerSecond == 0)
+            {
+                Assert.Equal(sims[1].StateHash(), sims[0].StateHash());
+                mostAsleep = Math.Max(mostAsleep, sims[0].Tiles.Sum(x => x.Grid.Machines.Count(b => b.Machine!.Bed != null)));
+            }
+        }
+        Assert.Equal(sims[1].StateHash(), sims[0].StateHash());
+        Assert.True(mostAsleep > 0);
+    }
+
+    [Fact]
+    public void MachinesSleepingWithoutPowerWakeWhenAGeneratorStarts()
+    {
+        // Drills on a fuel generator's network sit mid-batch with no power until fuel reaches it along a belt, with no
+        // layout change to wake them: only the power check does. Same state every tick as stepping them all.
+        var sims = new[] { PoweredSim(), PoweredSim() };
+        var tiles = sims.Select(sim =>
+        {
+            var tile = Tile(sim);
+            Place(sim, tile, "core_large", 0, 0);
+            Harness.Ore(tile, "copper_ore", 3, 2);
+            Place(sim, tile, "drill", 3, 2);
+            Place(sim, tile, "fuel_press", 3, 0, recipe: "press_fuel");
+            Belt(sim, tile, 5, 0, 5);
+            Place(sim, tile, "fuel_generator", 10, 0);
+            Harness.Ore(tile, Iron, 12, 0);
+            Place(sim, tile, "drill", 12, 0);
+            Harness.Ore(tile, Iron, 10, 2);
+            Place(sim, tile, "drill", 10, 2);
+            Place(sim, tile, "container", 12, 2);
+            return tile;
+        }).ToArray();
+        tiles[1].Grid.Sleep.Off = true;
+        foreach (var sim in sims)
+            sim.Step();
+        var drill = tiles[0].Grid.BuildingAt(12, 0)!.Machine!;
+        bool slept = false;
+        for (int t = 0; t < 3 * 60 * Simulation.TicksPerSecond; t++)
+        {
+            foreach (var sim in sims)
+                sim.Step();
+            slept |= drill.Bed != null && drill.Working;
+            Assert.Equal(sims[1].StateHash(), sims[0].StateHash());
+        }
+        Assert.True(slept);
+        Assert.True(tiles[0].Stats.MadeTotal(Iron) > 0);
     }
 }

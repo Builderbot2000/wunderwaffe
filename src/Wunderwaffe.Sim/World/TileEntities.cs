@@ -24,8 +24,14 @@ internal static class TileEntities
 
         PowerNet.Step(sim, tile);
 
-        foreach (var b in grid.Machines)
+        // Machines that can't do anything sleep until something changes around them (MachineSleep, NF-001).
+        var machines = grid.Machines;
+        var sleep = grid.Sleep;
+        sleep.Begin(grid);
+        for (int i = sleep.NextAwake(0); i >= 0; i = sleep.NextAwake(i + 1))
         {
+            sleep.Visit(i);
+            var b = machines[i];
             var m = b.Machine!;
             // Draw and supply change only when these flip (PowerNet.DrawOf, SupplyOf): report only then (NF-001).
             bool drew = m.Working || m.IdleTicks == 0, worked = m.Working;
@@ -34,7 +40,11 @@ internal static class TileEntities
             if ((m.Working || m.IdleTicks == 0) != drew || m.Working != worked)
                 m.Net?.Report(m);
             Dump(sim, tile, b, m);
+            // Idle with nothing to dump: every later tick would do the same until an input, power or the layout changes.
+            if (m.Recipe != null && m.IdleTicks > 0 && m.OutputCount == 0 && !sleep.Off)
+                sleep.Sleep(m);
         }
+        sleep.End();
         foreach (var b in grid.ImportPorts)
             Dump(sim, tile, b, b.Machine!);
         foreach (var b in grid.Storages)
@@ -241,6 +251,8 @@ internal static class TileEntities
                 if (have >= need * MachineState.InputBatches)
                     return false;
                 m.Input[item] = have + 1;
+                if (m.Bed is { } bed)
+                    bed.Wake(m);
                 return true;
             }
 

@@ -170,6 +170,9 @@ public sealed class TileGrid
     /// <summary>Power networks and boosted stats, rebuilt from the layout when <see cref="Revision"/> changes (FB-005, FB-016).</summary>
     public TilePower Power { get; }
 
+    /// <summary>Machines the entity step skips until something changes around them (NF-001).</summary>
+    internal MachineSleep Sleep { get; } = new();
+
     /// <summary>Weapons, shields and repair blocks, in id order: what the combat step visits.</summary>
     public IReadOnlyList<PlacedBuilding> CombatBuildings => _combat;
 
@@ -454,6 +457,7 @@ public sealed class TileGrid
         WreckCount = 0;
         BuildingCount = 0;
         Power.Dirty = true;
+        Sleep.Dirty = true;
     }
 
     /// <summary>Adds a building under a given id, higher than any added since <see cref="ClearForRestore"/>.</summary>

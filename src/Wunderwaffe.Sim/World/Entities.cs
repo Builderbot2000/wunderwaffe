@@ -130,7 +130,20 @@ public sealed class MachineState(RecipeDef? recipe) : OutputBuffer
     public SortedDictionary<string, int> Input { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Consecutive ticks the recipe hasn't advanced, so the UI can ignore short gaps between batches.</summary>
-    public int IdleTicks { get; internal set; }
+    public int IdleTicks
+    {
+        get => Bed is { } bed ? bed.IdleOf(this) : SleptIdle;
+        internal set => SleptIdle = value;
+    }
+
+    internal void SetIdle(int ticks) => SleptIdle = ticks;
+
+    // MachineSleep: set while asleep (Bed), its slot in TileGrid.Machines, idle ticks (counted on from SleptAt while
+    // asleep), and the power it slept at. Derived, not hashed.
+    internal MachineSleep? Bed;
+    internal int Slot, SleptIdle, SleptPower;
+    internal long SleptAt;
+    internal bool InUnpowered;
 
     /// <summary>
     /// Power this machine got last tick, in permille of what it asked for (FB-005). 1000 for machines that draw none.

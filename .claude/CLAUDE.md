@@ -65,6 +65,8 @@ game/data/*.json ── text ──▶ ContentDb.FromJson (validated) ◀── 
 - Anything iterated in the sim must have a deterministic order: `SortedDictionary` with `StringComparer.Ordinal`,
   id-ordered lists. No `HashSet`/`Dictionary` iteration that affects state.
 - New sim state must be mixed into `Core/StateHash.cs`, or desyncs and broken saves go undetected.
+- Idle machines sleep (`World/MachineSleep.cs`). Anything that lets a machine run again other than an item through
+  `TileEntities.TryInsert`, its power, or a `TileGrid.Revision` bump must wake it (`m.Bed?.Wake(m)`).
 - New command kinds: add a `[JsonDerivedType]` line with a new stable tag in `Command.cs`. Never rename existing tags
   (saves store them).
 - Gameplay checks live in the sim as public read-only `Check` methods returning a result enum; the command's `Apply`
