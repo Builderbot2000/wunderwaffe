@@ -53,7 +53,7 @@ public class DemoLoopTests(ITestOutputHelper output)
         var me = () => sim.PlayerOrNull(Me)!;
         var scoutCore = home.Grid.BuildingAt(46, 46)!;
         Assert.Equal("core", scoutCore.DefId);
-        Assert.Equal(Balance.StartingItems["copper_ore"], scoutCore.Stock!.Get("copper_ore"));
+        Assert.Equal(StartItems(sim)["copper_ore"], scoutCore.Stock!.Get("copper_ore"));
 
         // Goals 1-2: a base core off the frame, so home keeps funds once the scout leaves, and copper ore and iron
         // plates into it. The scout's core pays first (lowest id, OQ-38).
@@ -109,7 +109,8 @@ public class DemoLoopTests(ITestOutputHelper output)
         for (int x = 62; x <= 91; x++)
             Place(home, "conveyor", x, 48, West);
         sim.Step();
-        Assert.Equal(5 + wires.Count, coal.Grid.BuildingCount);
+        Assert.Equal(5, coal.Grid.BuildingCount);
+        Assert.Equal(wires.Count, coal.Grid.CableCount);
         Assert.Same(coal.Grid.Power.NetworkOf(landed), coal.Grid.Power.NetworkOf(coal.Grid.BuildingAt(1, 46)!));
 
         // Goal 6: the steel mill, once affordable; it needs plates from its own smelter and coal from the port. It

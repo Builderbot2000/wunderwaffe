@@ -75,7 +75,11 @@ public enum BuildingKind
     /// <summary>Wheels, a hull or a rotor: gives a unit its <see cref="BuildingDef.Locomotion"/> class (UD-004). Inert on a tile.</summary>
     Locomotor,
 
-    /// <summary>Conductor (FB-005): no behaviour, but joins the power buildings it touches into one network.</summary>
+    /// <summary>
+    /// Power cable (FB-005, FB-020): not a building on the tile but a layer under its cells, like frame. Buildings and
+    /// belts may stand on it; it joins every power building standing on or beside it, and the cables beside it, into one
+    /// network. Ownerless; removed (and refunded) once nothing stands on the cell.
+    /// </summary>
     Wire,
 
     /// <summary>Stores its network's surplus power and gives it back when the network falls short (FB-005).</summary>
@@ -95,6 +99,12 @@ public enum BuildingKind
 
     /// <summary>Carries items over up to <see cref="BuildingDef.Range"/> cells to the next bridge ahead (FB-004).</summary>
     Bridge,
+
+    /// <summary>
+    /// Power node (FB-020): joins every generator, battery and node within <see cref="BuildingDef.PowerRadius"/> cells
+    /// into its network, besides what it touches.
+    /// </summary>
+    PowerNode,
 }
 
 /// <summary>
@@ -155,6 +165,7 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// <param name="Range">Bridges: the farthest cell ahead the next bridge may stand on.</param>
 /// <param name="Booster">Boosters: what it does to its hosts.</param>
 /// <param name="Menu">Build menu tab, one of <see cref="BuildingDef.Menus"/>.</param>
+/// <param name="PowerRadius">Power nodes only: cells from its footprint to the footprints it joins (FB-020).</param>
 /// <param name="Capacity">Cores only: most of each item its stock holds from deliveries (OQ-38, OQ-39); belts back up past it.</param>
 public sealed record BuildingDef(
     string Id,
@@ -185,7 +196,8 @@ public sealed record BuildingDef(
     int Range = 0,
     BoosterDef? Booster = null,
     string Menu = "",
-    int Capacity = 0)
+    int Capacity = 0,
+    int PowerRadius = 0)
 {
     /// <summary>Build menu tabs, in the order the HUD shows them (and Shift+1.. picks them).</summary>
     public static readonly string[] Menus = ["production", "logistics", "power", "units", "combat", "boosters"];
@@ -196,7 +208,7 @@ public sealed record BuildingDef(
     /// </summary>
     public bool IsPower =>
         Kind != BuildingKind.Thruster
-        && (Power > 0 || PowerSupply > 0 || Kind is BuildingKind.Wire or BuildingKind.Battery);
+        && (Power > 0 || PowerSupply > 0 || Kind is BuildingKind.Wire or BuildingKind.Battery or BuildingKind.PowerNode);
 
     /// <summary>Width and height after <paramref name="rotation"/> quarter turns: odd turns swap them.</summary>
     public (int W, int H) Footprint(int rotation) => (rotation & 1) == 0 ? (Width, Height) : (Height, Width);

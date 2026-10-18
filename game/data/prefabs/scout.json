@@ -1,0 +1,17 @@
+// The starting unit (WM-005): a thruster, the 2x2 core and a thruster on a 4x2 frame, all pushing east.
+// Its core holds the starting items.
+{
+  "id": "scout",
+  "name": "Scout",
+  "tags": ["unit", "start"],
+  "items": { "copper_ore": 600, "iron_ore": 300 },
+  "blocks": [
+    { "defId": "thruster", "x": 0, "y": 0, "rotation": 0 },
+    { "defId": "core", "x": 1, "y": 0, "rotation": 0 },
+    { "defId": "thruster", "x": 3, "y": 0, "rotation": 0 }
+  ],
+  "frames": [
+    { "x": 0, "y": 0 }, { "x": 1, "y": 0 }, { "x": 2, "y": 0 }, { "x": 3, "y": 0 },
+    { "x": 0, "y": 1 }, { "x": 1, "y": 1 }, { "x": 2, "y": 1 }, { "x": 3, "y": 1 }
+  ]
+}

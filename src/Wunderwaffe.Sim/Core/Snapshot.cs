@@ -64,7 +64,7 @@ public sealed record ClaimSnap(int Player, int Ticks);
 
 public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingId, int NextWreckId,
     List<int> Frames, List<int> Platforms, List<BuildingSnap> Buildings, List<Wreck> Wrecks, List<ClaimSnap> Claims, StatsSnap Stats,
-    bool Full, List<AccSnap> Rates)
+    bool Full, List<AccSnap> Rates, List<int> Cables)
 {
     internal static TileSnap Of(Simulation sim, TileState t)
     {
@@ -78,12 +78,18 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
             if (g.HasPlatform(i % g.Width, i / g.Width))
                 platforms.Add(i);
         }
+        var cables = new List<int>();
+        for (int i = 0; g.CableCount > 0 && i < g.Width * g.Height; i++)
+        {
+            if (g.HasCable(i % g.Width, i / g.Width))
+                cables.Add(i);
+        }
         var rs = sim.RateState(t.Id);
         var acc = rs.Acc.Select((a, i) => (a, i)).Where(e => e.a != 0)
             .Select(e => new AccSnap(rs.AccKeys[e.i].Kind, rs.AccKeys[e.i].PortId, rs.AccKeys[e.i].Item, e.a)).ToList();
         return new TileSnap(t.Id, t.Owner, g.Revision, g.NextBuildingId, g.NextWreckId, frames, platforms,
             g.Buildings.Select(BuildingSnap.Of).ToList(), [.. g.Wrecks],
-            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc);
+            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc, cables);
     }
 
     internal void Restore(Simulation sim, TileState t)
@@ -100,6 +106,8 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
             g.SetFrame(i % g.Width, i / g.Width, true);
         foreach (int i in Platforms)
             g.SetPlatform(i % g.Width, i / g.Width, true);
+        foreach (int i in Cables)
+            g.SetCable(i % g.Width, i / g.Width, true);
         foreach (var b in Buildings)
             b.Restore(sim.Content, g);
         foreach (var w in Wrecks)
@@ -131,7 +139,7 @@ public sealed record CombatSnap(int Ammo, int Cooldown, int Charge, WeaponStatus
 
 /// <summary>A unit factory's state; its steps are rebuilt from the projection (<c>UnitFactory.StepsOf</c>).</summary>
 public sealed record FactorySnap(Blueprint? Projected, int OX, int OY, int Next, bool Working, int Progress,
-    Dictionary<string, int> Buffer, FactoryStatus Status, AssembleResult LiftOff, int Built);
+    Dictionary<string, int> Buffer, FactoryStatus Status, AssembleResult LiftOff, int Built, FactoryMode Mode = FactoryMode.Continuous);
 
 public sealed record StorageSnap(int DumpWait, int DumpCursor, Dictionary<string, int> Output, int OutputCount);
 
@@ -149,7 +157,7 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
             : null,
         b.Export is { } e ? new ExportSnap(e.Cursor, [.. e.InFlight]) : null,
         CombatSnap.Of(b.Combat),
-        b.Factory is { } f ? new FactorySnap(f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, new(f.Buffer), f.Status, f.LiftOff, f.Built) : null,
+        b.Factory is { } f ? new FactorySnap(f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, new(f.Buffer), f.Status, f.LiftOff, f.Built, f.Mode) : null,
         b.Storage is { } s ? new StorageSnap(s.DumpWait, s.DumpCursor, new(s.Output), s.OutputCount) : null,
         b.Battery?.Charge,
         b.Relay is { } r ? new RelaySnap(r.Cursor, r.Lanes.Select(l => l.ToList()).ToList()) : null,
@@ -190,6 +198,7 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
         {
             (f.Projected, f.OX, f.OY, f.Next, f.Working, f.Progress, f.Status, f.LiftOff, f.Built) =
                 (fs.Projected, fs.OX, fs.OY, fs.Next, fs.Working, fs.Progress, fs.Status, fs.LiftOff, fs.Built);
+            f.Mode = fs.Mode;
             f.Steps = fs.Projected is { } bp ? UnitFactory.StepsOf(content, bp, fs.OX, fs.OY) : [];
             foreach (var (id, n) in fs.Buffer)
                 f.Buffer[id] = n;

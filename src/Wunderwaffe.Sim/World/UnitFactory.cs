@@ -43,8 +43,38 @@ public enum FactoryStatus
     /// <summary>The next block's cell is taken, for instance by the last building blueprint it finished.</summary>
     Blocked,
 
-    /// <summary>Every block is placed but the design won't lift off; <see cref="FactoryState.LiftOff"/> says why.</summary>
-    LiftOffFailed,
+    /// <summary>
+    /// The finished unit wouldn't lift off (OQ-44); <see cref="FactoryState.LiftOff"/> says why. It takes no items and
+    /// does nothing until resumed (<see cref="UnitFactory.Resume"/>), which tries the lift-off again.
+    /// </summary>
+    Stopped,
+
+    /// <summary>Manual mode: a copy is done and the factory waits for the next trigger (<see cref="UnitFactory.Trigger"/>).</summary>
+    AwaitingTrigger,
+}
+
+/// <summary>A factory's production setting (UD-006, OQ-43).</summary>
+public enum FactoryMode
+{
+    /// <summary>Starts the next copy as soon as one is done.</summary>
+    Continuous,
+
+    /// <summary>Builds one copy per trigger; projecting a blueprint counts as the first.</summary>
+    Manual,
+}
+
+/// <summary>Why a factory control command (mode, trigger, resume) can't apply.</summary>
+public enum FactoryControlResult
+{
+    Ok,
+    NoFactory,
+    NotOwner,
+
+    /// <summary>Trigger: the factory isn't waiting for one (not manual, or still building).</summary>
+    NotAwaiting,
+
+    /// <summary>Resume: the factory isn't stopped.</summary>
+    NotStopped,
 }
 
 /// <summary>Assembly stages, in build order (WW-004).</summary>
@@ -86,7 +116,10 @@ public sealed class FactoryState
 
     public FactoryStatus Status { get; internal set; }
 
-    /// <summary>Why the last lift-off failed, while <see cref="Status"/> is <see cref="FactoryStatus.LiftOffFailed"/>.</summary>
+    /// <summary>Manual or continuous production (OQ-43), set by <c>set_factory_mode</c>.</summary>
+    public FactoryMode Mode { get; internal set; }
+
+    /// <summary>Why the last lift-off failed, while <see cref="Status"/> is <see cref="FactoryStatus.Stopped"/>.</summary>
     public AssembleResult LiftOff { get; internal set; }
 
     /// <summary>Copies finished: units lifted off, or building blueprints completed.</summary>
@@ -98,7 +131,8 @@ public sealed class FactoryState
 /// <summary>
 /// Unit factories (UD-006): a factory projects a library blueprint within its radius and builds it block by block as
 /// belts deliver each block's items, frame first, then systems, then armament (WW-004). When the last block of a unit
-/// is in place it lifts the unit off and starts the next copy. A building blueprint stays where it was built and blocks
+/// is in place it lifts the unit off and starts the next copy, or in manual mode waits for a trigger (OQ-43); a failed
+/// lift-off stops it until resumed (OQ-44). A building blueprint stays where it was built and blocks
 /// the factory until it is removed. A factory's radius and block cap are its def's plus its boosters' (FB-016), so a
 /// megafactory is just a well-boosted factory (WW-002).
 /// </summary>
@@ -272,7 +306,7 @@ public static class UnitFactory
     internal static bool TryInsert(PlacedBuilding factory, string item)
     {
         var f = factory.Factory!;
-        if (f.Projected == null)
+        if (f.Projected == null || !Runs(f))
             return false;
         int need = 0;
         for (int i = f.Working ? f.Next + 1 : f.Next; i < f.Steps.Count; i++)
@@ -308,7 +342,7 @@ public static class UnitFactory
     static void StepOne(Simulation sim, TileState tile, PlacedBuilding factory)
     {
         var f = factory.Factory!;
-        if (f.Projected is not { } bp)
+        if (f.Projected is not { } bp || !Runs(f))
             return;
 
         if (f.Current is not { } step)
@@ -381,7 +415,14 @@ public static class UnitFactory
     static bool Has(SortedDictionary<string, int> buffer, IReadOnlyDictionary<string, int> cost) =>
         cost.All(kv => buffer.GetValueOrDefault(kv.Key) >= kv.Value);
 
-    /// <summary>Every block is placed: lift a unit off, or leave a building blueprint standing, and start the next copy.</summary>
+    /// <summary>Neither stopped nor waiting for a trigger: it takes items and builds.</summary>
+    static bool Runs(FactoryState f) => f.Status is not (FactoryStatus.Stopped or FactoryStatus.AwaitingTrigger);
+
+    /// <summary>
+    /// Every block is placed: lift a unit off, or leave a building blueprint standing, then start the next copy
+    /// (continuous) or wait for a trigger (manual). A failed lift-off stops the factory and raises
+    /// <see cref="Core.GameEventKind.FactoryStopped"/> (item id = the <see cref="AssembleResult"/>) until it is resumed (OQ-44).
+    /// </summary>
     static void Finish(Simulation sim, TileState tile, PlacedBuilding factory, Blueprint bp)
     {
         var f = factory.Factory!;
@@ -393,12 +434,68 @@ public static class UnitFactory
             f.LiftOff = UnitAssembly.Launch(sim, tile, factory.Owner, f.OX + b.X, f.OY + b.Y, BlockCap(sim, tile, factory), factory, out _);
             if (f.LiftOff != AssembleResult.Ok)
             {
-                f.Status = FactoryStatus.LiftOffFailed;
+                f.Status = FactoryStatus.Stopped;
+                sim.Raise(Core.GameEventKind.FactoryStopped, factory.Owner, tile.Id, itemId: f.LiftOff.ToString());
                 return;
             }
         }
         f.Built++;
         f.Next = 0;
+        f.Status = f.Mode == FactoryMode.Manual ? FactoryStatus.AwaitingTrigger : FactoryStatus.Waiting;
+    }
+
+    /// <summary>The player's unit factory covering (x, y), or why not.</summary>
+    static FactoryControlResult Own(TileState tile, int player, int x, int y, out FactoryState? f)
+    {
+        f = null;
+        if (tile.Grid.BuildingAt(x, y) is not { Kind: BuildingKind.UnitFactory } factory)
+            return FactoryControlResult.NoFactory;
+        if (factory.Owner != player)
+            return FactoryControlResult.NotOwner;
+        f = factory.Factory!;
+        return FactoryControlResult.Ok;
+    }
+
+    /// <summary>Whether the player may set the production setting of the factory covering (x, y): any time (UD-006).</summary>
+    public static FactoryControlResult CheckSetMode(TileState tile, int player, int x, int y) => Own(tile, player, x, y, out _);
+
+    /// <summary>
+    /// Sets manual or continuous production. A manual factory waiting for a trigger switched to continuous starts the
+    /// next copy; a copy in progress always finishes.
+    /// </summary>
+    internal static void SetMode(TileState tile, int player, int x, int y, FactoryMode mode)
+    {
+        if (Own(tile, player, x, y, out var f) != FactoryControlResult.Ok)
+            return;
+        f!.Mode = mode;
+        if (mode == FactoryMode.Continuous && f.Status == FactoryStatus.AwaitingTrigger)
+            f.Status = FactoryStatus.Waiting;
+    }
+
+    /// <summary>Whether the factory covering (x, y) is the player's and waiting for a manual trigger.</summary>
+    public static FactoryControlResult CheckTrigger(TileState tile, int player, int x, int y) =>
+        Own(tile, player, x, y, out var f) is not FactoryControlResult.Ok and var r ? r
+        : f!.Status == FactoryStatus.AwaitingTrigger ? FactoryControlResult.Ok : FactoryControlResult.NotAwaiting;
+
+    /// <summary>Manual mode: starts one more copy of the projected blueprint.</summary>
+    internal static void Trigger(TileState tile, int player, int x, int y)
+    {
+        if (CheckTrigger(tile, player, x, y) == FactoryControlResult.Ok)
+            tile.Grid.BuildingAt(x, y)!.Factory!.Status = FactoryStatus.Waiting;
+    }
+
+    /// <summary>Whether the factory covering (x, y) is the player's and stopped after a failed lift-off.</summary>
+    public static FactoryControlResult CheckResume(TileState tile, int player, int x, int y) =>
+        Own(tile, player, x, y, out var f) is not FactoryControlResult.Ok and var r ? r
+        : f!.Status == FactoryStatus.Stopped ? FactoryControlResult.Ok : FactoryControlResult.NotStopped;
+
+    /// <summary>Clears a stop: the factory tries the lift-off again on its next step, and stops again if it still fails.</summary>
+    internal static void Resume(TileState tile, int player, int x, int y)
+    {
+        if (CheckResume(tile, player, x, y) != FactoryControlResult.Ok)
+            return;
+        var f = tile.Grid.BuildingAt(x, y)!.Factory!;
         f.Status = FactoryStatus.Waiting;
+        f.LiftOff = AssembleResult.Ok;
     }
 }

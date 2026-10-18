@@ -128,7 +128,7 @@ public partial class Hud : Control
         side.AddChild(_sideInfo);
         var buttons = Ui.Row();
         _claim = Ui.Button("Send units (C)", SendToCircle);
-        _enter = Ui.Button("Open tile (Enter)", () => _host.EnterTile(SelectedWorldTile().Id));
+        _enter = Ui.Button("Open tile (Enter)", () => _host.ZoomInto(SelectedWorldTile().Id));
         buttons.AddChild(_claim);
         buttons.AddChild(_enter);
         side.AddChild(buttons);

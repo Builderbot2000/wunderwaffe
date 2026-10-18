@@ -36,6 +36,9 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(SetSquadStanceCommand), "set_squad_stance")]
 [JsonDerivedType(typeof(SetRallyCommand), "set_rally")]
 [JsonDerivedType(typeof(SetFilterCommand), "set_filter")]
+[JsonDerivedType(typeof(SetFactoryModeCommand), "set_factory_mode")]
+[JsonDerivedType(typeof(TriggerFactoryCommand), "trigger_factory")]
+[JsonDerivedType(typeof(ResumeFactoryCommand), "resume_factory")]
 [JsonDerivedType(typeof(SetTargetingCommand), "set_targeting")]
 [JsonDerivedType(typeof(SetSquadTargetingCommand), "set_squad_targeting")]
 public abstract record Command(int Player)
@@ -305,6 +308,36 @@ public sealed record SetFilterCommand(int Player, int TileId, int X, int Y, stri
     {
         if (sim.TryGetTile(TileId) is { } tile)
             Logistics.SetFilter(sim, tile, Player, X, Y, ItemId);
+    }
+}
+
+/// <summary>Sets the production setting of the factory covering (X, Y): manual or continuous (UD-006, OQ-43).</summary>
+public sealed record SetFactoryModeCommand(int Player, int TileId, int X, int Y, FactoryMode Mode) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile)
+            UnitFactory.SetMode(tile, Player, X, Y, Mode);
+    }
+}
+
+/// <summary>A manual factory covering (X, Y) builds one more copy (UD-006). See <see cref="UnitFactory.CheckTrigger"/>.</summary>
+public sealed record TriggerFactoryCommand(int Player, int TileId, int X, int Y) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile)
+            UnitFactory.Trigger(tile, Player, X, Y);
+    }
+}
+
+/// <summary>A factory stopped by a failed lift-off tries again (UD-006, OQ-44). See <see cref="UnitFactory.CheckResume"/>.</summary>
+public sealed record ResumeFactoryCommand(int Player, int TileId, int X, int Y) : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile)
+            UnitFactory.Resume(tile, Player, X, Y);
     }
 }
 

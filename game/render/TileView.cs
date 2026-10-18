@@ -10,6 +10,10 @@ namespace Wunderwaffe.Game.Render;
 /// as a flat <see cref="Palette"/> colour. Rebuilds only when the grid's revision changes.
 /// The ground is the tile's terrain, one colour per cell. The tile's bounding box also shows the land of the tiles
 /// around it, dimmed, with the border drawn over it and each I/O zone outlined in its own colour.
+/// <para>
+/// Near the zoom threshold (WM-007) it fades over the world map at <see cref="SimHost.TileOpacity"/>; on the world map
+/// side it shows <see cref="SimHost.FadeTile"/>, scaled into the world map's canvas so both pictures line up.
+/// </para>
 /// </summary>
 public partial class TileView : Node2D
 {
@@ -31,6 +35,7 @@ public partial class TileView : Node2D
     MultiMeshInstance2D _deposits = null!;
     MultiMeshInstance2D _frames = null!;
     MultiMeshInstance2D _platforms = null!;
+    MultiMeshInstance2D _cables = null!;
     MultiMeshInstance2D _buildings = null!;
     Node2D _depositIcons = null!;
     Node2D _buildingSprites = null!;
@@ -44,7 +49,6 @@ public partial class TileView : Node2D
     public override void _Ready()
     {
         _host = SimHost.Instance;
-        _host.ShowOnlyIn(this, ViewMode.Tile);
         _terrain = new Sprite2D
         {
             Name = "Terrain",
@@ -59,6 +63,7 @@ public partial class TileView : Node2D
         _depositIcons = AddGroup("DepositIcons");
         _platforms = AddLayer(this, "Platforms", Sprites.Get(Sprites.Platform));
         _frames = AddLayer(this, "Frames", Sprites.Get(Sprites.Frame));
+        _cables = AddLayer(this, "Cables", null);
         _buildings = AddLayer(this, "Buildings", null);
         _buildingSprites = AddGroup("BuildingSprites");
         _items = AddLayer(this, "Items", null);
@@ -69,7 +74,16 @@ public partial class TileView : Node2D
 
     public override void _Process(double delta)
     {
-        var tile = _host.ViewedTile;
+        bool onTile = _host.View == ViewMode.Tile;
+        var shown = onTile ? _host.ViewedTile : _host.FadeTile;
+        Visible = shown != null && _host.TileOpacity > 0;
+        if (shown is not { } tile || !Visible)
+            return;
+        Modulate = Colors.White with { A = _host.TileOpacity };
+        // The tile layer's canvas is the tile's local cells; on the world map, map that into world-map pixels.
+        const float toMap = WorldMapView.CellPx / Palette.CellPx;
+        Scale = onTile ? Vector2.One : Vector2.One * toMap;
+        Position = onTile ? Vector2.Zero : new Vector2(tile.OriginX, tile.OriginY) * WorldMapView.CellPx;
         TileGrid grid = tile.Grid;
         // Grids of different tiles can share a revision number, so the tile id is part of "what's drawn".
         if (grid.Revision != _drawnRevision || tile.Id != _drawnTileId)
@@ -85,6 +99,7 @@ public partial class TileView : Node2D
             DrawDeposits(grid);
             DrawPlatforms(grid);
             DrawFrames(grid);
+            DrawCables(grid);
             DrawBuildings(grid);
         }
         DrawItems(grid);
@@ -340,6 +355,35 @@ public partial class TileView : Node2D
         {
             mm.SetInstanceTransform2D(i, Rect(cells[i].X, cells[i].Y, 1, 1, sprite ? 0 : 0.06f, 0));
             mm.SetInstanceColor(i, sprite ? Colors.White : Palette.Frame);
+        }
+    }
+
+    /// <summary>Power cables (FB-020): a dot per cell and a bar to each cable east or south of it, under the buildings.</summary>
+    void DrawCables(TileGrid grid)
+    {
+        const float Thick = 0.22f;
+        float px = Palette.CellPx;
+        var quads = new List<Transform2D>();
+        for (int y = 0; grid.CableCount > 0 && y < grid.Height; y++)
+        {
+            for (int x = 0; x < grid.Width; x++)
+            {
+                if (!grid.HasCable(x, y))
+                    continue;
+                var centre = new Vector2(x + 0.5f, y + 0.5f) * px;
+                quads.Add(new Transform2D(0, new Vector2(Thick * 1.6f * px, -Thick * 1.6f * px), 0, centre));
+                if (grid.HasCable(x + 1, y))
+                    quads.Add(new Transform2D(0, new Vector2(px, -Thick * px), 0, centre + new Vector2(px / 2, 0)));
+                if (grid.HasCable(x, y + 1))
+                    quads.Add(new Transform2D(0, new Vector2(Thick * px, -px), 0, centre + new Vector2(0, px / 2)));
+            }
+        }
+        var mm = _cables.Multimesh;
+        mm.InstanceCount = quads.Count;
+        for (int i = 0; i < quads.Count; i++)
+        {
+            mm.SetInstanceTransform2D(i, quads[i]);
+            mm.SetInstanceColor(i, Palette.Cable);
         }
     }
 

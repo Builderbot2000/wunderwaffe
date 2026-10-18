@@ -26,6 +26,7 @@ GODOT="/c/Users/Public/Godot/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_
 "$GODOT" --path game --headless -- --stress     # sim benchmark, prints ms/tick, quits (no window)
 "$GODOT" --path game -- --tour <out_dir>        # UI smoke test: clicks through every screen, PNG per step (opens a window, moves the mouse)
 "$GODOT" --path game -- --drive [shot.png]      # scripted unit lift-off and move via real input (opens a window)
+"$GODOT" --path game --headless --export-release "Windows Desktop" ../build/windows/Wunderwaffe3037.exe  # NF-005 package (needs 4.7.2 mono export templates)
 ```
 
 Verify sim changes with `dotnet test`. Verify Godot-side changes with a build, then `--tour` and look at the

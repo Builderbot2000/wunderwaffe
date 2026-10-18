@@ -10,10 +10,22 @@ namespace Wunderwaffe.Sim;
 /// <param name="CaptureSeconds">How long a building must hold a victory circle to claim the tile (WM-006).</param>
 /// <param name="VictoryPercent">Share of all tiles, in percent, that wins the match (MP-001).</param>
 /// <param name="RichnessPercent">Deposit richness relative to normal (MP-005); 100 is the content as written.</param>
+/// <param name="StartPrefabs">
+/// Prefab ids stamped on each seat's starting tile (FB-021), indexed by player: the first nearest the victory circle
+/// centre, the rest beside it (an AI head start, OQ-47). A missing or empty entry gets <see cref="DefaultStart"/>.
+/// </param>
 public sealed record GameSetup(
     int Width, int Height, ulong Seed, int Players = 1,
-    int AiPlayers = 0, int CaptureSeconds = Balance.CaptureSeconds, int VictoryPercent = 60, int RichnessPercent = 100)
+    int AiPlayers = 0, int CaptureSeconds = Balance.CaptureSeconds, int VictoryPercent = 60, int RichnessPercent = 100,
+    string[][]? StartPrefabs = null)
 {
+    /// <summary>The prefab every seat starts with unless the setup names others: the landed scout (WM-005).</summary>
+    public const string DefaultStart = "scout";
+
+    /// <summary>The prefabs <paramref name="player"/> starts with, the first one in the victory circle.</summary>
+    public IReadOnlyList<string> PrefabsFor(int player) =>
+        StartPrefabs is { } s && player < s.Length && s[player] is { Length: > 0 } p ? p : [DefaultStart];
+
     public const int MinSize = 3;
     public const int MaxSize = 7;
     public const int MaxPlayers = 8;
@@ -32,7 +44,13 @@ public sealed record GameSetup(
         : CaptureSeconds is < MinCaptureSeconds or > MaxCaptureSeconds ? $"capture time {CaptureSeconds} s; {MinCaptureSeconds} to {MaxCaptureSeconds} allowed"
         : VictoryPercent is < MinVictoryPercent or > MaxVictoryPercent ? $"victory share {VictoryPercent}%; {MinVictoryPercent} to {MaxVictoryPercent} allowed"
         : RichnessPercent is < MinRichness or > MaxRichness ? $"richness {RichnessPercent}%; {MinRichness} to {MaxRichness} allowed"
+        : StartPrefabs is { } s && s.Length > Players ? $"start prefabs for {s.Length} seats of {Players}"
         : null;
+
+    /// <summary>Why the setup can't start a match with this content, or null: <see cref="Problem()"/> or an unknown prefab.</summary>
+    public string? Problem(Content.ContentDb content) =>
+        Problem() ?? Enumerable.Range(0, Players).SelectMany(PrefabsFor).Where(id => !content.Prefabs.ContainsKey(id))
+            .Select(id => $"unknown start prefab '{id}'").FirstOrDefault();
 
     public static readonly GameSetup Default = new(5, 5, 3037);
 

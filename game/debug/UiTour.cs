@@ -49,7 +49,24 @@ public partial class UiTour : Node
         Step(5, "new game", () => Press("New game"));
         Step(10, "setup", () => { Shot("02_new_game"); Press("Start"); });
         Step(40, "world", () => Shot("03_world"));
-        Step(1, "enter", () => _host.EnterTile(_host.ViewedTile.Id));
+        // WM-007: the wheel over the home circle zooms through the cross-fade into the tile.
+        Step(1, "zoom to fade", () => WheelUntil(c => c.CellScale >= c.Threshold * 0.8f));
+        Step(5, "fade shot", () =>
+        {
+            Log(_host.View == ViewMode.World && _host.TileOpacity is > 0 and < 1
+                ? $"world map side of the fade, tile opacity {_host.TileOpacity:0.00}"
+                : $"FAIL: expected the fade on the world map side, got {_host.View} at opacity {_host.TileOpacity:0.00}");
+            Shot("03b_zoom_fade");
+            WheelUntil(c => c.CellScale >= c.Threshold * 1.1f);
+        });
+        Step(5, "tile side shot", () =>
+        {
+            Log(_host.View == ViewMode.Tile && _host.ViewedTile.Owner == _host.LocalPlayer
+                ? $"wheel opened the home tile, tile opacity {_host.TileOpacity:0.00}"
+                : $"FAIL: the wheel didn't open the home tile ({_host.View})");
+            Shot("03c_zoom_tile_side");
+            WheelUntil(c => c.CellScale >= 12);
+        });
         Step(20, "tile", () => Shot("04_tile"));
         Step(1, "build", () => { Build(); WaitTicks(14 * 60); });
         Step(1, "built", () => Shot("05_building"));
@@ -71,7 +88,12 @@ public partial class UiTour : Node
             Key(Godot.Key.O);
         });
         Step(5, "world again", () => { Key(Godot.Key.Tab); });
-        Step(10, "select coal tile", SelectCoalNeighbour);
+        Step(14, "zooming out", () => Shot("06_zoom_out"));
+        Step(40, "select coal tile", () =>
+        {
+            Log(_host.View == ViewMode.World ? "Tab zoomed out to the world map" : "FAIL: Tab didn't reach the world map");
+            SelectCoalNeighbour();
+        });
         Step(1, "lift off scout", LiftOffScout);
         Step(10, "select scout", SelectScout);
         Step(10, "world tile panel", () => { Shot("07_world_coal"); Press("Send units"); });
@@ -90,7 +112,16 @@ public partial class UiTour : Node
             Shot("07c_logistics_off");
             Key(Godot.Key.L);
         });
-        Step(1, "back to tile", () => { _host.Selected.Clear(); Key(Godot.Key.Tab); });
+        Step(1, "back to tile", () => Key(Godot.Key.Tab));
+        Step(40, "back on tile", () =>
+        {
+            // WM-007: the selection survives the zoom.
+            Log(_host.View == ViewMode.Tile && _host.Selected.Count > 0
+                ? "Tab zoomed back into the tile with the scout still selected"
+                : $"FAIL: after Tab: {_host.View}, {_host.Selected.Count} selected");
+            Shot("07d_back_on_tile");
+            _host.Selected.Clear();
+        });
         Step(5, "pause", () => { Key(Godot.Key.Escape); });
         Step(5, "paused", () => { _pausedTick = _host.Sim.Tick; Shot("08_pause"); });
         Step(20, "still paused", () =>
@@ -263,6 +294,26 @@ public partial class UiTour : Node
                 return hit;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Warps the mouse over the home circle and turns the wheel up one notch at a time until <paramref name="done"/>
+    /// holds for the camera (at most 60 notches).
+    /// </summary>
+    void WheelUntil(Func<CameraController, bool> done)
+    {
+        var camera = GetTree().Root.FindChild("Camera", true, false) as CameraController ?? throw new InvalidOperationException("no Camera");
+        var home = _host.Sim.Tiles[_host.Sim.StartTileId];
+        var cell = new Vector2(home.OriginX + home.CircleX + 0.5f, home.OriginY + home.CircleY + 0.5f);
+        var canvas = _host.View == ViewMode.Tile ? (cell - new Vector2(home.OriginX, home.OriginY)) * Palette.CellPx : cell * WorldMapView.CellPx;
+        var at = GetViewport().GetCanvasTransform() * canvas;
+        GetViewport().WarpMouse(at);
+        GetViewport().PushInput(new InputEventMouseMotion { Position = at, GlobalPosition = at });
+        for (int i = 0; i < 60 && !done(camera); i++)
+        {
+            foreach (bool pressed in new[] { true, false })
+                GetViewport().PushInput(new InputEventMouseButton { ButtonIndex = MouseButton.WheelUp, Pressed = pressed, Position = at, GlobalPosition = at });
+        }
     }
 
     void Key(Key key)

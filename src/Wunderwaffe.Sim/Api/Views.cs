@@ -99,13 +99,20 @@ public sealed record SquadView(
 /// <param name="Next">Index of the step being built, of <paramref name="Steps"/>.</param>
 public sealed record FactoryView(
     int BuildingId, FactoryStatus Status, bool Projecting, int Next, int Steps, int Built, int Radius, int BlockCap,
-    IReadOnlyList<StageProgressView> Stages, IReadOnlyDictionary<string, int> Buffer, IReadOnlyDictionary<string, int> Missing);
+    IReadOnlyList<StageProgressView> Stages, IReadOnlyDictionary<string, int> Buffer, IReadOnlyDictionary<string, int> Missing,
+    FactoryMode Mode = FactoryMode.Continuous, AssembleResult LiftOff = AssembleResult.Ok);
+
+/// <summary>A prefab blueprint (FB-021): placeable and projectable like a library one. <c>Items</c> = what its core starts with.</summary>
+public sealed record PrefabView(
+    string Id, string Name, Blueprint Blueprint, IReadOnlyDictionary<string, int> Items, IReadOnlyList<string> Tags, bool IsUnit);
 
 public sealed record StageProgressView(BuildStage Stage, int Done, int Total);
 
 /// <summary>A power network's balance this tick (FB-005).</summary>
 /// <param name="Satisfaction">Permille of demand met.</param>
-public sealed record PowerView(int Id, IReadOnlyList<int> Members, long Supply, long Demand, long Stored, long Capacity, int Satisfaction);
+/// <param name="Tiles">Every tile the network spans (FB-020), ascending.</param>
+public sealed record PowerView(int Id, IReadOnlyList<int> Members, long Supply, long Demand, long Stored, long Capacity, int Satisfaction,
+    IReadOnlyList<int>? Tiles = null);
 
 /// <summary>A tile's production over the last minute (FB-011).</summary>
 public sealed record ProductionView(IReadOnlyList<ItemRate> Items, IReadOnlyList<PartnerRate> Sent);

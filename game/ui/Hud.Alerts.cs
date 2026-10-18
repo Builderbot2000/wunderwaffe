@@ -21,7 +21,7 @@ public partial class Hud
     [
         (AlertFilter.Combat, "Combat", [GameEventKind.TileUnderAttack, GameEventKind.TileLost, GameEventKind.PlayerEliminated]),
         (AlertFilter.Production, "Production", [GameEventKind.InputsStarved]),
-        (AlertFilter.Units, "Units", [GameEventKind.UnitCompleted]),
+        (AlertFilter.Units, "Units", [GameEventKind.UnitCompleted, GameEventKind.FactoryStopped]),
         (AlertFilter.Territory, "Territory", [GameEventKind.TileClaimed]),
     ];
 
@@ -108,6 +108,7 @@ public partial class Hud
             GameEventKind.TileUnderAttack => $"{tile} is under attack",
             GameEventKind.InputsStarved => $"{tile}: machines short of {GameText.ItemName(Content, e.ItemId ?? "")}",
             GameEventKind.UnitCompleted => $"Unit {e.UnitId} ready{(tile.Length > 0 ? $" on {tile}" : "")}",
+            GameEventKind.FactoryStopped => $"{tile}: a factory stopped, its unit can't lift off",
             GameEventKind.TileClaimed => $"You took {tile}",
             GameEventKind.TileLost => $"You lost {tile}",
             GameEventKind.PlayerEliminated => e.Player == Me ? "You were eliminated" : $"{PlayerName(e.Player)} was eliminated",
@@ -118,7 +119,7 @@ public partial class Hud
     static Color AlertColor(GameEventKind kind) => kind switch
     {
         GameEventKind.TileUnderAttack or GameEventKind.TileLost or GameEventKind.PlayerEliminated => Ui.Bad,
-        GameEventKind.InputsStarved => Ui.Warn,
+        GameEventKind.InputsStarved or GameEventKind.FactoryStopped => Ui.Warn,
         _ => Ui.Good,
     };
 

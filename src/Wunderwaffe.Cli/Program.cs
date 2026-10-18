@@ -9,7 +9,8 @@ string Read(string name) => File.ReadAllText(Path.Combine(dir, name));
 ContentDb content;
 try
 {
-    content = ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"));
+    content = ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"),
+        Directory.GetFiles(Path.Combine(dir, "prefabs"), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText));
 }
 catch (Exception e) when (e is IOException or ContentException)
 {

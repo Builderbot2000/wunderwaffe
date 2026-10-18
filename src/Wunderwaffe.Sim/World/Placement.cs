@@ -53,11 +53,12 @@ public static class Placement
         TileGrid grid = tile.Grid;
         if (!grid.InBounds(x, y, w, h))
             return PlaceResult.OutOfBounds;
-        if (!grid.IsFree(x, y, w, h))
+        // A cable lies under buildings (FB-020): it only clashes with another cable.
+        if (def.Kind == BuildingKind.Wire ? Any(grid.HasCable, x, y, w, h) : !grid.IsFree(x, y, w, h))
             return PlaceResult.Blocked;
         if (def.Kind == BuildingKind.Platform)
         {
-            if (AnyPlatform(grid, x, y, w, h))
+            if (Any(grid.HasPlatform, x, y, w, h))
                 return PlaceResult.Blocked;
             if (!OnWater(content, grid, x, y, w, h))
                 return PlaceResult.BadTerrain;
@@ -86,13 +87,13 @@ public static class Placement
         return PlaceResult.Ok;
     }
 
-    static bool AnyPlatform(TileGrid grid, int x, int y, int w, int h)
+    static bool Any(Func<int, int, bool> layer, int x, int y, int w, int h)
     {
         for (int cy = y; cy < y + h; cy++)
         {
             for (int cx = x; cx < x + w; cx++)
             {
-                if (grid.HasPlatform(cx, cy))
+                if (layer(cx, cy))
                     return true;
             }
         }

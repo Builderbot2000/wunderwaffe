@@ -56,18 +56,32 @@ public partial class WorldMapView : Node2D
         _overlay.Draw += DrawOverlay;
         AddChild(_overlay);
         SelectedTileId = _host.ViewedTile.Id;
-        _host.ShowOnlyIn(this, ViewMode.World, OnViewChanged);
+        // Under the tile layer, which fades over it near the zoom threshold (WM-007).
+        ZIndex = -1;
+        _host.WatchView(this, OnViewChanged);
     }
 
     void OnViewChanged()
     {
-        if (!Visible)
+        if (_host.View != ViewMode.World)
             return;
         SelectedTileId = _host.ViewedTile.Id;
-        if (_snapshot?.Sim != _host.Sim)
-            Rebuild();
-        else if (_host.ToggleCount % GameSettings.SnapshotEvery == 0 && _snapshot.Refresh() > 0)
+        if (_snapshot?.Sim == _host.Sim && _host.ToggleCount % GameSettings.SnapshotEvery == 0 && _snapshot.Refresh() > 0)
             QueueRedraw();
+    }
+
+    /// <summary>
+    /// Shown on the world map, and under the tile view while it fades (WM-007). The world map's canvas is world-map
+    /// pixels; in the tile view it is scaled into the viewed tile's local canvas so the two line up.
+    /// </summary>
+    bool Place()
+    {
+        bool world = _host.View == ViewMode.World;
+        Visible = world || _host.TileOpacity < 1;
+        var origin = new Vector2(_host.ViewedTile.OriginX, _host.ViewedTile.OriginY);
+        Scale = world ? Vector2.One : Vector2.One * (Palette.CellPx / CellPx);
+        Position = world ? Vector2.Zero : -origin * Palette.CellPx;
+        return Visible;
     }
 
     /// <summary>A new match: everything cached about the old world goes.</summary>
@@ -83,6 +97,10 @@ public partial class WorldMapView : Node2D
 
     public override void _Process(double delta)
     {
+        if (_snapshot?.Sim != _host.Sim)
+            Rebuild();
+        if (!Place())
+            return;
         if (OwnersChanged())
             QueueRedraw();
         _overlay.QueueRedraw();
@@ -90,18 +108,20 @@ public partial class WorldMapView : Node2D
 
     public override void _UnhandledInput(InputEvent e)
     {
+        if (_host.View != ViewMode.World)
+            return;
         if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } click)
         {
             if (TileUnderMouse() is { } hit)
             {
                 SelectedTileId = hit.Id;
                 if (click.DoubleClick)
-                    _host.EnterTile(hit.Id);
+                    _host.ZoomInto(hit.Id);
             }
         }
         else if (e.IsActionPressed(InputActions.WorldEnter))
         {
-            _host.EnterTile(SelectedTileId);
+            _host.ZoomInto(SelectedTileId);
         }
         else if (e.IsActionPressed(InputActions.WorldClaim))
         {
@@ -203,19 +223,22 @@ public partial class WorldMapView : Node2D
         if (sim.TryGetTile(SelectedTileId) is { } selected)
             _overlay.DrawMultiline(Outline(selected), Selected, 3);
 
+        // Labels stop growing past twice their size as the camera zooms toward a tile (WM-007).
+        float labelScale = Mathf.Min(1f, 2f / _overlay.GetGlobalTransformWithCanvas().Scale.X);
         foreach (var tile in sim.Tiles)
         {
-            var c = Center(tile);
+            _overlay.DrawSetTransform(Center(tile), 0, Vector2.One * labelScale);
             string name = tile.Name, what = Describe(tile);
             float width = Mathf.Max(font.GetStringSize(name, HorizontalAlignment.Left, -1, FontSize).X,
                 font.GetStringSize(what, HorizontalAlignment.Left, -1, FontSize - 4).X);
-            var box = new Rect2(c.X - width / 2 - 6, c.Y - FontSize - 8, width + 12, FontSize * 2 + 22);
+            var box = new Rect2(-width / 2 - 6, -FontSize - 8, width + 12, FontSize * 2 + 22);
             _overlay.DrawRect(box, new Color(0, 0, 0, 0.45f));
-            _overlay.DrawString(font, new Vector2(box.Position.X + 6, c.Y - 4), name, HorizontalAlignment.Left, -1, FontSize, Colors.White);
-            _overlay.DrawString(font, new Vector2(box.Position.X + 6, c.Y + FontSize - 6), what, HorizontalAlignment.Left, -1, FontSize - 4, Colors.White);
+            _overlay.DrawString(font, new Vector2(box.Position.X + 6, -4), name, HorizontalAlignment.Left, -1, FontSize, Colors.White);
+            _overlay.DrawString(font, new Vector2(box.Position.X + 6, FontSize - 6), what, HorizontalAlignment.Left, -1, FontSize - 4, Colors.White);
             DrawDeposits(tile, new Rect2(box.Position.X, box.End.Y - 8, box.Size.X, 6));
             DrawRegional(tile, new Vector2(box.End.X + 4, box.Position.Y));
         }
+        _overlay.DrawSetTransform(Vector2.Zero, 0, Vector2.One);
         if (ShowLogistics)
             DrawLinks();
         DrawDisrupted();

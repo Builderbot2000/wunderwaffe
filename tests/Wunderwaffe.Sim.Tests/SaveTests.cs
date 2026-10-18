@@ -59,6 +59,8 @@ public class SaveTests(ITestOutputHelper output)
         var belts = new Blueprint([new BlueprintBlock("conveyor", 0, 0, 0), new BlueprintBlock("conveyor", 1, 0, 0)], []);
         At(22, new PlaceBlueprintCommand(Me, home.Id, belts, x0, y0 + 5, 2, Flip: true),
             new SetFactoryBlueprintCommand(Me, home.Id, x0, y0 + 5, belts, x0, y0 + 1));
+        At(23, new SetFactoryModeCommand(Me, home.Id, x0, y0 + 5, FactoryMode.Manual), new TriggerFactoryCommand(Me, home.Id, x0, y0 + 5),
+            new ResumeFactoryCommand(Me, home.Id, x0, y0 + 5));
         At(30);
         return sim;
     }

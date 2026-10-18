@@ -73,13 +73,13 @@ public partial class TitleScreen : Control
         }
         AddChild(FullRect(new ColorRect { Color = new Color(0.03f, 0.035f, 0.045f, 0.55f), MouseFilter = MouseFilterEnum.Ignore }));
 
-        // A few factory pieces on the right as decoration.
+        // A few factory pieces on the right as decoration, with a scout (thruster, core, thruster) below.
         var deco = FullRect(new Control { MouseFilter = MouseFilterEnum.Ignore });
         AddChild(deco);
         (string Id, float X, float Y, float Size)[] pieces =
         [
             ("core", 1340, 380, 210), ("steel_mill", 1590, 300, 190), ("smelter", 1560, 560, 130),
-            ("drill", 1160, 600, 130), ("thruster", 1420, 700, 70), ("unit_core", 1500, 700, 70),
+            ("drill", 1160, 600, 130), ("thruster", 1420, 700, 70), ("core", 1500, 700, 70),
             ("thruster", 1580, 700, 70), ("conveyor", 1290, 640, 60), ("conveyor", 1350, 640, 60),
         ];
         foreach (var (id, x, y, size) in pieces)
