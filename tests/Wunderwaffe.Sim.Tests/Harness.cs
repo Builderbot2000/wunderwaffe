@@ -158,6 +158,25 @@ static class Harness
                 tile.Grid.SetDeposit(cx, cy, item);
     }
 
+    /// <summary>
+    /// Makes every deposit on the tile finite (RS-004): finds its patches again, as generation does, each holding its
+    /// content amount. Hand-laid deposits (<see cref="Ore"/>) never run out until this runs.
+    /// </summary>
+    public static void FindPatches(Simulation sim, TileState tile) => tile.Grid.Patches.Find(sim.Content);
+
+    /// <summary>
+    /// A finite deposit patch of <paramref name="item"/> under a w x h block holding <paramref name="amount"/> (RS-004).
+    /// Finds the tile's patches again (<see cref="FindPatches"/>), so call it before mining anything else there.
+    /// </summary>
+    public static DepositPatch Patch(Simulation sim, TileState tile, string item, int x, int y, long amount, int w = 2, int h = 2)
+    {
+        Ore(tile, item, x, y, w, h);
+        FindPatches(sim, tile);
+        var patch = tile.Grid.Patches.At(x, y)!;
+        tile.Grid.Patches.SetAmount(patch, amount);
+        return patch;
+    }
+
     /// <summary>A straight run of conveyors starting at (x, y) and heading the way <paramref name="rotation"/> faces.</summary>
     public static void Belt(Simulation sim, TileState tile, int x, int y, int length, int rotation = 0)
     {

@@ -29,7 +29,7 @@ internal static class TileEntities
             var m = b.Machine!;
             // Draw and supply change only when these flip (PowerNet.DrawOf, SupplyOf): report only then (NF-001).
             bool drew = m.Working || m.IdleTicks == 0, worked = m.Working;
-            if (Work(tile, m) is { } made && tile.Owner != TileState.Unowned)
+            if (Work(tile, b, m) is { } made && tile.Owner != TileState.Unowned)
                 sim.Player(tile.Owner).AddProduced(made);
             if ((m.Working || m.IdleTicks == 0) != drew || m.Working != worked)
                 m.Net?.Report(m);
@@ -55,15 +55,16 @@ internal static class TileEntities
 
     /// <summary>
     /// Advances the machine's recipe at its boosted speed, scaled by its power (FB-005, FB-016). Returns the outputs
-    /// of a batch that finished this tick, if one did, with any booster extra included.
+    /// of a batch that finished this tick, if one did, with any booster extra included. An extractor's batch comes out
+    /// of the deposit patch under it (RS-004).
     /// </summary>
-    static IReadOnlyDictionary<string, int>? Work(TileState tile, MachineState m)
+    static IReadOnlyDictionary<string, int>? Work(TileState tile, PlacedBuilding b, MachineState m)
     {
         var recipe = m.Recipe;
         if (recipe == null)
             return null;
 
-        int rate = m.Working || TryStart(tile, m, recipe)
+        int rate = m.Working || TryStart(tile, b, m, recipe)
             ? MachineState.ProgressPerTick * m.SpeedPercent / 100 * m.PowerPermille / 1000
             : 0;
         if (rate <= 0)
@@ -83,19 +84,27 @@ internal static class TileEntities
         m.OutputCredit += m.OutputBonus;
         for (; m.OutputCredit >= 100; m.OutputCredit -= 100)
             batches++;
-        var made = batches == 1 ? recipe.Outputs : recipe.Outputs.ToDictionary(kv => kv.Key, kv => kv.Value * batches);
+        IReadOnlyDictionary<string, int> made = batches == 1 ? recipe.Outputs : recipe.Outputs.ToDictionary(kv => kv.Key, kv => kv.Value * batches);
+        if (m.Mines is { } ore && tile.Grid.Patches.Extract(b, ore, made) is { } mined)
+            made = mined;
         foreach (var (id, n) in made)
         {
             m.AddOutput(id, n);
             tile.Stats.RecordMade(id, n);
         }
-        return made;
+        return made.Count == 0 ? null : made;
     }
 
-    static bool TryStart(TileState tile, MachineState m, RecipeDef recipe)
+    static bool TryStart(TileState tile, PlacedBuilding b, MachineState m, RecipeDef recipe)
     {
         if (m.OutputCount + m.OutputPerBatch > MachineState.OutputCapacity)
             return false;
+        if (m.Mines is { } ore)
+        {
+            m.Depleted = tile.Grid.Patches.SourceOf(b, ore) < 0;
+            if (m.Depleted)
+                return false;
+        }
         if (m.Input.Count == 0 && recipe.Inputs.Count > 0)
             return false;
         foreach (var (id, need) in recipe.Inputs)

@@ -7,7 +7,34 @@ namespace Wunderwaffe.Sim.Content;
 /// <param name="Regional">
 /// Deposits only appear on some tiles, never the starting one, so players must expand to get it (RS-003).
 /// </param>
-public sealed record ItemDef(string Id, string Name, int Tier, bool Regional = false);
+/// <param name="Deposit">How much a deposit patch of it holds and how its density is drawn (RS-004); null never runs out.</param>
+public sealed record ItemDef(string Id, string Name, int Tier, bool Regional = false, DepositDef? Deposit = null);
+
+/// <summary>
+/// A minable item's finite deposits (RS-004, OQ-49): each patch of connected cells starts with <see cref="PerCell"/>
+/// per cell, scaled by the match richness percent.
+/// </summary>
+/// <param name="PerCell">Items a patch holds per cell at 100% richness.</param>
+/// <param name="Levels">
+/// Density thresholds in items left per starting cell, ascending: a patch is drawn at level n, the number of
+/// thresholds it still reaches (0 = nearly mined out, <see cref="MaxLevel"/> = full), with sprite <c>{item}_{n}</c>.
+/// </param>
+public sealed record DepositDef(int PerCell, int[]? Levels = null)
+{
+    /// <summary>Density level for <paramref name="perCell"/> items left per starting cell.</summary>
+    public int LevelOf(long perCell)
+    {
+        int level = 0;
+        foreach (int t in Levels ?? [])
+        {
+            if (perCell >= t)
+                level++;
+        }
+        return level;
+    }
+
+    public int MaxLevel => Levels?.Length ?? 0;
+}
 
 /// <summary>Converts inputs to outputs over <see cref="Ticks"/> in a given building (RS-002). Empty inputs = extraction.</summary>
 public sealed record RecipeDef(

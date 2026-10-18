@@ -15,7 +15,8 @@ public static class TileGenerator
     /// <summary>
     /// Lays circular deposit patches on the tile's buildable ground. The number of patches follows the buildable
     /// area, and each patch's centre is drawn in proportion to the terrain's weight for the item in
-    /// <c>terrain.json</c>, falling back to any buildable cell when no terrain on the tile carries it.
+    /// <c>terrain.json</c>, falling back to any buildable cell when no terrain on the tile carries it. Then finds the
+    /// tile's patches and their amounts (RS-004).
     /// </summary>
     /// <param name="exclude">Minable items this tile has no deposits of (RS-003).</param>
     /// <param name="richnessPercent">Scales the number of patches (match setting; 100 is normal), never below one.</param>
@@ -79,6 +80,7 @@ public static class TileGenerator
                 }
             }
         }
+        grid.Patches.Find(content, richnessPercent);
     }
 
     /// <summary>The first index whose running total is above <paramref name="pick"/>.</summary>

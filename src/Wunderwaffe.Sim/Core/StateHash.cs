@@ -109,6 +109,26 @@ internal sealed class StateHash
             Mix(partner);
             Mix(n);
         }
+        MixPatches(g);
+    }
+
+    /// <summary>Deposit patches (RS-004): each patch's item, size and amounts, then each cell's patch id.</summary>
+    void MixPatches(TileGrid g)
+    {
+        Mix(g.Patches.All.Count);
+        foreach (var p in g.Patches.All)
+        {
+            Mix(p.Item);
+            Mix(p.Cells);
+            Mix(p.Start);
+            Mix(p.Amount);
+        }
+        var cells = g.Patches.CellIds;
+        for (int i = 0; i < cells.Length; i++)
+        {
+            if (cells[i] != 0)
+                Mix(((long)i << 16) | cells[i]);
+        }
     }
 
     /// <summary>Every cell layer (FB-022), deposits included: per layer its filled count, then each filled cell and its entry.</summary>

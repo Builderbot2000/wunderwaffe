@@ -60,6 +60,9 @@ public enum MachineStatus
 
     /// <summary>Has its inputs but its power network gives it nothing (FB-005).</summary>
     NoPower,
+
+    /// <summary>An extractor whose deposit patch ran out (RS-004): nothing under it to mine.</summary>
+    Depleted,
 }
 
 /// <summary>
@@ -100,6 +103,9 @@ public sealed class MachineState(RecipeDef? recipe) : OutputBuffer
     public const int ProgressPerTick = 100;
 
     public RecipeDef? Recipe { get; } = recipe;
+
+    /// <summary>The deposit item an extraction recipe (no inputs) mines (RS-004), or null.</summary>
+    public string? Mines { get; } = recipe is { Inputs.Count: 0, Outputs.Count: > 0 } ? recipe.Outputs.Keys.First() : null;
 
     /// <summary>Items one finished batch adds to the output buffer.</summary>
     public int OutputPerBatch { get; } = recipe?.Outputs.Values.Sum() ?? 0;
@@ -158,9 +164,16 @@ public sealed class MachineState(RecipeDef? recipe) : OutputBuffer
     /// <summary>Boosted recipe speed and extra output, in percent, cached from <see cref="Boost"/> for the per-tick work.</summary>
     internal int SpeedPercent = 100, OutputBonus;
 
+    /// <summary>
+    /// An extractor that last tried to start with no deposit of its item left under it (RS-004). Set by the full sim's
+    /// start attempt, for the status only: derived from the deposit layer, so not hashed.
+    /// </summary>
+    public bool Depleted { get; internal set; }
+
     public MachineStatus Status =>
         Recipe == null ? MachineStatus.Idle
         : Working ? (PowerPermille == 0 ? MachineStatus.NoPower : MachineStatus.Working)
+        : Depleted ? MachineStatus.Depleted
         : OutputCount + OutputPerBatch > OutputCapacity ? MachineStatus.OutputFull
         : MachineStatus.Starved;
 

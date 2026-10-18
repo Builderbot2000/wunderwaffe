@@ -71,6 +71,9 @@ public static class RateModel
         // after output boosters, power network index (-1 if none), boosted draw if it draws, supply while it burns.
         readonly int[] _ticks, _fullSpeed, _outPct, _net, _powerDraw, _powerMake;
 
+        // Extractors (RS-004): the deposit patch each draws from (DepositPatches.SourceOf: 0 never runs out, -1 none left).
+        readonly int[] _source;
+
         // Per power network with members here (local index into _nets): what its other members here supply and draw
         // whatever the machines do, in power units, and the steady-state satisfaction in permille. A network spanning
         // several tiles (FB-020) adds the other tiles' graphs' figures in Rebalance.
@@ -122,6 +125,7 @@ public static class RateModel
             _net = new int[n];
             _powerDraw = new int[n];
             _powerMake = new int[n];
+            _source = new int[n];
             _done = new long[n];
             _busy = new long[n];
             for (int i = 0; i < n; i++)
@@ -142,6 +146,8 @@ public static class RateModel
                 };
                 if (b.Kind is BuildingKind.ExportPort or BuildingKind.ImportPort)
                     _partner[i] = PortRules.PartnerOf(grid, b);
+                if (_kind[i] == NodeKind.Extractor)
+                    _source[i] = grid.Patches.SourceOf(b, recipe!.Outputs.Keys.First());
                 _net[i] = grid.Power.NetworkOf(b) is { } net ? _netIndex[net] : -1;
                 if (recipe != null && b.Machine is { } m)
                 {
@@ -363,7 +369,7 @@ public static class RateModel
             for (int i = 0; i < _nodes.Length; i++)
             {
                 if (_ticks[i] > 0)
-                    _batchCap[i] = CapAt(i, _powerDraw[i] > 0 ? _sat[_net[i]] : 1000);
+                    _batchCap[i] = _source[i] < 0 ? 0 : CapAt(i, _powerDraw[i] > 0 ? _sat[_net[i]] : 1000);
             }
         }
 
@@ -746,6 +752,21 @@ public static class RateModel
             {
                 if (_kind[i] is NodeKind.Export or NodeKind.Core)
                     Add(_kind[i] == NodeKind.Core ? FlowKind.Core : FlowKind.Export, _nodes[i].Id, _taken, i * _k);
+            }
+            // What the extractors take out of each deposit patch (RS-004): everything they make of the patch's item.
+            var mined = new SortedDictionary<int, (int K, long Rate)>();
+            for (int i = 0; i < _nodes.Length; i++)
+            {
+                if (_kind[i] != NodeKind.Extractor || _source[i] <= 0)
+                    continue;
+                int k = Array.IndexOf(_items, Tile.Grid.Patches.ById(_source[i])!.Item);
+                var (_, rate) = mined.GetValueOrDefault(_source[i]);
+                mined[_source[i]] = (k, rate + Made(i, k, _done[i]));
+            }
+            foreach (var (patch, (k, rate)) in mined)
+            {
+                if (rate > 0)
+                    flows.Add(new Flow(FlowKind.Mined, patch, _items[k], rate));
             }
             flows.Sort();
             var rates = new TileRates { Flows = flows };
