@@ -67,17 +67,17 @@ See also the [glossary](glossary.md).
 | [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 14 | 0 | 74% | 0 | 2 |
 | [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 9 | 0 | 100% | 0 | 0 |
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 7 | 0 | 54% | 0 | 0 |
-| [Multiplayer & Victory](multiplayer-victory.md) | 4 | 3 | 1 | 0 | 8 | 4 | 1 | 50% | 0 | 0 |
+| [Multiplayer & Victory](multiplayer-victory.md) | 4 | 3 | 1 | 0 | 8 | 5 | 1 | 62% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 13 | 1 | 87% | 0 | 2 |
-| **Total** | 75 | 33 | 10 | 1 | 119 | 90 | 2 | 76% | 0 | 9 |
+| **Total** | 75 | 33 | 10 | 1 | 119 | 91 | 2 | 76% | 0 | 9 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 90 | 76% |
+| Done | 91 | 76% |
 | In Progress | 2 | 2% |
-| Approved | 4 | 3% |
+| Approved | 3 | 3% |
 | Proposed | 8 | 7% |
 | Deferred | 2 | 2% |
 | Rejected | 13 | 11% |
@@ -102,7 +102,7 @@ See also the [glossary](glossary.md).
 | P5 | Squad command | 10 | 5 | 10 |
 | P6 | No Rush | 6 | 4 | 0 |
 | P7 | Resource-gated tech | 8 | 6 | 3 |
-| P8 | World domination | 18 | 10 | 12 |
+| P8 | World domination | 18 | 10 | 13 |
 
 <!-- END generated summary -->
 
