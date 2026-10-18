@@ -86,7 +86,7 @@ public class AiTests(ITestOutputHelper output)
         Assert.DoesNotContain(sim.CommandLog, c => c.Command.Player == 0);
 
         var ai = director.TakeOver(0, sim);
-        Assert.NotNull(ai.Design);
+        Assert.Equal("scout", ai.Design?.Name);
         Assert.Same(ai, director.TakeOver(0, sim));
         Play(sim, 3 * 60, director: director);
         var q = new GameQuery(sim, 0);

@@ -32,8 +32,11 @@ public sealed class AiPlayer(int player, AiConfig? config = null)
     /// <summary>The modules in tie-break order.</summary>
     public IReadOnlyList<IAiModule> Modules { get; init; } = AiModules.Default();
 
-    /// <summary>The unit design picked at <see cref="Init"/>; null before it.</summary>
+    /// <summary>The unit design picked from the prefabs at <see cref="Init"/>; null if none fits.</summary>
     public AiDesign? Design { get; private set; }
+
+    /// <summary>True once <see cref="Init"/> has run.</summary>
+    public bool Initialised { get; private set; }
 
     /// <summary>The latest think's debug log, or null before the first.</summary>
     public ThinkReport? Last { get; private set; }
@@ -49,6 +52,7 @@ public sealed class AiPlayer(int player, AiConfig? config = null)
     {
         _plans.Clear();
         Design = AiDesigns.Pick(new GameQuery(sim, Player));
+        Initialised = true;
     }
 
     /// <summary>True on the ticks this AI decides on.</summary>
@@ -68,12 +72,12 @@ public sealed class AiPlayer(int player, AiConfig? config = null)
     /// <summary>What to do now: zero or more commands to enqueue before the next step.</summary>
     public IReadOnlyList<Command> Think(Simulation sim)
     {
-        if (Design == null)
+        if (!Initialised)
             Init(sim);
         var q = new GameQuery(sim, Player);
         if (q.Match().Over || q.Players().FirstOrDefault(p => p.Id == Player) is not { Eliminated: false })
             return [];
-        var c = new AiContext(q, _plans, Design!);
+        var c = new AiContext(q, _plans, Design);
         if (c.Home < 0)
             return [];
         c.Influence = InfluenceMap.Build(c);

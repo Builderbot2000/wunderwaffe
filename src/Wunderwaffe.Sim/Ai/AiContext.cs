@@ -19,7 +19,7 @@ public sealed class AiContext
     readonly PlanCache _plans;
     readonly Dictionary<int, TileInfo> _tiles = [];
 
-    internal AiContext(GameQuery q, PlanCache plans, AiDesign design)
+    internal AiContext(GameQuery q, PlanCache plans, AiDesign? design)
     {
         Q = q;
         _plans = plans;
@@ -61,8 +61,8 @@ public sealed class AiContext
     public Dictionary<int, Dictionary<int, BuildingView>> Buildings { get; } = [];
     public Dictionary<int, Dictionary<int, int>> Outlets { get; } = [];
 
-    /// <summary>The unit design picked at <see cref="AiPlayer.Init"/> (seam for FB-021 prefabs).</summary>
-    public AiDesign Design { get; }
+    /// <summary>The unit design picked from the prefabs at <see cref="AiPlayer.Init"/>; null if there is none.</summary>
+    public AiDesign? Design { get; }
 
     /// <summary>The strategic layer's map, by tile id. Set before the modules are asked.</summary>
     public IReadOnlyList<TileInfluence> Influence { get; internal set; } = [];

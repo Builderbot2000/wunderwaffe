@@ -148,9 +148,9 @@ public sealed class ProductionModule : IAiModule
                     $"holding {string.Join(", ", core.Holding.Select(kv => $"{kv.Value} {kv.Key}"))}", Locks: [Proposal.Layout(h)]);
             yield break;
         }
-        if (c.Units.Count >= MaxUnits || c.Find(h, Mill) == null)
+        if (c.Units.Count >= MaxUnits || c.Find(h, Mill) == null || c.Design is not { } design)
             yield break;
-        var bp = c.Design.Blueprint;
+        var bp = design.Blueprint;
         var cost = c.Q.BlueprintStats(bp).Cost;
         var (w, hgt) = bp.Size(c.Q.Content.Buildings);
         // The frame search is the costly part: only once the home can pay.
@@ -160,6 +160,6 @@ public sealed class ProductionModule : IAiModule
         if (result != BlueprintResult.Ok)
             yield break;
         yield return new Proposal($"unit@{h}", NewUnitScore, [new PlaceBlueprintCommand(c.Player, h, bp, spot.X, spot.Y)],
-            $"{c.Design.Name} at {spot.X},{spot.Y}", h, cost, [Proposal.Layout(h)]);
+            $"{design.Name} at {spot.X},{spot.Y}", h, cost, [Proposal.Layout(h)]);
     }
 }
