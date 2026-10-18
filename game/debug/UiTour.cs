@@ -47,6 +47,22 @@ public partial class UiTour : Node
         Step(1, "multiplayer", () => Press("Multiplayer"));
         Step(10, "multiplayer page", () => { Shot("01b_multiplayer"); Press("Back"); });
         Step(5, "new game", () => Press("New game"));
+        // WM-017, MP-008: pick a scenario and a head start for its AI seat, then back to a generated map for the tour.
+        Step(10, "pick scenario", () => PickScenario("ai_head_start"));
+        Step(5, "pick head start", () => PickHeadStart(0, "stockpile"));
+        Step(5, "scenario setup shot", () =>
+        {
+            var setup = Form().Read();
+            Log(setup is { Scenario: "ai_head_start", AiPlayers: 1 } && setup.HeadStartFor(1) == "stockpile"
+                ? "new game form: scenario with one AI seat on the Stockpile head start"
+                : $"FAIL: the form reads {setup}");
+            Shot("02a_new_game_scenario");
+            PickScenario(null);
+        });
+        Step(5, "generated again", () =>
+        {
+            Log(Form().Read() is { Scenario: null, AiPlayers: 0 } ? "back to a generated map" : "FAIL: the map pick didn't reset");
+        });
         Step(10, "setup", () => { Shot("02_new_game"); Press("Start"); });
         Step(40, "world", () => Shot("03_world"));
         // WM-007: the wheel over the home circle zooms through the cross-fade into the tile.
@@ -138,6 +154,50 @@ public partial class UiTour : Node
                                 $"{_host.ViewedTile.Grid.BuildingCount} buildings on home" : "FAIL: no game after Continue");
             Shot("12_loaded");
         });
+        // WM-017: save the loaded match as a scenario from the Esc menu, then start the shipped scenario with an AI head start.
+        Step(1, "scenario pause", () => Key(Godot.Key.Escape));
+        Step(5, "save scenario", () =>
+        {
+            _scenariosBefore = _host.Content.Scenarios.Keys.ToHashSet();
+            Press("Save as scenario");
+        });
+        Step(5, "scenario saved", () =>
+        {
+            var added = _host.Content.Scenarios.Keys.Where(k => !_scenariosBefore.Contains(k)).ToList();
+            Log(added.Count == 1 ? $"saved scenario {added[0]}" : "FAIL: Save as scenario added nothing");
+            _savedScenario = added.FirstOrDefault();
+            Shot("13_scenario_saved");
+            Press("Quit to title");
+        });
+        Step(30, "scenario new game", () => Press("New game"));
+        Step(10, "scenario picks", () =>
+        {
+            Log(_savedScenario != null
+                && Form().Root.FindChild(MatchSettings.MapPickName, true, false) is OptionButton map
+                && Enumerable.Range(0, map.ItemCount).Any(i => map.GetItemText(i).Contains(_host.Content.Scenarios[_savedScenario].Name))
+                ? "the saved scenario is in the map list" : "FAIL: the saved scenario isn't offered");
+            PickScenario("ai_head_start");
+        });
+        Step(5, "scenario head start", () => PickHeadStart(0, "second_scout"));
+        Step(5, "scenario start", () => Press("Start"));
+        Step(40, "scenario match", () =>
+        {
+            // The AI's cores, standing or lifted off: the scenario's plus the second scout's.
+            var sim = _host.Sim;
+            var def = _host.Content.Scenarios["ai_head_start"];
+            int expected = def.Seats[1].Buildings!.Count(b => _host.Content.Buildings[b.DefId].Kind == Sim.Content.BuildingKind.Core)
+                           + (def.Seats[1].Units?.Count ?? 0) + 1;
+            int aiCores = sim.CoreCount(1);
+            Log(sim.Setup is { Scenario: "ai_head_start" } && aiCores >= expected
+                ? $"scenario match started: {sim.Tiles.Count} tiles, the AI has {aiCores} cores with its head start"
+                : $"FAIL: scenario match: {sim.Setup}, AI cores {aiCores}, expected {expected}");
+            Shot("14_scenario_world");
+        });
+        Step(1, "scenario cleanup", () =>
+        {
+            if (_savedScenario != null)
+                DirAccess.RemoveAbsolute($"{SimHost.ScenarioDir}/{_savedScenario}.json");
+        });
         Step(1, "done", () =>
         {
             // Leave the player's saves folder as it was.
@@ -150,6 +210,32 @@ public partial class UiTour : Node
     }
 
     void Step(int frames, string name, Action action) => _steps.Add((frames, name, action));
+
+    HashSet<string> _scenariosBefore = [];
+    string? _savedScenario;
+
+    /// <summary>The new-game form on screen.</summary>
+    MatchSettings Form() => MatchSettings.Shown ?? throw new InvalidOperationException("no match settings on screen");
+
+    /// <summary>Picks a scenario (by id; null for a generated map) in the new-game form's map list, as a click would.</summary>
+    void PickScenario(string? id)
+    {
+        var map = Form().Root.FindChild(MatchSettings.MapPickName, true, false) as OptionButton ?? throw new InvalidOperationException("no map pick");
+        int index = id == null ? 0 : Enumerable.Range(1, map.ItemCount - 1)
+            .First(i => map.GetItemText(i).Contains(_host.Content.Scenarios[id].Name));
+        map.Select(index);
+        map.EmitSignal(OptionButton.SignalName.ItemSelected, index);
+    }
+
+    /// <summary>Picks a head-start preset for the AI seat <paramref name="ai"/> (0 = the first AI seat).</summary>
+    void PickHeadStart(int ai, string preset)
+    {
+        var pick = Form().Root.FindChild($"{MatchSettings.HeadStartName}{ai}", true, false) as OptionButton
+                   ?? throw new InvalidOperationException($"no head-start pick for AI {ai}");
+        int index = _host.Content.HeadStartList.ToList().FindIndex(p => p.Id == preset) + 1;
+        pick.Select(index);
+        pick.EmitSignal(OptionButton.SignalName.ItemSelected, index);
+    }
 
     public override void _Process(double delta)
     {

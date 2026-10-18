@@ -213,31 +213,8 @@ public static class UnitAssembly
             return result;
 
         var (cells, buildings, core) = plan!;
-        var content = sim.Content;
-
-        // Mass: each building's cost, spread over its cells, on top of the frame under every cell.
-        var mass = new Dictionary<(int, int), int>();
-        foreach (var c in cells)
-            mass[c] = Unit.FrameMass;
-        var blocks = new List<UnitBlock>();
-        foreach (var b in buildings)
-        {
-            var def = content.Buildings[b.DefId];
-            int total = Math.Max(1, def.Cost.Values.Sum());
-            int n = b.Width * b.Height, i = 0;
-            for (int cy = b.Y; cy < b.Y + b.Height; cy++)
-            {
-                for (int cx = b.X; cx < b.X + b.Width; cx++, i++)
-                    mass[(cx, cy)] += total / n + (i < total % n ? 1 : 0);
-            }
-            blocks.Add(new UnitBlock(b.DefId, b.X - core.X, b.Y - core.Y, b.Width, b.Height, b.Rotation, b.RecipeId, b.Hp));
-        }
-
-        var body = cells.Select(c => (c.X - core.X, c.Y - core.Y, mass[c])).ToList();
-        var (gx, gy) = tile.ToGlobal(core.X, core.Y);
-        int px = gx * Unit.CellScale + Unit.CellScale / 2, py = gy * Unit.CellScale + Unit.CellScale / 2;
-        unit = sim.SpawnUnit(player, tile.Id, px, py, blocks, body, 0, 0);
-        unit.UpkeepDue = sim.Tick + Balance.UpkeepPeriod;
+        var blocks = buildings.Select(b => new UnitBlock(b.DefId, b.X - core.X, b.Y - core.Y, b.Width, b.Height, b.Rotation, b.RecipeId, b.Hp)).ToList();
+        unit = Spawn(sim, tile, player, core.X, core.Y, cells.Select(c => (c.X - core.X, c.Y - core.Y)).ToList(), blocks);
         sim.Player(player).Launched++;
 
         // The buildings are the unit now: the core's stock and whatever the others held ride along as its cargo (UD-010).
@@ -250,6 +227,37 @@ public static class UnitAssembly
             tile.Grid.Clear(BuildingKind.Frame, cx, cy);
         Built(sim, unit, tile, factory ?? core);
         return AssembleResult.Ok;
+    }
+
+    /// <summary>
+    /// A new unit at rest, heading 0, its core's top-left cell at tile-local (<paramref name="coreX"/>, <paramref name="coreY"/>).
+    /// <paramref name="cells"/> (frame) and <paramref name="blocks"/> are relative to that cell. Lift-off and scenario
+    /// units (WM-017) both come through here.
+    /// </summary>
+    internal static Unit Spawn(Simulation sim, TileState tile, int player, int coreX, int coreY,
+        IReadOnlyList<(int X, int Y)> cells, IReadOnlyList<UnitBlock> blocks)
+    {
+        // Mass: each building's cost, spread over its cells, on top of the frame under every cell.
+        var mass = new Dictionary<(int, int), int>();
+        foreach (var c in cells)
+            mass[c] = Unit.FrameMass;
+        foreach (var b in blocks)
+        {
+            int total = Math.Max(1, sim.Content.Buildings[b.DefId].Cost.Values.Sum());
+            int n = b.Width * b.Height, i = 0;
+            for (int cy = b.GY; cy < b.GY + b.Height; cy++)
+            {
+                for (int cx = b.GX; cx < b.GX + b.Width; cx++, i++)
+                    mass[(cx, cy)] += total / n + (i < total % n ? 1 : 0);
+            }
+        }
+
+        var body = cells.Select(c => (c.X, c.Y, mass[c])).ToList();
+        var (gx, gy) = tile.ToGlobal(coreX, coreY);
+        int px = gx * Unit.CellScale + Unit.CellScale / 2, py = gy * Unit.CellScale + Unit.CellScale / 2;
+        var unit = sim.SpawnUnit(player, tile.Id, px, py, blocks, body, 0, 0);
+        unit.UpkeepDue = sim.Tick + Balance.UpkeepPeriod;
+        return unit;
     }
 
     /// <summary>

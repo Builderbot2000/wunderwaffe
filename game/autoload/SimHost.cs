@@ -463,8 +463,57 @@ public partial class SimHost : Node
     static ContentDb LoadContent()
     {
         static string Read(string name) => FileAccess.GetFileAsString($"res://data/{name}");
-        var prefabs = DirAccess.GetFilesAt("res://data/prefabs").Where(f => f.EndsWith(".json")).Order(StringComparer.Ordinal)
-            .Select(f => Read($"prefabs/{f}"));
-        return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"), Read("layers.json"), prefabs);
+        static IEnumerable<string> Files(string dir) =>
+            DirAccess.GetFilesAt(dir).Where(f => f.EndsWith(".json")).Order(StringComparer.Ordinal).Select(f => FileAccess.GetFileAsString($"{dir}/{f}"));
+        var content = ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"),
+            Read("layers.json"), Files("res://data/prefabs"), Read("head_starts.json"), Files("res://data/scenarios"));
+        // The player's own scenarios: one that no longer fits the content is skipped, not fatal.
+        if (DirAccess.DirExistsAbsolute(ScenarioDir))
+        {
+            foreach (var text in Files(ScenarioDir))
+            {
+                try
+                {
+                    content.AddScenario(text);
+                }
+                catch (ContentException e)
+                {
+                    GD.PushWarning($"skipping a scenario in {ScenarioDir}: {e.Errors.FirstOrDefault()}");
+                }
+            }
+        }
+        return content;
+    }
+
+    /// <summary>Where <see cref="SaveScenario"/> writes the player's scenarios (WM-017); loaded with the content.</summary>
+    public const string ScenarioDir = "user://scenarios";
+
+    /// <summary>
+    /// Saves the map and everything standing on it as a scenario (WM-017) in <see cref="ScenarioDir"/> and offers it in
+    /// the new-game menu from now on. Returns its name, or null if it failed.
+    /// </summary>
+    public string? SaveScenario()
+    {
+        if (!HasGame)
+            return null;
+        var now = DateTime.Now;
+        string id = $"saved_{now:yyyyMMdd_HHmmss}";
+        string home = Sim.TryGetTile(Sim.StartTileIds.ElementAtOrDefault(LocalPlayer))?.Name ?? "map";
+        string json = Scenarios.ToJson(Sim.ToScenario(id, $"{home} · {now:d MMM HH:mm}", $"Saved from a match at {Ui.Clock(Sim.Tick)}."));
+        try
+        {
+            var def = Content.AddScenario(json);
+            DirAccess.MakeDirRecursiveAbsolute(ScenarioDir);
+            using var file = FileAccess.Open($"{ScenarioDir}/{id}.json", FileAccess.ModeFlags.Write);
+            if (file == null)
+                return null;
+            file.StoreString(json);
+            return def.Name;
+        }
+        catch (ContentException e)
+        {
+            GD.PushWarning($"scenario not saved: {e.Errors.FirstOrDefault()}");
+            return null;
+        }
     }
 }

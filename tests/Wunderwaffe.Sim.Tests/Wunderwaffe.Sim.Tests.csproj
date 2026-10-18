@@ -25,6 +25,7 @@
   <ItemGroup>
     <None Include="..\..\game\data\*.json" LinkBase="data" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\game\data\prefabs\*.json" LinkBase="data\prefabs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\game\data\scenarios\*.json" LinkBase="data\scenarios" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

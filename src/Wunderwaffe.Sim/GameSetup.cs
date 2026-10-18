@@ -1,3 +1,5 @@
+using Wunderwaffe.Sim.Content;
+
 namespace Wunderwaffe.Sim;
 
 /// <summary>
@@ -14,10 +16,19 @@ namespace Wunderwaffe.Sim;
 /// Prefab ids stamped on each seat's starting tile (FB-021), indexed by player: the first nearest the victory circle
 /// centre, the rest beside it (an AI head start, OQ-47). A missing or empty entry gets <see cref="DefaultStart"/>.
 /// </param>
+/// <param name="Scenario">
+/// The scenario the world comes from (WM-017), or null to generate it from <see cref="Seed"/>. With a scenario,
+/// <see cref="Width"/>, <see cref="Height"/>, <see cref="Seed"/> and <see cref="RichnessPercent"/> are unused and
+/// <see cref="Players"/> is its seat count.
+/// </param>
+/// <param name="ScenarioHash">The scenario's <see cref="ScenarioDef.Hash"/> when the match began: a changed file won't replay.</param>
+/// <param name="AiHeadStarts">
+/// Head-start preset id per AI seat, in seat order (MP-008: the first AI seat first); null or "" for none.
+/// </param>
 public sealed record GameSetup(
     int Width, int Height, ulong Seed, int Players = 1,
     int AiPlayers = 0, int CaptureSeconds = Balance.CaptureSeconds, int VictoryPercent = 60, int RichnessPercent = 100,
-    string[][]? StartPrefabs = null)
+    string[][]? StartPrefabs = null, string? Scenario = null, ulong ScenarioHash = 0, string?[]? AiHeadStarts = null)
 {
     /// <summary>The prefab every seat starts with unless the setup names others: the landed scout (WM-005).</summary>
     public const string DefaultStart = "scout";
@@ -36,21 +47,43 @@ public sealed record GameSetup(
     /// <summary>True if <paramref name="player"/> is one of the AI seats.</summary>
     public bool IsAi(int player) => player >= Players - AiPlayers && player < Players;
 
+    /// <summary>The head-start preset <paramref name="player"/> gets (MP-008), or null.</summary>
+    public string? HeadStartFor(int player) =>
+        IsAi(player) && AiHeadStarts is { } a && player - (Players - AiPlayers) is var i && i < a.Length && a[i] is { Length: > 0 } id ? id : null;
+
+    /// <summary>A setup for a scenario: its seats are the players, the last <paramref name="aiPlayers"/> of them AI.</summary>
+    public static GameSetup ForScenario(ScenarioDef scenario, int aiPlayers = 0) =>
+        Default with { Seed = 0, Players = scenario.Seats.Count, AiPlayers = aiPlayers, Scenario = scenario.Id, ScenarioHash = scenario.Hash };
+
     /// <summary>Why the setup can't start a match, or null if it can.</summary>
     public string? Problem() =>
-        Width is < MinSize or > MaxSize || Height is < MinSize or > MaxSize ? $"map size {Width}x{Height}; {MinSize} to {MaxSize} allowed"
+        Scenario == null && (Width is < MinSize or > MaxSize || Height is < MinSize or > MaxSize) ? $"map size {Width}x{Height}; {MinSize} to {MaxSize} allowed"
         : Players is < 1 or > MaxPlayers ? $"{Players} players; 1 to {MaxPlayers} allowed"
         : AiPlayers < 0 || AiPlayers > Players ? $"{AiPlayers} AI players of {Players}"
         : CaptureSeconds is < MinCaptureSeconds or > MaxCaptureSeconds ? $"capture time {CaptureSeconds} s; {MinCaptureSeconds} to {MaxCaptureSeconds} allowed"
         : VictoryPercent is < MinVictoryPercent or > MaxVictoryPercent ? $"victory share {VictoryPercent}%; {MinVictoryPercent} to {MaxVictoryPercent} allowed"
         : RichnessPercent is < MinRichness or > MaxRichness ? $"richness {RichnessPercent}%; {MinRichness} to {MaxRichness} allowed"
         : StartPrefabs is { } s && s.Length > Players ? $"start prefabs for {s.Length} seats of {Players}"
+        : AiHeadStarts is { } h && h.Length > AiPlayers ? $"head starts for {h.Length} AI seats of {AiPlayers}"
         : null;
 
-    /// <summary>Why the setup can't start a match with this content, or null: <see cref="Problem()"/> or an unknown prefab.</summary>
-    public string? Problem(Content.ContentDb content) =>
+    /// <summary>
+    /// Why the setup can't start a match with this content, or null: <see cref="Problem()"/>, an unknown prefab or head
+    /// start, or a scenario that is missing, changed since the setup was made, or has another seat count.
+    /// </summary>
+    public string? Problem(ContentDb content) =>
         Problem() ?? Enumerable.Range(0, Players).SelectMany(PrefabsFor).Where(id => !content.Prefabs.ContainsKey(id))
-            .Select(id => $"unknown start prefab '{id}'").FirstOrDefault();
+            .Select(id => $"unknown start prefab '{id}'")
+            .Concat((AiHeadStarts ?? []).Where(id => id is { Length: > 0 } && !content.HeadStarts.ContainsKey(id)).Select(id => $"unknown head start '{id}'"))
+            .FirstOrDefault()
+        ?? ScenarioProblem(content);
+
+    string? ScenarioProblem(ContentDb content) =>
+        Scenario == null ? null
+        : !content.Scenarios.TryGetValue(Scenario, out var s) ? $"unknown scenario '{Scenario}'"
+        : s.Hash != ScenarioHash ? $"scenario '{Scenario}' has changed since this match was set up"
+        : s.Seats.Count != Players ? $"scenario '{Scenario}' has {s.Seats.Count} seats, not {Players}"
+        : null;
 
     public static readonly GameSetup Default = new(5, 5, 3037);
 

@@ -15,8 +15,11 @@ public sealed class SaveException(string message) : Exception(message);
 /// <param name="Snapshot">State at a tick no later than <paramref name="Tick"/>, or null for a full replay.</param>
 public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Hash, string Label, List<LoggedCommand> Commands, Snapshot? Snapshot = null)
 {
-    /// <summary>3: rate mode, view commands and snapshots. No compatibility with older saves (OQ-34).</summary>
-    public const int CurrentVersion = 6;
+    /// <summary>
+    /// 7: the setup names a scenario (with its hash) or a seed, and AI head starts (WM-017, MP-008). No compatibility
+    /// with older saves (OQ-34).
+    /// </summary>
+    public const int CurrentVersion = 7;
 
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
@@ -62,6 +65,9 @@ public sealed class Replay
     /// <param name="useSnapshot">False forces a full replay from the setup, ignoring the save's snapshot.</param>
     public Replay(ContentDb content, SaveFile save, bool useSnapshot = true)
     {
+        // A missing or edited scenario, or content without the save's prefabs, can't rebuild the match.
+        if (save.Setup.Problem(content) is { } problem)
+            throw new SaveException($"can't rebuild this match: {problem}");
         _content = content;
         _save = save;
         if (useSnapshot && save.Snapshot is { } snap && snap.Tick <= save.Tick)

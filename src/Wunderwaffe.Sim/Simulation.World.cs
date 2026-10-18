@@ -30,20 +30,7 @@ public sealed partial class Simulation
         var tileOf = Partition.Generate(Content, terrain, elevation, w, h, tileSize, seed);
         _map = new WorldMap(w, h, terrain, elevation, tileOf);
         _names = new TileNames(seed);
-
-        int count = tileOf.Max() + 1;
-        var box = Enumerable.Repeat((X0: int.MaxValue, Y0: int.MaxValue, X1: -1, Y1: -1), count).ToArray();
-        for (int y = 0; y < h; y++)
-        {
-            for (int x = 0; x < w; x++)
-            {
-                ref var b = ref box[tileOf[y * w + x]];
-                b = (Math.Min(b.X0, x), Math.Min(b.Y0, y), Math.Max(b.X1, x), Math.Max(b.Y1, y));
-            }
-        }
-        foreach (var b in box)
-            CreateTile(b.X0, b.Y0, b.X1 - b.X0 + 1, b.Y1 - b.Y0 + 1);
-        RebuildTopology();
+        CreateTiles(tileOf.Max() + 1);
 
         _startTileIds.AddRange(ChooseStarts(w, h, players, seed, richnessPercent));
         var missing = RegionalExclusions(_startTileIds.Select(id => _tiles[id]).ToList(), seed);
@@ -55,6 +42,32 @@ public sealed partial class Simulation
         Parallel.For(0, _tiles.Count, i => circles[i] = Circles.Place(_tiles[i].Grid));
         foreach (var t in _tiles)
             (t.CircleX, t.CircleY) = circles[t.Id];
+    }
+
+    /// <summary>
+    /// One tile per id 0..count-1 of the map's cells, each the bounding box of its cells, then topology. False (and no
+    /// tiles) if an id has no cells.
+    /// </summary>
+    bool CreateTiles(int count)
+    {
+        int w = _map.Width, h = _map.Height;
+        var box = Enumerable.Repeat((X0: int.MaxValue, Y0: int.MaxValue, X1: -1, Y1: -1), count).ToArray();
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                if (_map.TileAtCell(x, y) is not (>= 0 and var id))
+                    continue;
+                ref var b = ref box[id];
+                b = (Math.Min(b.X0, x), Math.Min(b.Y0, y), Math.Max(b.X1, x), Math.Max(b.Y1, y));
+            }
+        }
+        if (box.Any(b => b.X1 < 0))
+            return false;
+        foreach (var b in box)
+            CreateTile(b.X0, b.Y0, b.X1 - b.X0 + 1, b.Y1 - b.Y0 + 1);
+        RebuildTopology();
+        return true;
     }
 
     static Rng DepositRng(ulong seed, int tileId) => new(seed ^ (ulong)(tileId + 1) * 0x9E3779B97F4A7C15UL);
@@ -260,13 +273,42 @@ public sealed partial class Simulation
             throw new InvalidOperationException($"tile {tile.Id} is already owned");
         tile.Owner = owner;
         Player(owner);
+        StampStart(tile, owner);
+        GiveHeadStart(tile, owner);
+    }
+
+    /// <summary>The seat's start prefabs on its tile, nearest the victory circle centre in order.</summary>
+    void StampStart(TileState tile, int owner)
+    {
         foreach (var id in StartPrefabsOf(owner))
-        {
-            var prefab = Content.Prefabs[id];
-            var (w, h) = prefab.Blueprint.Size(Content.Buildings);
-            if (tile.Grid.BuildableCount >= w * h && FreeSpot(tile, w, h, tile.CircleX - w / 2, tile.CircleY - h / 2) is { } spot)
-                Blueprints.Stamp(this, tile, owner, prefab, spot.X, spot.Y);
-        }
+            StampNear(tile, owner, Content.Prefabs[id], tile.CircleX, tile.CircleY);
+    }
+
+    /// <summary>Stamps a prefab as near local (x, y) as it fits, if it fits anywhere on the tile.</summary>
+    void StampNear(TileState tile, int owner, PrefabDef prefab, int x, int y)
+    {
+        var (w, h) = prefab.Blueprint.Size(Content.Buildings);
+        if (tile.Grid.BuildableCount >= w * h && FreeSpot(tile, w, h, x - w / 2, y - h / 2) is { } spot)
+            Blueprints.Stamp(this, tile, owner, prefab, spot.X, spot.Y);
+    }
+
+    /// <summary>
+    /// The seat's head-start preset (MP-008), if the setup gives it one: its prefabs as close beside the seat's first
+    /// core on <paramref name="tile"/> as they fit (the victory circle centre if it has none there), its items into
+    /// that core (or the seat's first unit's cargo).
+    /// </summary>
+    void GiveHeadStart(TileState tile, int owner)
+    {
+        if (Setup?.HeadStartFor(owner) is not { } id)
+            return;
+        var preset = Content.HeadStarts[id];
+        var core = tile.Grid.Cores.FirstOrDefault(c => c.Owner == owner);
+        var (ax, ay) = core is { } c ? (c.X + c.Width / 2, c.Y + c.Height / 2) : (tile.CircleX, tile.CircleY);
+        foreach (var p in preset.Prefabs ?? [])
+            StampNear(tile, owner, Content.Prefabs[p], ax, ay);
+        if (preset.Items is not { Count: > 0 } items)
+            return;
+        (core?.Stock ?? _units.FirstOrDefault(u => u.Owner == owner)?.Cargo)?.Add(items);
     }
 
     IReadOnlyList<string> StartPrefabsOf(int player) => (Setup ?? GameSetup.Default).PrefabsFor(player);

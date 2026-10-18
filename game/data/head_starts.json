@@ -1,0 +1,11 @@
+// Generic head starts (MP-008, OQ-47): the host picks one per AI seat in the match settings. Each stamps its prefabs
+// (game/data/prefabs) beside the seat's first start prefab, then adds its items to that seat's core. File order is
+// the order the menu offers them in.
+[
+  { "id": "second_scout", "name": "Second scout", "description": "Another landed scout beside the first, so it can expand twice at once.",
+    "prefabs": ["scout"] },
+  { "id": "stockpile", "name": "Stockpile", "description": "A depot of plates beside the start and extra ore in the core.",
+    "prefabs": ["depot"], "items": { "copper_ore": 300, "iron_ore": 300 } },
+  { "id": "both", "name": "Second scout and stockpile", "description": "Both of the above.",
+    "prefabs": ["scout", "depot"], "items": { "copper_ore": 300, "iron_ore": 300 } }
+]

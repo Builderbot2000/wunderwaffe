@@ -40,6 +40,9 @@ public partial class PauseMenu : CanvasLayer
         col.AddChild(_heading);
         col.AddChild(Ui.Button("Resume", Close, 280));
         col.AddChild(Ui.Button("Save game", Save));
+        var scenario = Ui.Button("Save as scenario", SaveScenario);
+        scenario.TooltipText = "Saves this map and everything on it as a scenario to start new games from (New game · Map)";
+        col.AddChild(scenario);
         _load = Ui.Button("Load game", () => Show(LoadMenu.Build(Load, Back)));
         col.AddChild(_load);
         col.AddChild(Ui.Button("Settings", () => Show(GameSettings.BuildPanel(Back))));
@@ -88,6 +91,13 @@ public partial class PauseMenu : CanvasLayer
         string? path = _host.Save();
         _status.Text = path == null ? "Couldn't save the game." : $"Saved as {path.GetFile()}";
         _status.AddThemeColorOverride("font_color", path == null ? Ui.Bad : Ui.Good);
+    }
+
+    void SaveScenario()
+    {
+        string? name = _host.SaveScenario();
+        _status.Text = name == null ? "Couldn't save the scenario." : $"Scenario \"{name}\" saved";
+        _status.AddThemeColorOverride("font_color", name == null ? Ui.Bad : Ui.Good);
     }
 
     /// <summary>The title screen does the loading, with its progress bar.</summary>

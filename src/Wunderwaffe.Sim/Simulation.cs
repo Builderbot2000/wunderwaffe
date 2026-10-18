@@ -63,13 +63,21 @@ public sealed partial class Simulation(ContentDb content)
 
     /// <summary>
     /// A whole match: the world from <paramref name="setup"/>, with each of its players (ids 0 up) settled on their
-    /// starting tile. Player 0 starts in the middle.
+    /// starting tile. Player 0 starts in the middle. With a <see cref="GameSetup.Scenario"/>, the world and every seat's
+    /// starting state come from the scenario instead (WM-017), plus any head starts (MP-008).
     /// </summary>
     public static Simulation NewGame(ContentDb content, GameSetup setup)
     {
         if (setup.Problem(content) is { } problem)
             throw new ArgumentOutOfRangeException(nameof(setup), problem);
         var sim = new Simulation(content) { Setup = setup, RateModeEnabled = true };
+        if (setup.Scenario is { } scenario)
+        {
+            sim.LoadScenario(content.Scenarios[scenario]);
+            for (int p = 0; p < setup.Players; p++)
+                sim.GiveHeadStart(sim.Tiles[sim.StartTileIds[p]], p);
+            return sim;
+        }
         sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, setup.Players, richnessPercent: setup.RichnessPercent);
         for (int p = 0; p < setup.Players; p++)
             sim.SettleStartingTile(sim.Tiles[sim.StartTileIds[p]], p);

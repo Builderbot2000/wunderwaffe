@@ -28,8 +28,20 @@ public enum NetState
 /// <summary>What every machine in the lobby sees: the host's settings and who is in, host first (seat order).</summary>
 public sealed record LobbyInfo(GameSetup Setup, List<string> Names)
 {
-    /// <summary>The setup the match starts with: the people here plus the AI seats.</summary>
-    public GameSetup Final => Setup with { Players = Math.Min(GameSetup.MaxPlayers, Names.Count + Setup.AiPlayers) };
+    /// <summary>
+    /// The setup the match starts with: the people here plus the AI seats, or on a scenario its seats with every one no
+    /// person took an AI (WM-017). Head starts (MP-008) only for AI seats that are left.
+    /// </summary>
+    public GameSetup Final
+    {
+        get
+        {
+            var s = Setup.Scenario != null
+                ? Setup with { AiPlayers = Math.Max(0, Setup.Players - Names.Count) }
+                : Setup with { Players = Math.Min(GameSetup.MaxPlayers, Names.Count + Setup.AiPlayers) };
+            return s with { AiHeadStarts = s.AiHeadStarts?.Take(Math.Max(0, s.AiPlayers)).ToArray() };
+        }
+    }
 }
 
 /// <summary>
@@ -132,6 +144,13 @@ public partial class NetSession : Node
         if (State != NetState.Hosting || Lobby == null)
             return;
         var setup = Lobby.Final;
+        // A scenario has a fixed seat count (WM-017): more people than seats can't start.
+        if (setup.Problem(SimHost.Instance.Content) is { } problem)
+        {
+            Notice = $"Can't start: {problem}.";
+            Changed?.Invoke();
+            return;
+        }
         _peerOfSeat.Clear();
         _seatOfPeer.Clear();
         for (int seat = 1; seat < _members.Count; seat++)
@@ -253,7 +272,7 @@ public partial class NetSession : Node
     [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     void StartMatch(string setupJson, int seat)
     {
-        if (JsonSerializer.Deserialize<GameSetup>(setupJson, Json) is not { } setup || setup.Problem() != null)
+        if (JsonSerializer.Deserialize<GameSetup>(setupJson, Json) is not { } setup || setup.Problem(SimHost.Instance.Content) != null)
         {
             Fail("The host sent a match this game can't start.");
             return;

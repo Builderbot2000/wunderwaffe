@@ -1,0 +1,11 @@
+// A head-start depot (MP-008): a large core holding plates, so the seat can build plate-priced buildings at once.
+{
+  "id": "depot",
+  "name": "Depot",
+  "tags": ["building", "head start"],
+  "items": { "iron_plate": 120, "copper_plate": 80 },
+  "blocks": [
+    { "defId": "core_large", "x": 0, "y": 0, "rotation": 0 }
+  ],
+  "frames": []
+}

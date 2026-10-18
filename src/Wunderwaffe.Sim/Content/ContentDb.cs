@@ -97,9 +97,11 @@ public sealed class ContentDb
     /// <param name="terrain">Terrain kinds for world generation; null for a single buildable terrain.</param>
     /// <param name="layers">Cell layers (FB-022), bottom to top; null for a deposit layer alone.</param>
     /// <param name="prefabs">Prefab blueprints (FB-021), one JSON object per text (one file each); null for none.</param>
+    /// <param name="headStarts">Head-start presets (MP-008), a JSON list; null for none.</param>
+    /// <param name="scenarios">Scenarios (WM-017), one JSON object per text (one file each); null for none.</param>
     public static ContentDb FromJson(
         string items, string recipes, string buildings, string? goals = null, string? terrain = null, string? layers = null,
-        IEnumerable<string>? prefabs = null)
+        IEnumerable<string>? prefabs = null, string? headStarts = null, IEnumerable<string>? scenarios = null)
     {
         var errors = new List<string>();
         var itemList = Parse<ItemDef>(items, "items");
@@ -118,9 +120,83 @@ public sealed class ContentDb
         db.Validate(errors);
         db.LoadLayers(layers == null ? [FallbackLayer] : Parse<LayerDef>(layers, "layers"), itemList, buildingList, errors);
         db.LoadPrefabs(prefabs ?? [], errors);
+        db.LoadHeadStarts(headStarts == null ? [] : Parse<HeadStartDef>(headStarts, "head_starts"), errors);
+        // Scenarios last: a trial build checks them against everything else.
+        if (errors.Count == 0)
+        {
+            foreach (var text in scenarios ?? [])
+                db.TryAddScenario(text, errors);
+        }
         if (errors.Count > 0)
             throw new ContentException(errors);
         return db;
+    }
+
+    readonly SortedDictionary<string, ScenarioDef> _scenarios = new(StringComparer.Ordinal);
+
+    /// <summary>Scenarios by id (WM-017), each validated by a trial build when loaded.</summary>
+    public IReadOnlyDictionary<string, ScenarioDef> Scenarios => _scenarios;
+
+    /// <summary>Head-start presets by id (MP-008).</summary>
+    public IReadOnlyDictionary<string, HeadStartDef> HeadStarts { get; private set; } = new SortedDictionary<string, HeadStartDef>(StringComparer.Ordinal);
+
+    /// <summary>Head-start presets in file order, the order the match settings offer them in.</summary>
+    public IReadOnlyList<HeadStartDef> HeadStartList { get; private set; } = [];
+
+    /// <summary>
+    /// Adds (or replaces, by id) a scenario after loading, such as one just saved from a match. Throws
+    /// <see cref="ContentException"/> if it doesn't validate.
+    /// </summary>
+    public ScenarioDef AddScenario(string json)
+    {
+        var errors = new List<string>();
+        return TryAddScenario(json, errors) ?? throw new ContentException(errors);
+    }
+
+    ScenarioDef? TryAddScenario(string json, List<string> errors)
+    {
+        ScenarioDef def;
+        try
+        {
+            def = Content.Scenarios.Parse(json);
+        }
+        catch (JsonException e)
+        {
+            errors.Add($"scenario: {e.Message}");
+            return null;
+        }
+        int before = errors.Count;
+        Content.Scenarios.Validate(this, def, errors);
+        if (errors.Count > before)
+            return null;
+        def.Hash = Content.Scenarios.Hash(def);
+        _scenarios[def.Id] = def;
+        return def;
+    }
+
+    void LoadHeadStarts(List<HeadStartDef> list, List<string> errors)
+    {
+        var map = Index(list, x => x.Id ?? "", "head start", errors);
+        foreach (var h in list)
+        {
+            string at = $"head start '{h.Id}'";
+            if (string.IsNullOrWhiteSpace(h.Name))
+                errors.Add($"{at}: no name");
+            foreach (var p in h.Prefabs ?? [])
+            {
+                if (!Prefabs.ContainsKey(p))
+                    errors.Add($"{at}: unknown prefab '{p}'");
+            }
+            foreach (var (item, n) in h.Items ?? [])
+            {
+                if (!Items.ContainsKey(item))
+                    errors.Add($"{at}: unknown item '{item}'");
+                if (n <= 0)
+                    errors.Add($"{at}: item '{item}' count must be > 0");
+            }
+        }
+        HeadStarts = new SortedDictionary<string, HeadStartDef>(map, StringComparer.Ordinal);
+        HeadStartList = list;
     }
 
     /// <summary>Resolves and checks the layers (FB-022): stacking rules, the one deposit layer, which buildings go on which.</summary>

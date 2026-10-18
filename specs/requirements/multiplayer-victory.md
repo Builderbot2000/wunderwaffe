@@ -15,7 +15,7 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 | [MP-005](#mp-005-match-settings) | Match settings | Should | Done | Yes | Alpha | Functional | P8 | MP-001 | Updated |  |
 | [MP-006](#mp-006-ai-framework) | AI framework | Must | Done | Yes | MVP | Non-Functional | P8 | MP-002, NF-009, FB-021 | New |  |
 | [MP-007](#mp-007-content-agnostic-ai) | Content-agnostic AI | Must | Approved | No | MVP | Non-Functional | P8 | MP-006, RS-002 |  |  |
-| [MP-008](#mp-008-ai-head-starts) | AI head starts | Should | Approved | No | Alpha | Functional | P8 | FB-021, MP-005, WM-017 |  |  |
+| [MP-008](#mp-008-ai-head-starts) | AI head starts | Should | Done | Yes | Alpha | Functional | P8 | FB-021, MP-005, WM-017 |  |  |
 
 ### MP-001 Domination victory
 
@@ -91,7 +91,7 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 
 **Acceptance criteria:** A scenario's per-seat assets (buildings, units, owned tiles, core stock) belong to that seat, and an AI seat runs them from the first think like anything else it owns. Generic head starts are named presets in content, each a list of prefabs (FB-021) with optional extra items, stamped beside the seat's first start prefab; the match settings let the host pick a preset per AI seat (MP-005). Both are part of the setup, so saves replay them.
 
-**As built:** Not built. Groundwork: GameSetup.StartPrefabs stamps extra prefabs beside the first (FB-021), but nothing in the menu sets it, there are no presets, and scenarios don't exist.
+**As built:** game/data/head_starts.json presets (second scout, stockpile with a depot prefab, both), validated on load. GameSetup.AiHeadStarts picks one per AI seat (new-game form and lobby: one picker per AI seat); Simulation.GiveHeadStart stamps its prefabs beside the seat's first core and adds its items to it, on generated maps and scenarios alike. Scenario seat assets belong to the seat and an AI seat runs them from its first think (ScenarioTests: a fresh AI carries on a mid-game scenario). Both are in the setup, so saves replay them.
 
 **Notes:** Owner, 2026-10-18.
 

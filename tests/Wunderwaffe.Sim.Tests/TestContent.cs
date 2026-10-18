@@ -29,13 +29,25 @@ static class TestContent
         foreach (var json in extraBuildings)
             buildings.Add(JsonNode.Parse(json));
         return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), buildings.ToJsonString(), Read("goals.json"), Read("terrain.json"),
-            layersJson ?? Read("layers.json"), Prefabs());
+            layersJson ?? Read("layers.json"), Prefabs(), Read("head_starts.json"));
     }
 
     /// <summary>The real content as shipped (no test bank) with <paramref name="extra"/> prefab JSON objects added.</summary>
     public static ContentDb WithPrefabs(params string[] extra) =>
         ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"),
-            Read("layers.json"), [.. Prefabs(), .. extra]);
+            Read("layers.json"), [.. Prefabs(), .. extra], Read("head_starts.json"));
+
+    /// <summary>
+    /// The real content as shipped (no test bank) with the shipped scenarios (WM-017) and <paramref name="extra"/>
+    /// scenario texts. Only scenario tests load them: each is validated by building its world.
+    /// </summary>
+    public static ContentDb WithScenarios(params string[] extra) =>
+        ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"),
+            Read("layers.json"), Prefabs(), Read("head_starts.json"), [.. ShippedScenarios(), .. extra]);
+
+    /// <summary>The texts of every shipped scenario.</summary>
+    public static IEnumerable<string> ShippedScenarios() =>
+        Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "data", "scenarios"), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText);
 
     /// <summary>The texts of every shipped prefab (FB-021).</summary>
     public static IEnumerable<string> Prefabs() =>
