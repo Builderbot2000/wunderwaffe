@@ -73,7 +73,11 @@ public class ScenarioTests
         var other = Enumerable.Range(0, def.Tiles.Count).First(t => sim.Tiles[t].Owner == TileState.Unowned);
 
         var tiles = def.Tiles.ToList();
-        tiles[home] = homeTile with { Name = "Edited", Layers = new(homeTile.Layers) { ["deposit"] = deposits with { Legend = legend } } };
+        // Changed deposits drop their patches, which are found again from the new deposits.
+        tiles[home] = homeTile with
+        {
+            Name = "Edited", Layers = new(homeTile.Layers) { ["deposit"] = deposits with { Legend = legend } }, Patches = null, PatchMap = null,
+        };
         var edited = def with
         {
             Id = "edited",
@@ -105,6 +109,41 @@ public class ScenarioTests
                 Assert.Equal(forest, b.Map.TerrainAt(x, y));
         }
         Assert.True(anyPlains);
+    }
+
+    [Fact]
+    public void DepositPatchAmountsAreSavedAndEditable()
+    {
+        // RS-004: a patch's remaining amount is part of the map; the file can change it, or leave patches out.
+        var (content, sim, def) = Saved(Duel);
+        int home = sim.StartTileIds[0];
+        var patches = sim.Tiles[home].Grid.Patches;
+        Assert.NotEmpty(patches.All);
+        var first = patches.All[0];
+        patches.SetAmount(first, first.Start / 3);
+        var used = content.AddScenario(Scenarios.ToJson(sim.ToScenario("used", "Used")));
+        var b = Simulation.NewGame(content, GameSetup.ForScenario(used));
+        Assert.Equal(sim.StateHash(), b.StateHash());
+        Assert.Equal(first.Start / 3, b.Tiles[home].Grid.Patches.All[0].Amount);
+        Assert.Equal(patches.All.Select(p => (p.Item, p.Cells, p.Start, p.Amount)),
+            b.Tiles[home].Grid.Patches.All.Select(p => (p.Item, p.Cells, p.Start, p.Amount)));
+
+        var tiles = used.Tiles.ToList();
+        var records = tiles[home].Patches!.ToList();
+        records[0] = records[0] with { Amount = 7 };
+        tiles[home] = tiles[home] with { Patches = records };
+        var edited = Simulation.NewGame(content, GameSetup.ForScenario(content.AddScenario(Scenarios.ToJson(used with { Id = "edited", Tiles = tiles }))));
+        Assert.Equal(7, edited.Tiles[home].Grid.Patches.All[0].Amount);
+
+        // No patches in the file: found from the deposits at full amounts, as the generated map had them.
+        tiles = [.. def.Tiles.Select(t => t with { Patches = null, PatchMap = null })];
+        var found = Simulation.NewGame(content, GameSetup.ForScenario(content.AddScenario(Scenarios.ToJson(def with { Id = "found", Tiles = tiles }))));
+        Assert.Equal(Simulation.NewGame(content, Duel).StateHash(), found.StateHash());
+
+        // A patch over cells without its deposit is refused.
+        tiles = [.. def.Tiles];
+        tiles[home] = tiles[home] with { Patches = [.. tiles[home].Patches!.Select(p => p with { Item = p.Item == "iron_ore" ? "copper_ore" : "iron_ore" })] };
+        Assert.Throws<ContentException>(() => content.AddScenario(Scenarios.ToJson(def with { Id = "bad", Tiles = tiles })));
     }
 
     [Fact]
@@ -255,6 +294,9 @@ public class ScenarioTests
             b.Step();
         }
         Assert.Contains(b.CommandLog, c => c.Command.Player == 1);
+        // It builds on what it was handed rather than stalling (MP-007 plans from whatever it owns).
+        Assert.True(b.Tiles.Sum(t => t.Grid.Buildings.Count(x => x.Owner == 1)) + b.Units.Count(u => u.Owner == 1) > built,
+            "the AI added nothing to its scenario assets");
     }
 
     [Fact]

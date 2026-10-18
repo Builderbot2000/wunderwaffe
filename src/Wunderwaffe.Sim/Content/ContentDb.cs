@@ -370,6 +370,21 @@ public sealed class ContentDb
             ValidateCondition(g.Condition, $"goal '{g.Id}'", errors);
 
         ValidateTerrain(errors);
+
+        // RS-004: finite deposits.
+        foreach (var item in Items.Values)
+        {
+            if (item.Deposit is not { } d)
+                continue;
+            if (d.PerCell <= 0)
+                errors.Add($"item '{item.Id}': deposit perCell must be > 0");
+            var levels = d.Levels ?? [];
+            for (int i = 0; i < levels.Length; i++)
+            {
+                if (levels[i] <= 0 || (i > 0 && levels[i] <= levels[i - 1]))
+                    errors.Add($"item '{item.Id}': deposit levels must be > 0 and ascending");
+            }
+        }
     }
 
     /// <summary>Weapons, shields, repair and supply fields (CB-001, CB-002, CB-004, CB-005, FB-010, FB-018).</summary>

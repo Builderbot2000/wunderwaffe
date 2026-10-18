@@ -18,7 +18,7 @@ public partial class Hud
             tile.Grid.BuildingAt(cell.X, cell.Y) is { } b ? DescribeBuilding(tile, b)
             : tile.Grid.WreckAt(cell.X, cell.Y) is { } wreck ? DescribeWreck(wreck)
             : tile.Grid.Has(BuildingKind.Wire, cell.X, cell.Y) ? DescribeCable(tile, cell.X, cell.Y)
-            : tile.Grid.DepositAt(cell.X, cell.Y) is { } ore && DescribeDeposit(ore));
+            : tile.Grid.DepositAt(cell.X, cell.Y) is { } ore && DescribeDeposit(ore, tile.Grid.Patches.At(cell.X, cell.Y)));
         if (!show && !BuildTool.HasTool && (_host.Selected.Count > 0 || UnitTool.Status.Contains('\n')))
             show = SetHover(UnitTool.Status);
         _hoverPanel.Visible = show;
@@ -45,7 +45,7 @@ public partial class Hud
         return true;
     }
 
-    bool DescribeDeposit(string item)
+    bool DescribeDeposit(string item, DepositPatch? patch)
     {
         Ui.Clear(_hover);
         var row = Ui.Row(8);
@@ -53,8 +53,14 @@ public partial class Hud
         row.AddChild(Ui.Label($"{GameText.ItemName(Content, item)} deposit", 20));
         _hover.AddChild(row);
         _hover.AddChild(Ui.Label("A drill placed on it mines it.", Ui.SmallFont, Ui.Muted));
+        if (patch != null)
+            _hover.AddChild(Ui.Label(PatchText(patch), Ui.SmallFont, Ui.Text));
         return true;
     }
+
+    /// <summary>What a deposit patch has left (RS-004).</summary>
+    static string PatchText(DepositPatch p) =>
+        $"Patch: {p.Amount:N0} of {p.Start:N0} left ({p.Amount * 100 / System.Math.Max(1, p.Start)}%), {p.Cells} cells";
 
     bool DescribeBuilding(TileState tile, PlacedBuilding b)
     {
@@ -113,9 +119,12 @@ public partial class Hud
                     MachineStatus.Starved => ($"Waiting for {GameText.ItemName(Content, m.MissingInput ?? recipe.Inputs.Keys.First())}", Ui.Warn),
                     MachineStatus.OutputFull => ($"Output full: put a belt or building next to it that takes {GameText.ItemName(Content, recipe.Outputs.Keys.First())}", Ui.Bad),
                     MachineStatus.NoPower => ("No power: touch it to a core or generator, or run wire to one", Ui.Bad),
+                    MachineStatus.Depleted => ("Deposit mined out: move it to another patch", Ui.Bad),
                     _ => ("Idle", Ui.Muted),
                 };
                 Line(status, color);
+                if (recipe.Inputs.Count == 0 && tile.Grid.Patches.ById(tile.Grid.Patches.SourceOf(b, recipe.Outputs.Keys.First())) is { } source)
+                    Line(PatchText(source));
                 if (m.Input.Count > 0)
                     AddBuffer("In", m.Input);
                 if (m.Output.Count > 0)

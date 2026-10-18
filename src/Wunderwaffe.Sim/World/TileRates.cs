@@ -17,12 +17,15 @@ public enum FlowKind
 
     /// <summary>Taken in by the tile's machines as recipe inputs, a fuel generator's fuel included; for the stats.</summary>
     Used,
+
+    /// <summary>Taken out of one deposit patch (<see cref="Flow.PortId"/> = its id) by the extractors on it (RS-004).</summary>
+    Mined,
 }
 
 /// <summary>
 /// One steady-state item flow of a tile, in items per tick times <see cref="RateModel.One"/>.
 /// <paramref name="PortId"/> is the export port's building id for <see cref="FlowKind.Export"/>, the core's for
-/// <see cref="FlowKind.Core"/> (so per player per core), else 0.
+/// <see cref="FlowKind.Core"/> (so per player per core), the deposit patch's id for <see cref="FlowKind.Mined"/>, else 0.
 /// </summary>
 public readonly record struct Flow(FlowKind Kind, int PortId, string Item, long Rate) : IComparable<Flow>
 {

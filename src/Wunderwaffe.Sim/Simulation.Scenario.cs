@@ -123,6 +123,49 @@ public sealed partial class Simulation
                 }
             }
         }
+        LoadPatches(grid, st, at, errors);
+    }
+
+    /// <summary>Deposit patches (RS-004) as the file has them, or found from the deposits if it has none.</summary>
+    void LoadPatches(TileGrid grid, ScenarioTile st, string at, List<string> errors)
+    {
+        if (st.Patches is not { } patches)
+        {
+            grid.Patches.Find(Content);
+            return;
+        }
+        int before = errors.Count;
+        foreach (var p in patches)
+        {
+            if (!Content.Items.TryGetValue(p.Item ?? "", out var item) || item.Deposit == null || p.Cells <= 0 || p.Start <= 0 || p.Amount < 0 || p.Amount > p.Start)
+                errors.Add($"{at}: patch of '{p.Item}' needs an item with a deposit, cells > 0 and 0 <= amount <= start > 0");
+        }
+        if (st.PatchMap is null)
+            errors.Add($"{at}: patches need a patchMap");
+        var ids = errors.Count == before ? st.PatchMap!.Decode(grid.Width, grid.Height, 0, patches.Count, $"{at} patchMap", errors) : null;
+        if (ids == null)
+            return;
+        var runs = new List<int>();
+        for (int i = 0; i < ids.Length;)
+        {
+            int j = i;
+            while (j < ids.Length && ids[j] == ids[i])
+                j++;
+            if (ids[i] != 0)
+            {
+                for (int k = i; k < j; k++)
+                {
+                    if (grid.DepositAt(k % grid.Width, k / grid.Width) != patches[ids[i] - 1].Item)
+                    {
+                        errors.Add($"{at}: patch {ids[i]} covers ({k % grid.Width}, {k / grid.Width}), which has no {patches[ids[i] - 1].Item} deposit");
+                        return;
+                    }
+                }
+                runs.AddRange([i, j - i, ids[i]]);
+            }
+            i = j;
+        }
+        grid.Patches.Restore(Content, [.. patches.Select(p => (p.Item, p.Cells, p.Start, p.Amount))], runs);
     }
 
     void LoadSeat(int p, ScenarioSeat seat, string at, List<string> errors)
@@ -244,7 +287,9 @@ public sealed partial class Simulation
         int w = _map.Width, h = _map.Height;
         var terrainIds = Content.TerrainList.Select(t => t.Id).ToArray();
         var tiles = _tiles.Select(t => new ScenarioTile(t.Name, t.CircleX, t.CircleY,
-            CellGrid.Encode(t.Grid.Width, t.Grid.Height, t.Grid.ZoneAt), LayersOf(t.Grid))).ToList();
+            CellGrid.Encode(t.Grid.Width, t.Grid.Height, t.Grid.ZoneAt), LayersOf(t.Grid),
+            [.. t.Grid.Patches.All.Select(p => new PatchRecord(p.Item, p.Cells, p.Start, p.Amount))],
+            CellGrid.Encode(t.Grid.Width, t.Grid.Height, t.Grid.Patches.IdAt))).ToList();
 
         int seats = Math.Max(1, Math.Max(Setup?.Players ?? 0, _players.Count));
         var list = new List<ScenarioSeat>();

@@ -102,9 +102,35 @@ public sealed record LayerSnap(string Layer, List<int> Runs)
     }
 }
 
+/// <summary>One deposit patch (RS-004): item, cells when found, starting and remaining amount.</summary>
+public sealed record PatchRecord(string Item, int Cells, long Start, long Amount);
+
+/// <summary>A tile's deposit patches (RS-004), in id order, and their cells as (first cell, length, patch id) run triples.</summary>
+public sealed record PatchSnap(List<PatchRecord> Patches, List<int> Runs)
+{
+    internal static PatchSnap Of(TileGrid g)
+    {
+        var cells = g.Patches.CellIds;
+        var runs = new List<int>();
+        for (int i = 0; i < cells.Length;)
+        {
+            int j = i;
+            while (j < cells.Length && cells[j] == cells[i])
+                j++;
+            if (cells[i] != 0)
+                runs.AddRange([i, j - i, cells[i]]);
+            i = j;
+        }
+        return new([.. g.Patches.All.Select(p => new PatchRecord(p.Item, p.Cells, p.Start, p.Amount))], runs);
+    }
+
+    internal void Restore(ContentDb content, TileGrid g) =>
+        g.Patches.Restore(content, [.. Patches.Select(p => (p.Item, p.Cells, p.Start, p.Amount))], Runs);
+}
+
 public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingId, int NextWreckId,
     List<LayerSnap> Layers, List<BuildingSnap> Buildings, List<Wreck> Wrecks, List<ClaimSnap> Claims, StatsSnap Stats,
-    bool Full, List<AccSnap> Rates)
+    bool Full, List<AccSnap> Rates, PatchSnap? Patches = null)
 {
     internal static TileSnap Of(Simulation sim, TileState t)
     {
@@ -114,7 +140,7 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
             .Select(e => new AccSnap(rs.AccKeys[e.i].Kind, rs.AccKeys[e.i].PortId, rs.AccKeys[e.i].Item, e.a)).ToList();
         return new TileSnap(t.Id, t.Owner, g.Revision, g.NextBuildingId, g.NextWreckId, LayerSnap.Of(g),
             g.Buildings.Select(BuildingSnap.Of).ToList(), [.. g.Wrecks],
-            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc);
+            t.Claims.Select(kv => new ClaimSnap(kv.Key, kv.Value)).ToList(), t.Stats.Snap(), rs.Full, acc, PatchSnap.Of(g));
     }
 
     internal void Restore(Simulation sim, TileState t)
@@ -129,6 +155,7 @@ public sealed record TileSnap(int Id, int Owner, int Revision, int NextBuildingI
         g.ClearForRestore();
         foreach (var layer in Layers)
             layer.Restore(g);
+        Patches?.Restore(sim.Content, g);
         foreach (var b in Buildings)
             b.Restore(sim.Content, g);
         foreach (var w in Wrecks)

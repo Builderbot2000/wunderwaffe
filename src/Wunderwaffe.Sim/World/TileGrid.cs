@@ -127,6 +127,7 @@ public sealed class TileGrid
             _layerCounts[l][0] = width * height;
         }
         Power = new TilePower(this);
+        Patches = new DepositPatches(this);
     }
 
     /// <summary>A copy of the ground alone (shape, buildability, terrain), with nothing on it: for trying out deposits.</summary>
@@ -284,12 +285,19 @@ public sealed class TileGrid
     /// <summary>The raw cells of a layer, row by row, for hashing and snapshots.</summary>
     internal ReadOnlySpan<byte> LayerCells(int layer) => _layers[layer];
 
-    // Deposits are the layer whose entries are items (RS-004 will point its cells at patches).
+    // Deposits are the layer whose entries are items; their patches and amounts (RS-004) sit beside it in Patches.
+
+    /// <summary>Deposit patches and what each holds (RS-004).</summary>
+    public DepositPatches Patches { get; }
 
     public string? DepositAt(int x, int y) => EntryAt(Layers.Deposit, x, y) is > 0 and var e ? Layers[Layers.Deposit].Ids[e] : null;
 
-    public void SetDeposit(int x, int y, string? itemId) =>
+    /// <summary>Lays or clears a deposit by hand. The cell leaves its patch, if it had one: a hand-laid deposit never runs out (RS-004).</summary>
+    public void SetDeposit(int x, int y, string? itemId)
+    {
+        Patches.Detach(x, y);
         SetEntry(Layers.Deposit, x, y, itemId == null ? 0 : Layers[Layers.Deposit].EntryOf(itemId));
+    }
 
     /// <summary>Cells per deposit item, for showing what a tile holds (WM-002).</summary>
     public SortedDictionary<string, int> DepositCounts()

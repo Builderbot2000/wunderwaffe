@@ -45,6 +45,7 @@ public partial class TileView : Node2D
     readonly Dictionary<string, int> _itemCounts = [];
     readonly Dictionary<string, MultiMeshInstance2D> _spriteLayers = [];
     int _drawnRevision = -1;
+    int _drawnPatches = -1;
     int _drawnTileId = -1;
 
     public override void _Ready()
@@ -88,8 +89,10 @@ public partial class TileView : Node2D
         Position = onTile ? Vector2.Zero : new Vector2(tile.OriginX, tile.OriginY) * WorldMapView.CellPx;
         TileGrid grid = tile.Grid;
         // Grids of different tiles can share a revision number, so the tile id is part of "what's drawn".
-        if (grid.Revision != _drawnRevision || tile.Id != _drawnTileId)
+        // Patches redraw only when one crosses a density threshold or runs out (RS-004), never per extraction.
+        if (grid.Revision != _drawnRevision || tile.Id != _drawnTileId || grid.Patches.Revision != _drawnPatches)
         {
+            _drawnPatches = grid.Patches.Revision;
             if (tile.Id != _drawnTileId)
             {
                 DrawTerrain(tile);
@@ -281,6 +284,7 @@ public partial class TileView : Node2D
         if (grid.CountOn(layer.Index) == 0)
             return;
         string style = layer.Def.Draw;
+        // Keyed by entry, plus (deposits, RS-004) the patch's density level times 256: cells in no patch draw full.
         var cells = new Dictionary<int, List<(int X, int Y)>>();
         for (int y = 0; y < grid.Height; y++)
         {
@@ -289,6 +293,8 @@ public partial class TileView : Node2D
                 int e = grid.EntryAt(layer.Index, x, y);
                 if (e == 0)
                     continue;
+                if (layer.HoldsItems)
+                    e |= (grid.Patches.At(x, y) is { } patch ? patch.Level : MaxLevel(layer.Ids[e])) << 8;
                 if (!cells.TryGetValue(e, out var list))
                     cells[e] = list = [];
                 list.Add((x, y));
@@ -298,10 +304,30 @@ public partial class TileView : Node2D
         const float Thick = 0.22f;
         float px = Palette.CellPx;
         var plain = new List<(Transform2D At, Color Colour)>();
-        foreach (var (e, list) in cells)
+        var sprites = new Dictionary<MultiMeshInstance2D, List<(Transform2D At, Color Colour)>>();
+        foreach (var (key, list) in cells)
         {
+            int e = key & 0xFF, level = key >> 8;
             string id = layer.Ids[e];
             var colour = layer.HoldsItems ? Palette.Deposit(id) : Palette.Building(id);
+            if (layer.HoldsItems)
+            {
+                // A sprite per density level ({item}_{level}); without one, the item's sprite or colour fades as it thins.
+                int max = MaxLevel(id);
+                var tint = Colors.White with { A = max == 0 ? 1 : 0.35f + 0.65f * level / max };
+                var art = SpriteLayer(group, $"{id}_{level}") is { } levelled ? (levelled, Colors.White) : (SpriteLayer(group, id), tint);
+                if (art.Item1 is { } layerOf)
+                {
+                    if (!sprites.TryGetValue(layerOf, out var at))
+                        sprites[layerOf] = at = [];
+                    foreach (var (x, y) in list)
+                        at.Add((Rect(x, y, 1, 1, 0.25f, 0), art.Item2));
+                    continue;
+                }
+                foreach (var (x, y) in list)
+                    plain.Add((Rect(x, y, 1, 1, 0, 0), colour with { A = colour.A * tint.A }));
+                continue;
+            }
             if (style == "links")
             {
                 foreach (var (x, y) in list)
@@ -332,14 +358,23 @@ public partial class TileView : Node2D
                 plain.Add((Rect(x, y, 1, 1, flatInset, 0), colour));
         }
 
-        var mm = _layerPlain[layer.Index].Multimesh;
-        mm.InstanceCount = plain.Count;
-        for (int i = 0; i < plain.Count; i++)
+        foreach (var (sprite, at) in sprites)
+            Fill(sprite.Multimesh, at);
+        Fill(_layerPlain[layer.Index].Multimesh, plain);
+    }
+
+    static void Fill(MultiMesh mm, List<(Transform2D At, Color Colour)> instances)
+    {
+        mm.InstanceCount = instances.Count;
+        for (int i = 0; i < instances.Count; i++)
         {
-            mm.SetInstanceTransform2D(i, plain[i].At);
-            mm.SetInstanceColor(i, plain[i].Colour);
+            mm.SetInstanceTransform2D(i, instances[i].At);
+            mm.SetInstanceColor(i, instances[i].Colour);
         }
     }
+
+    /// <summary>Densest level a deposit of the item is drawn at (RS-004); 0 if it never runs out.</summary>
+    int MaxLevel(string item) => _host.Sim.Content.Items[item].Deposit?.MaxLevel ?? 0;
 
     void DrawBuildings(TileGrid grid)
     {

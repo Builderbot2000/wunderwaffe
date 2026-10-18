@@ -141,6 +141,11 @@ public static class RateMode
             case FlowKind.Used:
                 tile.Stats.RecordUsed(f.Item, n);
                 break;
+            case FlowKind.Mined:
+                // Emptying the patch clears its cells, which bumps the grid's revision: the rates are solved again.
+                if (tile.Grid.Patches.ById(f.PortId) is { } patch)
+                    tile.Grid.Patches.Take(patch, n);
+                break;
         }
     }
 

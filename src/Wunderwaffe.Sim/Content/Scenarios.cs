@@ -35,9 +35,13 @@ public sealed record ScenarioDef(
 /// cells (WM-014). <paramref name="Zones"/>: neighbour tile id per cell of the tile's bounding box, -1 for none (null:
 /// computed from the borders, as generation does; drop it after changing a tile's shape). <paramref name="Layers"/>:
 /// each non-empty cell layer by layer id (FB-022: deposits, platforms, frames, cables), over the bounding box, its legend
-/// holding item or building ids with "" for empty.
+/// holding item or building ids with "" for empty. <paramref name="Patches"/>: the deposit patches (RS-004: item, cells
+/// when found, starting and remaining amount), with <paramref name="PatchMap"/> giving each box cell's patch, 1-based
+/// (0 for none); null finds them from the deposits as a generated map does, at normal richness. Drop both after editing
+/// the deposits' shapes.
 /// </summary>
-public sealed record ScenarioTile(string Name, int CircleX, int CircleY, CellGrid? Zones = null, SortedDictionary<string, CellGrid>? Layers = null);
+public sealed record ScenarioTile(string Name, int CircleX, int CircleY, CellGrid? Zones = null, SortedDictionary<string, CellGrid>? Layers = null,
+    List<Core.PatchRecord>? Patches = null, CellGrid? PatchMap = null);
 
 /// <summary>
 /// A seat's starting state: <paramref name="Tiles"/> it owns (the first is its start tile), its buildings and its units.
