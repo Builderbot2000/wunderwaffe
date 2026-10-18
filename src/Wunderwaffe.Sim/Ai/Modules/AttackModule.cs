@@ -16,8 +16,11 @@ public sealed class AttackModule : IAiModule
     /// <summary>Idle units held back until there are this many to form a squad.</summary>
     public const int Group = 3;
 
-    /// <summary>The stance attack squads fight in. Seam for silo E's stances and targeting modes (UC-004, CB-007).</summary>
+    /// <summary>The stance attack squads fight in (UC-004).</summary>
     public static Stance StanceFor(TileGoal goal) => Stance.Aggressive;
+
+    /// <summary>Which enemy attack squads shoot first (CB-007): whatever shoots back hardest.</summary>
+    public static TargetMode TargetingFor(TileGoal goal) => TargetMode.MostWeapons;
 
     public string Name => "attack";
 
@@ -47,6 +50,12 @@ public sealed class AttackModule : IAiModule
             {
                 yield return new Proposal($"stance:{squad.Id}", StanceScore, [new SetSquadStanceCommand(c.Player, squad.Id, StanceFor(TileGoal.Attack))],
                     $"squad {squad.Id} to {StanceFor(TileGoal.Attack)}", Locks: [.. squad.Members.Select(Proposal.UnitLock)]);
+                continue;
+            }
+            if (squad.Targeting != TargetingFor(TileGoal.Attack))
+            {
+                yield return new Proposal($"targeting:{squad.Id}", StanceScore, [new SetSquadTargetingCommand(c.Player, squad.Id, TargetingFor(TileGoal.Attack))],
+                    $"squad {squad.Id} targets {TargetingFor(TileGoal.Attack)}", Locks: [.. squad.Members.Select(Proposal.UnitLock)]);
                 continue;
             }
             var lead = c.Units.First(u => u.Id == squad.Members[0]);
