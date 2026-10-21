@@ -16,6 +16,8 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 | [MP-006](#mp-006-ai-framework) | AI framework | Must | Done | Yes | MVP | Non-Functional | P8 | MP-002, NF-009, FB-021 | New |  |
 | [MP-007](#mp-007-content-agnostic-ai) | Content-agnostic AI | Must | Done | Yes | MVP | Non-Functional | P8 | MP-006, RS-002 |  |  |
 | [MP-008](#mp-008-ai-head-starts) | AI head starts | Should | Done | Yes | Alpha | Functional | P8 | FB-021, MP-005, WM-017 |  |  |
+| [MP-009](#mp-009-faction-templates) | Faction templates | Should | Approved | No | Alpha | Functional | P8 | MP-005, MP-007, FB-021 | New |  |
+| [MP-010](#mp-010-faction-rules) | Faction rules | Should | Approved | No | Alpha | Functional | P8 | MP-009, FB-023, WM-010 | New |  |
 
 ### MP-001 Domination victory
 
@@ -95,6 +97,26 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 
 **Notes:** Owner, 2026-10-18.
 
+### MP-009 Faction templates
+
+**Requirement:** Every seat, human or AI, shall play a faction made from a template over one shared catalogue of buildings and blocks (buildings.json, Age of Empires style): the template picks the subset its faction can build, may swap some entries for variants (the faction's own version of a shared building), and names the special rules it plays by (MP-010). Factions are content, not code.
+
+**Acceptance criteria:** Templates are content (a factions file), validated with the rest: unknown ids, a variant of something not in the catalogue, a faction with no core, conveyor or extractor its start needs. Each seat's faction is chosen in match settings and the lobby (MP-005) and stored in the GameSetup, so saves, replays and lockstep use the same factions; a scenario may fix a seat's faction (WM-017) and its start prefabs and head starts fit it (FB-021, MP-008). Placement, blueprints and factories refuse what the seat's faction can't build through a sim check, which the build menu previews, not by hiding it in the UI only. The AI plays any faction with no code change (MP-007): roles and the chain planner search only its faction's catalogue. A default faction with the whole catalogue plays as today.
+
+**As built:** Not built.
+
+**Notes:** Owner, 2026-10-20. The neutral guardian faction (WM-010) is a template too, holding entries no player faction can build. Fits the content draft's Reclamation Corps (specs/content/content-update.md §1): rival charter companies can differ in kit. Open: OQ-55.
+
+### MP-010 Faction rules
+
+**Requirement:** A faction template may attach special rules that change what its seat can build, or how. The first rule is capture to build ('nomad'): the faction may build a building only once it has captured one of that building, from another seat or a neutral site (WM-010).
+
+**Acceptance criteria:** Rules come from a fixed list the sim knows, named in the template with their parameters, and validated. Under capture to build, placing a building not yet captured is refused with its own result, which the build menu shows as locked with the reason; capturing one (OQ-56) lets that seat build it. Per-seat capture state is sim state: hashed, snapshotted, and readable through GameQuery, so the AI can value capture targets (MP-007). Each rule has a read-only check that the command, the UI preview and the AI share.
+
+**As built:** Not built.
+
+**Notes:** Owner, 2026-10-20. A narrow exception to TT-001: buildings are gated by capture, never research, and only for factions whose template says so. Open: OQ-56.
+
 ## Decisions & open questions
 
 | # | Question | Related IDs | State | Decided By | Date |
@@ -106,6 +128,8 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 | [OQ-47](#oq-47-how-is-ai-difficulty-set) | How is AI difficulty set? | MP-002, MP-005 | Decided | Owner | 2026-10-17 |
 | [OQ-48](#oq-48-how-should-the-ai-choose-what-to-do) | How should the AI choose what to do? | MP-006, MP-002 | Decided | Owner | 2026-10-17 |
 | [OQ-50](#oq-50-how-does-the-ai-cope-with-content-changes) | How does the AI cope with content changes? | MP-007, MP-006, RS-002 | Decided | Owner | 2026-10-18 |
+| [OQ-55](#oq-55-what-can-a-faction-template-change-and-how-is-a-faction-chosen) | What can a faction template change, and how is a faction chosen? | MP-009, MP-010, MP-005, MP-007, FB-021 | Open |  | 2026-10-20 |
+| [OQ-56](#oq-56-under-capture-to-build-what-counts-as-capturing-a-building) | Under capture to build, what counts as capturing a building? | MP-010, FB-023, WM-010 | Open |  | 2026-10-20 |
 
 ### OQ-12 Real-time for all players at once, or async/turn-based on the world layer?
 
@@ -148,3 +172,15 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 **Options / notes:** Built: modules name items, recipes and buildings by id, so every content change means AI code changes. Common practice in data-driven strategy games: find buildings by role, plan production backwards through the recipe graph from what is wanted, and let content carry optional AI weights (Paradox, Civilization).
 
 **Decision:** Roles instead of ids, demand from the wanted designs and goals, backward chaining over the recipe graph, expansion towards missing deposits, value from stats, optional hints in content; the module framework stays (MP-007).
+
+### OQ-55 What can a faction template change, and how is a faction chosen?
+
+**Options / notes:** Can change: the subset (allow list, or deny list from the whole catalogue); variants (a variant is its own building in the catalogue that replaces a named base for that faction, so blueprints and the AI's roles map the base to the variant); rules (MP-010); start prefabs and head starts per faction; flat percentage modifiers (cost, HP, speed) per kind. Choosing: per seat in the lobby, random, or fixed by a scenario; the AI picks for its seat or is given one. A blueprint recorded by one faction and placed by another needs a rule for missing entries (refuse, or substitute variants). Leaning: subset, variants and rules first; modifiers later; per-seat choice with a random option; blueprints substitute variants and refuse the rest.
+
+**Decision:** Open.
+
+### OQ-56 Under capture to build, what counts as capturing a building?
+
+**Options / notes:** Options: owning a standing one (lost again when it's destroyed or taken back), or having ever owned one (stays unlocked); taken by clearing a neutral site, by claiming a tile with enemy buildings left standing (OQ-45), or by moving one (FB-023); does a captured variant unlock its base, and does capturing a unit block count. Leaning: having ever owned one, by any of those, unlocks that exact building for good; variants and bases are separate.
+
+**Decision:** Open.

@@ -117,3 +117,15 @@ A group of connected deposit cells of one item, found at world generation. It ho
 ### Scenario
 
 A map plus what stands on it at the start: the world (hand-authored, or generated and saved) and each seat's starting tiles, buildings, units and stock (WM-017).
+
+### Faction
+
+What a seat plays as: a template over the shared catalogue of buildings and blocks that sets which of them the seat can build, which variants replace shared entries, and which special rules apply (MP-009, MP-010).
+
+### Neutral site
+
+An installation of the neutral guardian faction, placed at world generation or in a scenario, guarding rich deposits and tech players can't build. Cleared, its buildings become the clearing player's (WM-010, WM-018).
+
+### Relocation
+
+Moving a building intact to another place, kept as it is and neither refunded nor paid for again; the way to take buildings and blocks from a neutral site (FB-023).

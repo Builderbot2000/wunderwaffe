@@ -38,6 +38,12 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 - Partial: the five playtest changes, UI-004 tutorial, MP-003 (two-peer online only), NF-005 (no packaged build).
 - RS-003 keeps its Review flag: only coal is regional, so the 'one per tier' criterion isn't met above tier 1.
 
+## Requirement additions (2026-10-20)
+
+- Building relocation: buildings move intact instead of being removed and rebuilt, including buildings and blocks taken from neutral sites that a faction can't build (FB-023; OQ-53).
+- Faction templates: each seat's faction is a subset of one shared catalogue, with variant replacements and special rules such as capture to build ('nomad'), a narrow exception to TT-001 (MP-009, MP-010; OQ-55, OQ-56).
+- Neutral guardian faction at sites placed by world generation, guarding valuable deposits and tech (WM-010 rewritten, WM-018; OQ-54, OQ-57).
+
 ## Mechanics
 
 - [World Map](world-map.md)
@@ -60,25 +66,25 @@ See also the [glossary](glossary.md).
 
 | Mechanic | Must | Should | Could | Won't | Total | Done | In Progress | % Done | Conflict | Review |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [World Map](world-map.md) | 11 | 3 | 2 | 1 | 17 | 15 | 0 | 88% | 0 | 2 |
-| [Factory & Logistics](factory-logistics.md) | 17 | 4 | 1 | 0 | 22 | 20 | 0 | 91% | 0 | 2 |
-| [Resources & Tech](resources-tech.md) | 7 | 2 | 1 | 0 | 10 | 5 | 0 | 50% | 0 | 1 |
+| [World Map](world-map.md) | 11 | 5 | 1 | 1 | 18 | 15 | 0 | 83% | 0 | 2 |
+| [Factory & Logistics](factory-logistics.md) | 17 | 5 | 1 | 0 | 23 | 20 | 0 | 87% | 0 | 2 |
+| [Resources & Tech](resources-tech.md) | 7 | 2 | 1 | 0 | 10 | 5 | 0 | 50% | 0 | 2 |
 | [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
 | [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 14 | 0 | 74% | 0 | 2 |
 | [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 9 | 0 | 100% | 0 | 0 |
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 7 | 0 | 54% | 0 | 0 |
-| [Multiplayer & Victory](multiplayer-victory.md) | 4 | 3 | 1 | 0 | 8 | 6 | 1 | 75% | 0 | 0 |
+| [Multiplayer & Victory](multiplayer-victory.md) | 4 | 5 | 1 | 0 | 10 | 6 | 1 | 60% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 13 | 1 | 87% | 0 | 2 |
-| **Total** | 75 | 33 | 10 | 1 | 119 | 94 | 2 | 79% | 0 | 9 |
+| **Total** | 75 | 38 | 9 | 1 | 123 | 94 | 2 | 76% | 0 | 10 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 94 | 79% |
+| Done | 94 | 76% |
 | In Progress | 2 | 2% |
-| Approved | 0 | 0% |
-| Proposed | 8 | 7% |
+| Approved | 5 | 4% |
+| Proposed | 7 | 6% |
 | Deferred | 2 | 2% |
 | Rejected | 13 | 11% |
 
@@ -87,22 +93,22 @@ See also the [glossary](glossary.md).
 | Flag | Count |
 |---|---|
 | Conflict | 0 |
-| Review | 9 |
+| Review | 10 |
 | Updated | 26 |
-| New | 23 |
+| New | 27 |
 
 ### Design pillar coverage
 
 | Pillar | Name | Reqs | Must | Done |
 |---|---|---|---|---|
-| P1 | World map of tiles | 19 | 13 | 17 |
-| P2 | Tile = RTS factory map | 22 | 17 | 20 |
+| P1 | World map of tiles | 20 | 13 | 17 |
+| P2 | Tile = RTS factory map | 23 | 17 | 20 |
 | P3 | Inter-tile I/O | 10 | 5 | 8 |
 | P4 | Block-by-block unit design | 15 | 10 | 13 |
 | P5 | Squad command | 10 | 5 | 10 |
 | P6 | No Rush | 6 | 4 | 0 |
 | P7 | Resource-gated tech | 8 | 6 | 3 |
-| P8 | World domination | 18 | 10 | 14 |
+| P8 | World domination | 20 | 10 | 14 |
 
 <!-- END generated summary -->
 

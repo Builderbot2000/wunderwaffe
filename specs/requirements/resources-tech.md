@@ -12,7 +12,7 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 | [RS-002](#rs-002-recipe-graph) | Recipe graph | Must | Done | Yes | MVP | Non-Functional | P7 | RS-001 |  |  |
 | [RS-003](#rs-003-regional-scarcity) | Regional scarcity | Must | Done | Yes | MVP | Functional | P1 | WM-002, RS-001 | Review |  |
 | [RS-004](#rs-004-deposit-depletion) | Deposit depletion | Should | Done | Yes | Alpha | Functional | P2 | FB-003, WM-009, FB-012 | Updated |  |
-| [TT-001](#tt-001-resource-gated-progression) | Resource-gated progression | Must | Done | Yes | MVP | Functional | P7 | RS-001 | Updated |  |
+| [TT-001](#tt-001-resource-gated-progression) | Resource-gated progression | Must | Done | Yes | MVP | Functional | P7 | RS-001 | Review |  |
 | [TT-002](#tt-002-unlock-conditions) | Unlock conditions | Must | Rejected | No | MVP | Functional | P7 | TT-001 |  |  |
 | [TT-003](#tt-003-tech-tree-viewer) | Tech tree viewer | Must | Rejected | No | MVP | Functional | P7 | TT-002 |  |  |
 | [TT-004](#tt-004-unlock-scope) | Unlock scope | Must | Rejected | No | MVP | Functional | P7 | TT-002 |  |  |
@@ -63,7 +63,7 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 
 **As built:** No tech tree: tech.json, unlocks and the T overlay are gone, and every building and recipe is available from the start (tested). The goal chain (goals.json) stays as guidance.
 
-**Notes:** Was: 'Tech unlocks shall be triggered by acquiring/producing higher-level resources, not by spending science points'. Tech tree removed 2026-10-10 (OQ-7 answer). To do: remove tech.json, Progression unlocks and the T overlay; goals.json still uses the same condition types.
+**Notes:** Was: 'Tech unlocks shall be triggered by acquiring/producing higher-level resources, not by spending science points'. Tech tree removed 2026-10-10 (OQ-7 answer). To do: remove tech.json, Progression unlocks and the T overlay; goals.json still uses the same condition types. Owner, 2026-10-20: a faction rule may gate a building behind capturing one (capture to build, MP-010). That is not a tech tree; with the default faction everything stays available from the start.
 
 ### TT-002 Unlock conditions
 
