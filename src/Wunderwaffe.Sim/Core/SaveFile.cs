@@ -20,7 +20,7 @@ public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Has
     /// (with its hash) or a seed, and AI head starts (WM-017, MP-008). No compatibility
     /// with older saves (OQ-34).
     /// </summary>
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 

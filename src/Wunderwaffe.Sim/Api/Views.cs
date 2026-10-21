@@ -31,10 +31,11 @@ public sealed record PlayerView(
 /// <param name="Tech">Building ids standing there that the viewing seat's faction can't build (MP-009), in order.</param>
 /// <param name="Deposit">The item of the deposit patch it guards, or null; <paramref name="DepositAmount"/> left in it.</param>
 /// <param name="Strength">The template's strength and <paramref name="Value"/> its value (WM-018), for ranking sites.</param>
+/// <param name="Regional">The regional item laid around it (WM-018, RS-003), or null; <paramref name="RegionalAmount"/> left.</param>
 public sealed record SiteView(
     int Id, string Name, int Player, int TileId, int X, int Y, int Width, int Height, string Template, bool Fallen,
     int Cores, int Turrets, int Guards, int Dps, int Hp, IReadOnlyDictionary<string, long> Stock, IReadOnlyList<string> Tech,
-    string? Deposit, long DepositAmount, long Strength, long Value);
+    string? Deposit, long DepositAmount, long Strength, long Value, string? Regional = null, long RegionalAmount = 0);
 
 public sealed record TileSummary(
     int Id, string Name, int Owner, string Biome, int CenterX, int CenterY, IReadOnlyList<int> Neighbors, int Buildings);

@@ -2,7 +2,8 @@
 // and the farthest the last, so the value held and the guards rise with distance. Each names its hidden guardian
 // faction (factions.json). "layout" is a prefab (FB-021: its blocks, the first core holding "items"); "guard" is a unit
 // prefab (one core) spawned "guards" times beside the layout, holding its ground on defensive stance; "richness"
-// multiplies the deposit patch the site guards (percent). Strength (weapons' DPS x HP) and value (item tiers of costs
+// multiplies the deposit patch the site guards (percent); "regional" lays that many cells of a regional item's deposit
+// (RS-003, one the tile lacks first) around the layout at that richness. Strength (weapons' DPS x HP) and value (item tiers of costs
 // and stock) are worked out from content and must rise from one template to the next. Values are placeholders.
 [
   { "id": "outpost", "name": "Keeper Outpost", "faction": "keepers", "richness": 200,
@@ -13,7 +14,7 @@
         { "defId": "keeper_turret", "x": 0, "y": 0 }, { "defId": "keeper_turret", "x": 6, "y": 0 },
         { "defId": "keeper_turret", "x": 0, "y": 6 }, { "defId": "keeper_turret", "x": 6, "y": 6 }
       ] } },
-  { "id": "vault", "name": "Keeper Vault", "faction": "keepers", "richness": 300, "guards": 1,
+  { "id": "vault", "name": "Keeper Vault", "faction": "keepers", "richness": 300, "regional": 24, "guards": 1,
     "layout": { "id": "vault", "name": "Keeper Vault", "frames": [],
       "items": { "shell": 400, "steel": 300 },
       "blocks": [
@@ -25,7 +26,7 @@
     "guard": { "id": "keeper_guard", "name": "Keeper Guard", "items": { "shell": 100 },
       "blocks": [ { "defId": "thruster", "x": 0, "y": 0 }, { "defId": "core", "x": 1, "y": 0 }, { "defId": "keeper_turret", "x": 3, "y": 0 }, { "defId": "thruster", "x": 3, "y": 1 } ],
       "frames": [ { "x": 0, "y": 0 }, { "x": 1, "y": 0 }, { "x": 2, "y": 0 }, { "x": 3, "y": 0 }, { "x": 0, "y": 1 }, { "x": 1, "y": 1 }, { "x": 2, "y": 1 }, { "x": 3, "y": 1 } ] } },
-  { "id": "citadel", "name": "Keeper Citadel", "faction": "keepers", "richness": 400, "guards": 3,
+  { "id": "citadel", "name": "Keeper Citadel", "faction": "keepers", "richness": 400, "regional": 48, "guards": 3,
     "layout": { "id": "citadel", "name": "Keeper Citadel", "frames": [],
       "items": { "shell": 600, "steel": 600, "copper_plate": 400 },
       "blocks": [

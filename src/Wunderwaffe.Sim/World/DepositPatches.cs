@@ -214,6 +214,28 @@ public sealed class DepositPatches(TileGrid grid)
         SetAmount(p, Math.Max(1, p.Amount * percent / 100));
     }
 
+    /// <summary>
+    /// A new patch of <paramref name="item"/> holding <paramref name="amount"/> over <paramref name="cells"/>, which already
+    /// are deposits of it and in no patch: a neutral site's regional deposit (WM-018).
+    /// </summary>
+    internal DepositPatch Add(ContentDb content, string item, IReadOnlyList<(int X, int Y)> cells, long amount)
+    {
+        if (_list.Count == ushort.MaxValue)
+            throw new InvalidOperationException("too many deposit patches on one tile");
+        _cells ??= new ushort[grid.Width * grid.Height];
+        var p = new DepositPatch(_list.Count + 1, item, content.Items[item].Deposit!, cells.Count, amount, amount)
+            { X0 = int.MaxValue, Y0 = int.MaxValue, X1 = -1, Y1 = -1 };
+        foreach (var (x, y) in cells)
+        {
+            _cells[y * grid.Width + x] = (ushort)p.Id;
+            (p.X0, p.Y0, p.X1, p.Y1) = (Math.Min(p.X0, x), Math.Min(p.Y0, y), Math.Max(p.X1, x), Math.Max(p.Y1, y));
+        }
+        _list.Add(p);
+        _cellsVersion++;
+        Revision++;
+        return p;
+    }
+
     /// <summary>Takes a cell out of its patch (the patch keeps its amount and starting size).</summary>
     internal void Detach(int x, int y)
     {
