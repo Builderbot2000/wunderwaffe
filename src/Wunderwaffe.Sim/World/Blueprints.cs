@@ -233,7 +233,8 @@ public static class Blueprints
             return result;
 
         Funds.TryPay(tile, player, plan.Cost);
-        Build(sim, tile, player, plan);
+        foreach (var b in Build(sim, tile, player, plan))
+            Territory.ClaimNear(sim, tile, player, b.X, b.Y, b.Width, b.Height); // WM-019
         return BlueprintResult.Ok;
     }
 

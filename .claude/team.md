@@ -81,6 +81,11 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   core at home first (else home has no funds once it leaves), lift it off with stock in its core, move it to
   `(tile.CircleX, tile.CircleY)`, land it, wait the capture time; its cargo is the new tile's funds.
 - **Contested:** `Territory.IsContested` / `ContestedTiles`, computed live from unit positions.
+- **Unclaimed buildings (WM-019):** owner `TileState.Unowned` (-1) once their seat's last core is destroyed
+  (`Territory.AfterCoreLost`, called from `Combat.DestroyBuilding`/`DestroyUnit`). Any new stepping, power, targeting
+  or radius code must skip `Owner < 0` (they do nothing); `sim.Player(owner)` needs `owner >= 0`. Ownership changes
+  only through `Territory.TakeOver` (claims: `ClaimNear` after placing or landing), which bumps `Revision`.
+
 
 ## Tick order inside `Simulation.Step`
 

@@ -508,10 +508,10 @@ public static class PowerNet
     /// </summary>
     public static int DrawOf(PlacedBuilding b) => b.Machine is { } m
         ? m.Working || m.IdleTicks == 0 ? BoostStats.Scaled(b.Def.Power, m.Boost.Power) : 0
-        : b.Def.Power;
+        : b.Owner < 0 ? 0 : b.Def.Power; // unclaimed (WM-019) draws nothing
 
-    /// <summary>The power a building makes this tick.</summary>
-    public static int SupplyOf(PlacedBuilding b) => b.Machine is { } m ? (m.Working ? b.Def.PowerSupply : 0) : b.Def.PowerSupply;
+    /// <summary>The power a building makes this tick; none when unclaimed (WM-019).</summary>
+    public static int SupplyOf(PlacedBuilding b) => b.Machine is { } m ? (m.Working ? b.Def.PowerSupply : 0) : b.Owner < 0 ? 0 : b.Def.PowerSupply;
 
     /// <summary>
     /// Balances every network on the tile for this tick, unless another tile it spans did already this tick. Runs before

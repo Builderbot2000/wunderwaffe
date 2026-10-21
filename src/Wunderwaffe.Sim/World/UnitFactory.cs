@@ -336,7 +336,10 @@ public static class UnitFactory
             var factories = tile.Grid.Factories;
             // Lift-off and placement change the grid but never the factory list, so a plain loop is safe.
             for (int i = 0; i < factories.Count; i++)
-                StepOne(sim, tile, factories[i]);
+            {
+                if (factories[i].Owner >= 0) // unclaimed (WM-019) builds nothing
+                    StepOne(sim, tile, factories[i]);
+            }
         }
     }
 

@@ -35,6 +35,17 @@ public enum GameEventKind
     /// <see cref="GameEvent.ItemId"/> is the <c>AssembleResult</c> name.
     /// </summary>
     FactoryStopped,
+
+    /// <summary>
+    /// The player lost their last core and their buildings on the tile became unclaimed (WM-019); one per tile they had
+    /// buildings on.
+    /// </summary>
+    BuildingsUnclaimed,
+
+    /// <summary>
+    /// The player claimed an unclaimed building (WM-019) on the tile; <see cref="GameEvent.ItemId"/> is its building id.
+    /// </summary>
+    BuildingClaimed,
 }
 
 /// <summary>

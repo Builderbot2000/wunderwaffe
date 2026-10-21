@@ -398,7 +398,7 @@ public partial class TileView : Node2D
         {
             var b = plain[i];
             mm.SetInstanceTransform2D(i, Rect(b.X, b.Y, b.Width, b.Height, BuildingInset, 0));
-            mm.SetInstanceColor(i, Palette.Building(b.DefId));
+            mm.SetInstanceColor(i, b.Owner < 0 ? Palette.Unclaimed : Palette.Building(b.DefId));
         }
 
         ClearLayers(_buildingSprites);
@@ -410,7 +410,7 @@ public partial class TileView : Node2D
             {
                 var b = list[i];
                 smm.SetInstanceTransform2D(i, Rect(b.X, b.Y, b.Width, b.Height, 0, b.Rotation));
-                smm.SetInstanceColor(i, Colors.White);
+                smm.SetInstanceColor(i, b.Owner < 0 ? Palette.Unclaimed : Colors.White); // WM-019
             }
         }
     }

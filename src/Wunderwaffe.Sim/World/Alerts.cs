@@ -21,7 +21,7 @@ public static class Alerts
         foreach (var b in tile.Grid.Machines)
         {
             var m = b.Machine!;
-            if (m.Recipe is { Inputs.Count: > 0 } && m.Status == MachineStatus.Starved && m.IdleTicks >= StarvedTicks
+            if (b.Owner >= 0 && m.Recipe is { Inputs.Count: > 0 } && m.Status == MachineStatus.Starved && m.IdleTicks >= StarvedTicks
                 && m.MissingInput is { } item)
                 return (b, item);
         }

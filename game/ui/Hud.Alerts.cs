@@ -22,7 +22,7 @@ public partial class Hud
         (AlertFilter.Combat, "Combat", [GameEventKind.TileUnderAttack, GameEventKind.TileLost, GameEventKind.PlayerEliminated]),
         (AlertFilter.Production, "Production", [GameEventKind.InputsStarved]),
         (AlertFilter.Units, "Units", [GameEventKind.UnitCompleted, GameEventKind.FactoryStopped]),
-        (AlertFilter.Territory, "Territory", [GameEventKind.TileClaimed]),
+        (AlertFilter.Territory, "Territory", [GameEventKind.TileClaimed, GameEventKind.BuildingClaimed]),
     ];
 
     VBoxContainer _alertList = null!;
@@ -111,6 +111,7 @@ public partial class Hud
             GameEventKind.FactoryStopped => $"{tile}: a factory stopped, its unit can't lift off",
             GameEventKind.TileClaimed => $"You took {tile}",
             GameEventKind.TileLost => $"You lost {tile}",
+            GameEventKind.BuildingClaimed => $"{tile}: you claimed an unclaimed {Content.Buildings[e.ItemId!].Name}",
             GameEventKind.PlayerEliminated => e.Player == Me ? "You were eliminated" : $"{PlayerName(e.Player)} was eliminated",
             _ => e.Kind.ToString(),
         };

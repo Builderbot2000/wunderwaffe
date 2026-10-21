@@ -131,6 +131,8 @@ public static class Combat
         b.Hp = 0;
         tile.Grid.Remove(b);
         tile.Grid.AddWreck(b.DefId, b.Owner, b.X, b.Y, b.Width, b.Height, b.Rotation);
+        if (b.Kind == BuildingKind.Core)
+            Territory.AfterCoreLost(sim, b.Owner); // WM-019
     }
 
     /// <summary>
@@ -178,6 +180,7 @@ public static class Combat
                 grid.AddWreck(b.DefId, u.Owner, x, y, w, h, (b.Rotation + q) & 3);
         }
         sim.RemoveUnit(u);
+        Territory.AfterCoreLost(sim, u.Owner); // WM-019
     }
 
     /// <summary>
@@ -223,7 +226,7 @@ public static class Combat
                 continue;
             foreach (var b in tile.Grid.CombatBuildings)
             {
-                if (b.Kind == BuildingKind.Weapon)
+                if (b.Kind == BuildingKind.Weapon && b.Owner >= 0)
                 {
                     var (x, y) = ResourceRadius.Centre(tile, b);
                     Fire(sim, targets, b.Combat!, sim.Content.Buildings[b.DefId], b.Owner, x, y, b.Id, null, Target.None, CombatPower.Has(tile, b), TargetMode.Nearest);
@@ -546,7 +549,7 @@ public static class Combat
         {
             foreach (var b in tile.Grid.CombatBuildings)
             {
-                if (sim.Content.Buildings[b.DefId].Repair is { } r && tile.Owner == b.Owner && CombatPower.Has(tile, b))
+                if (sim.Content.Buildings[b.DefId].Repair is { } r && tile.Owner == b.Owner && b.Owner >= 0 && CombatPower.Has(tile, b))
                 {
                     var (x, y) = ResourceRadius.Centre(tile, b);
                     var owner = b.Owner;
@@ -680,7 +683,7 @@ public static class Combat
         {
             foreach (var b in tile.Grid.CombatBuildings)
             {
-                if (sim.Content.Buildings[b.DefId].Shield is { } s && b.Combat!.Charge > 0)
+                if (sim.Content.Buildings[b.DefId].Shield is { } s && b.Combat!.Charge > 0 && b.Owner >= 0)
                 {
                     var (x, y) = ResourceRadius.Centre(tile, b);
                     list.Add(new(x, y, (long)s.Radius * S, b.Owner, b.Combat));
@@ -876,7 +879,7 @@ public static class Combat
                 for (long gx = gx0 - r; gx <= gx0 + r; gx++)
                 {
                     if (_sim.TileAtCell((int)gx, (int)gy) is not { } t
-                        || t.Grid.BuildingAt((int)gx - t.OriginX, (int)gy - t.OriginY) is not { } b || b.Owner == owner)
+                        || t.Grid.BuildingAt((int)gx - t.OriginX, (int)gy - t.OriginY) is not { } b || b.Owner == owner || b.Owner < 0)
                         continue;
                     long cx = gx * S + S / 2 - x, cy = gy * S + S / 2 - y, d = cx * cx + cy * cy;
                     if (d < bestD)

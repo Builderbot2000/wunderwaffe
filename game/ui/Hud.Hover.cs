@@ -73,6 +73,14 @@ public partial class Hud
 
         void Line(string text, Color? color = null) => _hover.AddChild(Ui.Label(text, Ui.SmallFont, color ?? Ui.Muted, SideWidth - 24));
 
+        if (Territory.IsUnclaimed(b))
+        {
+            // WM-019: stands idle until someone builds or lands near it.
+            Line($"Unclaimed: its owner lost their last core. It does nothing until claimed: build or land within " +
+                 $"{Balance.ClaimRadius} cells of it to make it yours.", Render.Palette.Unclaimed.Lightened(0.4f));
+            return true;
+        }
+
         switch (b.Kind)
         {
             case BuildingKind.Core:

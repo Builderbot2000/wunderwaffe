@@ -101,6 +101,17 @@ public class FactionTests
     }
 
     [Fact]
+    public void ClaimingAnUnclaimedBuildingCountsAsCapturingIt()
+    {
+        var sim = FactionSim("nomads");
+        var tile = Tile(sim);
+        var def = sim.Content.Buildings["unit_factory"];
+        var factory = tile.Grid.Add(def, TileState.Unowned, 2, 2, def.Width, def.Height, 0, null);
+        Territory.TakeOver(sim, tile, factory, Me); // WM-019's one seam for claims
+        Assert.Equal(FactionResult.Ok, Factions.Check(sim, Me, "unit_factory"));
+    }
+
+    [Fact]
     public void AVariantAndItsBaseAreCapturedSeparately()
     {
         var sim = FactionSim("raiders", Raiders);
