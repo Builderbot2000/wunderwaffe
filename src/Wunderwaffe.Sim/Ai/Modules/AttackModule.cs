@@ -6,7 +6,8 @@ namespace Wunderwaffe.Sim.Ai.Modules;
 
 /// <summary>
 /// Attack (MP-006): gathers idle units into squads of <see cref="Group"/>, sets their stance, and sends each idle
-/// squad at the core on the nearest tile the strategic layer marks Attack with an attack-move (CB-001), leaving the
+/// squad with an attack-move (CB-001) at the best neutral site it clearly outmatches (WM-010, WM-018:
+/// <see cref="SiteTargets"/>), else at the core on the nearest tile the strategic layer marks Attack, leaving the
 /// fighting on the way to the squad's stance. It commands squads, never single units.
 /// </summary>
 public sealed class AttackModule : IAiModule
@@ -22,7 +23,42 @@ public sealed class AttackModule : IAiModule
     /// <summary>Which enemy attack squads shoot first (CB-007): whatever shoots back hardest.</summary>
     public static TargetMode TargetingFor(TileGoal goal) => TargetMode.MostWeapons;
 
+    /// <summary>
+    /// A squad takes on a site only if its fighting strength (DPS x HP, Lanchester's square law) is at least this many
+    /// times the site's live turrets and guards: a Citadel early on never qualifies.
+    /// </summary>
+    public const int OutmatchFactor = 3;
+
+    /// <summary>Site rank in percent for a site holding a capture target (MP-010, <see cref="AiContext.CaptureTargets"/>).</summary>
+    public const int CapturePercent = 200;
+
+    /// <summary>Cells added to the distance when ranking sites, so a near one doesn't win on nearness alone.</summary>
+    public const int RankDistance = 64;
+
     public string Name => "attack";
+
+    /// <summary>True if a force of <paramref name="dps"/> and <paramref name="hp"/> clearly outmatches the site (<see cref="OutmatchFactor"/>).</summary>
+    public static bool Outmatches(long dps, long hp, SiteView site) => dps > 0 && dps * hp >= OutmatchFactor * (long)site.Dps * site.Hp;
+
+    /// <summary>
+    /// Live sites a force of <paramref name="dps"/> and <paramref name="hp"/> at world cell (x, y) clearly outmatches,
+    /// best first: template value (x <see cref="CapturePercent"/> with a capture target) over distance plus
+    /// <see cref="RankDistance"/>, then by id.
+    /// </summary>
+    public static IEnumerable<SiteView> SiteTargets(AiContext c, long dps, long hp, int x, int y) =>
+        c.Q.Sites().Where(s => !s.Fallen && Outmatches(dps, hp, s))
+            .Select(s => (Site: s, Rank: Rank(c, s, x, y)))
+            .OrderByDescending(r => r.Rank).ThenBy(r => r.Site.Id).Select(r => r.Site);
+
+    static long Rank(AiContext c, SiteView s, int x, int y)
+    {
+        var (_, ox, oy) = c.Facts(s.TileId);
+        int d = AiContext.Distance(x, y, ox + s.X + s.Width / 2, oy + s.Y + s.Height / 2);
+        long value = Math.Max(1, s.Value) * 1024;
+        if (c.HoldsCaptureTarget(c.Q.Buildings(s.TileId).Where(b => b.Owner == s.Player)))
+            value = value * CapturePercent / 100;
+        return value / (d + RankDistance);
+    }
 
     public IEnumerable<Proposal> Propose(AiContext c)
     {
@@ -59,6 +95,20 @@ public sealed class AttackModule : IAiModule
                 continue;
             }
             var lead = c.Units.First(u => u.Id == squad.Members[0]);
+            var members = squad.Members.Select(id => c.Units.First(u => u.Id == id)).ToList();
+            long dps = members.Sum(u => (long)(c.Q.UnitStatsOf(u.Id)?.Dps ?? 0)), hp = members.Sum(u => (long)u.Hp);
+            var site = SiteTargets(c, dps, hp, lead.CellX, lead.CellY)
+                .Select(s => (s, Core: c.Q.Buildings(s.TileId).FirstOrDefault(b => b.Owner == s.Player && c.Kind(b) == Content.BuildingKind.Core)))
+                .FirstOrDefault(t => t.Core != null && c.Q.Travel(lead.Id, t.s.TileId, t.Core.X, t.Core.Y) != null);
+            if (site.Core is { } keep)
+            {
+                int[] sent = [.. members.Where(u => u.TileId != site.s.TileId).Select(u => u.Id)];
+                if (sent.Length > 0)
+                    yield return new Proposal($"site:{squad.Id}", AttackScore,
+                        [new AttackMoveCommand(c.Player, sent, site.s.TileId, keep.X + keep.Width / 2, keep.Y + keep.Height / 2)],
+                        $"squad {squad.Id} at {site.s.Name}", Locks: [.. sent.Select(Proposal.UnitLock)]);
+                continue;
+            }
             var target = targets
                 .Select(g => c.Tiles[g.Tile])
                 .OrderBy(t => (long)(t.CenterX - lead.CellX) * (t.CenterX - lead.CellX) + (long)(t.CenterY - lead.CellY) * (t.CenterY - lead.CellY))

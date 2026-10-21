@@ -51,6 +51,6 @@ public sealed partial class GameQuery
     /// <summary>Cells from a placed or landed area within which unclaimed buildings are claimed (WM-019).</summary>
     public int ClaimRadius() => Balance.ClaimRadius;
 
-
-
+    /// <summary>A flying unit's build radius in cells around its centre (WM-015, from its live blocks); 0 if there is no such unit.</summary>
+    public int UnitBuildRadius(int unitId) => Sim.UnitById(unitId) is { } u ? UnitStats.BuildRadius(u) : 0;
 }
