@@ -105,7 +105,7 @@ public static class RateModel
             _nets = [.. grid.Power.Networks];
             for (int i = 0; i < _nets.Length; i++)
                 _netIndex[_nets[i]] = i;
-            _nodes = [.. grid.Buildings];
+            _nodes = [.. grid.Buildings.Where(b => b.Owner >= 0)]; // unclaimed buildings (WM-019) do nothing
             int n = _nodes.Length;
             var index = new Dictionary<int, int>(n);
             for (int i = 0; i < n; i++)

@@ -339,6 +339,10 @@ public static class UnitAssembly
                 b.Stock!.TakeAll(unit.Cargo);
         }
         sim.RemoveUnit(unit);
+        // Landing claims unclaimed buildings near the landed blocks (WM-019).
+        int x0 = plan.Blocks.Min(b => b.X), y0 = plan.Blocks.Min(b => b.Y);
+        int x1 = plan.Blocks.Max(b => b.X + b.W), y1 = plan.Blocks.Max(b => b.Y + b.H);
+        Territory.ClaimNear(sim, tile, player, x0, y0, x1 - x0, y1 - y0);
         return DeployResult.Ok;
     }
 

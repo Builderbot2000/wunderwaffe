@@ -37,5 +37,20 @@ public sealed partial class GameQuery
         return Enumerable.Range(0, contested.Length).Where(i => contested[i]).ToList();
     }
 
+    /// <summary>The tile's unclaimed buildings (WM-019; owner -1), in id order: anyone may claim them by building or landing near.</summary>
+    public IReadOnlyList<BuildingView> UnclaimedBuildings(int tileId) =>
+        Sim.TryGetTile(tileId) is { } t ? Territory.UnclaimedOn(t).Select(b => View(t, b)).ToList() : [];
+
+    /// <summary>
+    /// Ids of the unclaimed buildings that placing a building or landing over the area would claim (WM-019, within
+    /// <see cref="ClaimRadius"/>), in id order. Any player may claim; it is <see cref="Player"/>'s build radius that limits where.
+    /// </summary>
+    public IReadOnlyList<int> ClaimableNear(int tileId, int x, int y, int width = 1, int height = 1) =>
+        Sim.TryGetTile(tileId) is { } t ? Territory.ClaimableNear(t, x, y, width, height).Select(b => b.Id).ToList() : [];
+
+    /// <summary>Cells from a placed or landed area within which unclaimed buildings are claimed (WM-019).</summary>
+    public int ClaimRadius() => Balance.ClaimRadius;
+
+
 
 }

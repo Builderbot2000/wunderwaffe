@@ -97,7 +97,23 @@ static class Harness
     /// </summary>
     public static PlacedBuilding Foothold(Simulation sim, TileState tile, int player, int x, int y) => sim.AddCore(tile, player, x, y, "bank");
 
+    /// <summary>
+    /// Destroys every core of <paramref name="player"/>'s, on tiles and on units (WM-016), through combat: their other
+    /// buildings become unclaimed (WM-019).
+    /// </summary>
+    public static void Eliminate(Simulation sim, int player)
+    {
+        foreach (var u in sim.Units.Where(u => u.Owner == player).ToList())
+            Combat.DestroyUnit(sim, u);
+        foreach (var t in sim.Tiles)
+        {
+            foreach (var c in t.Grid.Cores.Where(c => c.Owner == player).ToList())
+                Combat.DestroyBuilding(sim, t, c);
+        }
+    }
+
     /// <summary>A core of <paramref name="player"/>'s at (x, y), put down unpaid and empty (see <see cref="Stock"/>).</summary>
+
     public static PlacedBuilding PutCore(Simulation sim, TileState tile, int player, int x, int y, string? defId = null) =>
         sim.AddCore(tile, player, x, y, defId);
 

@@ -205,6 +205,12 @@ public partial class BuildTool : Node2D
             DrawPortZone(px);
         var (x, y, w, h) = Footprint(HoveredCell());
         var tint = _preview == PlaceResult.Ok ? Palette.GhostOk : Palette.GhostBad;
+        if (_preview == PlaceResult.Ok) // WM-019: what this placement would claim
+        {
+            foreach (var c in Territory.ClaimableNear(_host.ViewedTile, x, y, w, h))
+                DrawRect(new Rect2(c.X * px, c.Y * px, c.Width * px, c.Height * px), Palette.Unclaimed.Lightened(0.5f), false, 2);
+        }
+
         if (Selected is { IsFrame: false } picked && _host.Sim.Content.Buildings[picked.BuildingId] is { Kind: BuildingKind.PowerNode } node)
             DrawNodeRadius(px, x, y, w, h, node.PowerRadius);
         if (Sprites.Get(_tools[_selected].BuildingId) is { } tex)

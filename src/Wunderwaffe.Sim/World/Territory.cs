@@ -19,8 +19,9 @@ public readonly record struct BuildRadius(int X, int Y, int Width, int Height, i
 }
 
 /// <summary>
-/// Who may act where (WM-015) and when a tile is Contested (WM-004); who pays is <see cref="Funds"/>. Read-only queries shared by placement,
-/// landing, the UI and the other silos; <see cref="DestroyBuilding"/> is the one write.
+/// Who may act where (WM-015), when a tile is Contested (WM-004) and unclaimed buildings (WM-019); who pays is
+/// <see cref="Funds"/>. Read-only queries shared by placement, landing, the UI and the other silos; the writes are
+/// <see cref="DestroyBuilding"/> and the unclaimed-building changes (<see cref="TakeOver"/>, <see cref="AfterCoreLost"/>).
 /// </summary>
 public static class Territory
 {
@@ -120,7 +121,87 @@ public static class Territory
         return tile.RadiusCache.Majors;
     }
 
+    // ---- Unclaimed buildings (WM-019, OQ-54). Owner TileState.Unowned: no seat holds them. They keep HP and held
+    // items and can be shot at by order, but don't run, fire, take deliveries, draw or supply power, give a build radius
+    // or presence, or count in a circle (Expansion.CircleOccupants). ----
 
+    /// <summary>True if no seat holds the building: its seat lost its last core (WM-019).</summary>
+    public static bool IsUnclaimed(PlacedBuilding b) => b.Owner == TileState.Unowned;
+
+    /// <summary>The tile's unclaimed buildings in id order (WM-019).</summary>
+    public static List<PlacedBuilding> UnclaimedOn(TileState tile) => [.. tile.Grid.Buildings.Where(IsUnclaimed)];
+
+    /// <summary>
+    /// The unclaimed buildings that placing a building or landing a unit over the w x h area would claim (WM-019): any
+    /// with a cell within <see cref="Balance.ClaimRadius"/> of the area (nearest cells, straight-line), in id order. The UI
+    /// previews with it; <see cref="ClaimNear"/> applies it.
+    /// </summary>
+    public static List<PlacedBuilding> ClaimableNear(TileState tile, int x, int y, int w = 1, int h = 1)
+    {
+        var found = new List<PlacedBuilding>();
+        foreach (var b in tile.Grid.Buildings)
+        {
+            if (!IsUnclaimed(b))
+                continue;
+            long dx = Math.Max(0, Math.Max(b.X - (x + w - 1), x - (b.X + b.Width - 1)));
+            long dy = Math.Max(0, Math.Max(b.Y - (y + h - 1), y - (b.Y + b.Height - 1)));
+            if (dx * dx + dy * dy <= (long)Balance.ClaimRadius * Balance.ClaimRadius)
+                found.Add(b);
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// Claims for <paramref name="player"/> every unclaimed building near the area (<see cref="ClaimableNear"/>): called
+    /// after a placement (<see cref="Simulation.TryPlace"/>, <see cref="Blueprints.Place"/>) or a landing
+    /// (<see cref="UnitAssembly.Deploy"/>). Two claims on one tick: the first command applied wins.
+    /// </summary>
+    internal static void ClaimNear(Simulation sim, TileState tile, int player, int x, int y, int w = 1, int h = 1)
+    {
+        foreach (var b in ClaimableNear(tile, x, y, w, h))
+            TakeOver(sim, tile, b, player);
+    }
+
+    /// <summary>
+    /// The one place an unclaimed building becomes a player's (WM-019): owner set (revision bumped, so radii, circles,
+    /// power and sleeping machines catch up) and <see cref="GameEventKind.BuildingClaimed"/> raised. Capture to build
+    /// (MP-010) hooks in here.
+    /// </summary>
+    internal static void TakeOver(Simulation sim, TileState tile, PlacedBuilding b, int player)
+    {
+        tile.Grid.SetOwner(b, player);
+        sim.Raise(GameEventKind.BuildingClaimed, player, tile.Id, itemId: b.DefId);
+    }
+
+    /// <summary>
+    /// After a core of <paramref name="player"/>'s is destroyed (on a tile or as a unit's): if it was their last
+    /// (<see cref="Simulation.CoreCount"/>, units included, WM-016), every building they still have becomes unclaimed and
+    /// every tile they own unowned (WM-019). Machines stop where they are, keeping their items and progress.
+    /// </summary>
+    internal static void AfterCoreLost(Simulation sim, int player)
+    {
+        if (player < 0 || sim.CoreCount(player) > 0)
+            return;
+        foreach (var tile in sim.Tiles)
+        {
+            if (tile.Owner == player)
+                tile.Owner = TileState.Unowned;
+            bool any = false;
+            foreach (var b in tile.Grid.Buildings.Where(b => b.Owner == player).ToList())
+            {
+                if (b.Machine is { } m)
+                {
+                    m.Bed?.Wake(m);
+                    m.Working = false;
+                    m.IdleTicks = Math.Max(1, m.IdleTicks);
+                }
+                tile.Grid.SetOwner(b, TileState.Unowned);
+                any = true;
+            }
+            if (any)
+                sim.Raise(GameEventKind.BuildingsUnclaimed, player, tile.Id);
+        }
+    }
 
     /// <summary>
     /// A tile is Contested while a player other than its owner has a unit on it (WM-004, OQ-20); an unowned tile is
