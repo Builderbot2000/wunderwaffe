@@ -55,6 +55,8 @@ public static class InputActions
     public const string StatsToggle = "ui_stats";
     /// <summary>L: the world map's logistics overlay, items per minute on each link (IO-005).</summary>
     public const string LogisticsToggle = "world_logistics";
+    /// <summary>M: cut and paste mode, moving a building of yours intact on its tile or onto a unit's frame (FB-023).</summary>
+    public const string Relocate = "build_move";
     public const int Slots = 10;
 
     /// <summary>Slots 1-9 are the number keys; the tenth is 0. They pick from the open build menu tab.</summary>
@@ -94,6 +96,7 @@ public static class InputActions
         Add(CycleFilter, Key.I);
         Add(StatsToggle, Key.O);
         Add(LogisticsToggle, Key.L);
+        Add(Relocate, Key.M);
         for (int i = 0; i < Slots; i++)
             Add(Slot(i), i == 9 ? Key.Key0 : Key.Key1 + i);
         for (int i = 0; i < BuildingDef.Menus.Length; i++)
@@ -114,6 +117,7 @@ public static class InputActions
         [UnitHold] = "Hold position", [UnitPatrol] = "Patrol", [UnitRetreat] = "Retreat", [UnitSquad] = "Make squad",
         [UnitFormation] = "Next formation", [UnitStance] = "Next stance", [UnitTargeting] = "Next targeting mode", [UnitRally] = "Set rally point",
         [CycleFilter] = "Sorter filter", [StatsToggle] = "Production stats", [LogisticsToggle] = "Logistics overlay",
+        [Relocate] = "Move building",
     };
 
     /// <summary>"Production" for <c>BuildingDef.Menus[0]</c>, and so on.</summary>

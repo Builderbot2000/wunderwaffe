@@ -13,7 +13,9 @@ namespace Wunderwaffe.Game.Input;
 /// <summary>
 /// Placement UI: number keys (or the HUD's build bar) pick a building, R rotates, left-click/drag places,
 /// right-click/drag removes. With no building picked, the mouse commands units instead.
-/// Shows a green/red footprint preview using the sim's own placement check (FB-002).
+/// Shows a green/red footprint preview using the sim's own placement check (FB-002). M toggles cut and paste
+/// (FB-023): click one of your buildings to cut it, then click to paste it, R turning it; the ghost uses
+/// <see cref="Relocation.Check"/>.
 /// </summary>
 public partial class BuildTool : Node2D
 {
@@ -41,6 +43,9 @@ public partial class BuildTool : Node2D
     int _rotation;
     Vector2I _lastActionCell = new(-1, -1);
     PlaceResult _preview;
+    bool _moving, _leftWasDown;
+    PlacedBuilding? _cut;
+    int _cutTile;
 
     /// <summary>Every build-menu entry, tab by tab.</summary>
     public IReadOnlyList<Tool> Tools => _tools;
@@ -65,8 +70,22 @@ public partial class BuildTool : Node2D
     /// <summary>The neighbour whose I/O zone the hovered cell is in, or -1.</summary>
     public int HoveredZone { get; private set; } = -1;
 
-    /// <summary>True while a building is picked. Otherwise the mouse belongs to <see cref="UnitTool"/>.</summary>
-    public bool HasTool => _selected >= 0;
+    /// <summary>True while a building is picked or cut and paste is on. Otherwise the mouse belongs to <see cref="UnitTool"/>.</summary>
+    public bool HasTool => _selected >= 0 || _moving;
+
+    /// <summary>Cut and paste mode (FB-023, M).</summary>
+    public bool Moving => _moving;
+
+    /// <summary>The building cut and waiting to be pasted, if any; it stays where it is until the paste goes through.</summary>
+    public PlacedBuilding? Cut => _cut;
+
+    /// <summary>Turns cut and paste on or off; on drops the picked building.</summary>
+    public void ToggleMove()
+    {
+        _moving = !_moving;
+        _cut = null;
+        _selected = -1;
+    }
 
     /// <summary>
     /// Picks tool <paramref name="i"/> and opens its tab, or drops it if it's already picked. -1 drops whatever is picked.
@@ -74,6 +93,7 @@ public partial class BuildTool : Node2D
     public void Select(int i)
     {
         _selected = i < 0 || i >= _tools.Count || _selected == i ? -1 : i;
+        (_moving, _cut) = (false, null);
         if (_selected >= 0)
             _menu = _tools[_selected].Menu;
     }
@@ -144,6 +164,17 @@ public partial class BuildTool : Node2D
             _selected = -1;
             GetViewport().SetInputAsHandled();
         }
+        if (e.IsActionPressed(InputActions.Relocate))
+            ToggleMove();
+        if (_moving && (e.IsActionPressed(InputActions.Cancel) || e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right }))
+        {
+            // First drops the cut building, then leaves the mode.
+            if (_cut != null)
+                _cut = null;
+            else
+                _moving = false;
+            GetViewport().SetInputAsHandled();
+        }
         if (e.IsActionPressed(InputActions.Rotate))
             _rotation = (_rotation + 1) & 3;
         if (e.IsActionPressed(InputActions.CycleFilter))
@@ -175,7 +206,7 @@ public partial class BuildTool : Node2D
 
         if (_selected >= 0)
         {
-            var (x, y, _, _) = Footprint(cell);
+            var (x, y, _, _) = Footprint(_tools[_selected].BuildingId, cell);
             var tool = _tools[_selected];
             _preview = Placement.Check(_host.Sim, tile, _host.LocalPlayer, tool.BuildingId, x, y, _rotation, tool.RecipeId, out _);
             if (!overUi && Godot.Input.IsMouseButtonPressed(MouseButton.Left) && cell != _lastActionCell && _preview == PlaceResult.Ok)
@@ -184,6 +215,10 @@ public partial class BuildTool : Node2D
                 _lastActionCell = cell;
             }
         }
+        bool down = Godot.Input.IsMouseButtonPressed(MouseButton.Left), click = down && !_leftWasDown && !overUi;
+        _leftWasDown = down;
+        if (_moving)
+            ProcessMove(tile, cell, click);
         if (_selected >= 0 && !overUi && Godot.Input.IsMouseButtonPressed(MouseButton.Right) && cell != _lastActionCell)
         {
             _host.Send(_tools[_selected].IsFrame
@@ -195,19 +230,75 @@ public partial class BuildTool : Node2D
         QueueRedraw();
     }
 
+    /// <summary>
+    /// Cut and paste (FB-023): with nothing cut, a click on one of your buildings cuts it; then the ghost follows the
+    /// cursor and a click pastes it if <see cref="Relocation.Check"/> passes. The cut stays on its own tile.
+    /// </summary>
+    void ProcessMove(TileState tile, Vector2I cell, bool click)
+    {
+        var sim = _host.Sim;
+        int me = _host.LocalPlayer;
+        // Gone meanwhile (destroyed, lifted off): nothing to paste.
+        if (_cut != null && sim.Tiles[_cutTile].Grid.BuildingById(_cut.Id) != _cut)
+            _cut = null;
+        if (_cut == null)
+        {
+            var hovered = tile.Grid.BuildingAt(cell.X, cell.Y);
+            _preview = hovered == null ? PlaceResult.NoSuchBuilding : hovered.Owner != me ? PlaceResult.NotOwner : PlaceResult.Ok;
+            if (click && hovered != null && _preview == PlaceResult.Ok)
+                (_cut, _cutTile, _rotation) = (hovered, tile.Id, hovered.Rotation);
+            return;
+        }
+        var (x, y, _, _) = Footprint(_cut.DefId, cell);
+        _preview = Relocation.Check(sim, sim.Tiles[_cutTile], me, _cut.X, _cut.Y, tile, x, y, _rotation, out _);
+        if (click && _preview == PlaceResult.Ok)
+        {
+            _host.Send(new MoveBuildingCommand(me, _cutTile, _cut.X, _cut.Y, tile.Id, x, y, _rotation));
+            _cut = null;
+        }
+    }
+
     public override void _Draw()
     {
+        if (_moving && !OverUi())
+        {
+            DrawMove();
+            return;
+        }
         if (_selected < 0 || OverUi())
             return;
         float px = Palette.CellPx;
         DrawBuildRadii(this, _host);
         if (PickedIsPort)
             DrawPortZone(px);
-        var (x, y, w, h) = Footprint(HoveredCell());
+        var (x, y, w, h) = Footprint(_tools[_selected].BuildingId, HoveredCell());
         var tint = _preview == PlaceResult.Ok ? Palette.GhostOk : Palette.GhostBad;
         if (Selected is { IsFrame: false } picked && _host.Sim.Content.Buildings[picked.BuildingId] is { Kind: BuildingKind.PowerNode } node)
             DrawNodeRadius(px, x, y, w, h, node.PowerRadius);
-        if (Sprites.Get(_tools[_selected].BuildingId) is { } tex)
+        DrawGhost(_tools[_selected].BuildingId, x, y, w, h, tint);
+    }
+
+    /// <summary>Cut and paste: the hovered or cut building outlined where it stands, and the paste ghost.</summary>
+    void DrawMove()
+    {
+        float px = Palette.CellPx;
+        DrawBuildRadii(this, _host);
+        var tint = _preview == PlaceResult.Ok ? Palette.GhostOk : Palette.GhostBad;
+        var cell = HoveredCell();
+        var marked = _cut ?? _host.ViewedTile.Grid.BuildingAt(cell.X, cell.Y);
+        if (marked != null && (_cut == null || _cutTile == _host.ViewedTile.Id))
+            DrawRect(new Rect2(marked.X * px, marked.Y * px, marked.Width * px, marked.Height * px), _cut == null ? tint : Palette.GhostOk, false, 2);
+        if (_cut == null)
+            return;
+        var (x, y, w, h) = Footprint(_cut.DefId, cell);
+        DrawGhost(_cut.DefId, x, y, w, h, tint);
+    }
+
+    /// <summary>A tinted ghost of <paramref name="defId"/> at the footprint, turned to <see cref="BuildRotation"/>.</summary>
+    void DrawGhost(string defId, int x, int y, int w, int h, Color tint)
+    {
+        float px = Palette.CellPx;
+        if (Sprites.Get(defId) is { } tex)
         {
             // Same transform as the placed building, drawn as a tinted ghost.
             bool turned = (_rotation & 1) == 1;
@@ -302,10 +393,10 @@ public partial class BuildTool : Node2D
 
     public Vector2I HoveredCell() => TileView.CellAt(GetGlobalMousePosition());
 
-    /// <summary>Rotated footprint centred on the hovered cell.</summary>
-    (int X, int Y, int W, int H) Footprint(Vector2I cell)
+    /// <summary>Rotated footprint of <paramref name="defId"/> centred on the hovered cell.</summary>
+    (int X, int Y, int W, int H) Footprint(string defId, Vector2I cell)
     {
-        var (w, h) = _host.Sim.Content.Buildings[_tools[_selected].BuildingId].Footprint(_rotation);
+        var (w, h) = _host.Sim.Content.Buildings[defId].Footprint(_rotation);
         return (cell.X - (w - 1) / 2, cell.Y - (h - 1) / 2, w, h);
     }
 }

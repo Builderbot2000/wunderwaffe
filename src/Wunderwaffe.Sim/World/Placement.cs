@@ -29,6 +29,12 @@ public enum PlaceResult
 
     /// <summary>Some cell lies outside every build radius of the player's on the tile (WM-015, <see cref="Territory.InBuildRadius"/>).</summary>
     OutOfRange,
+
+    /// <summary>A cut building isn't the player's (FB-023).</summary>
+    NotOwner,
+
+    /// <summary>A cut building can only be pasted on its own tile; grafting onto a unit takes it off (FB-023).</summary>
+    OtherTile,
 }
 
 /// <summary>A placement that passed every check, ready to apply. The player's cores on the tile pay (<see cref="Funds"/>).</summary>
@@ -40,14 +46,20 @@ public readonly record struct PlacementPlan(BuildingDef Def, int X, int Y, int W
 /// </summary>
 public static class Placement
 {
+    /// <param name="moving">
+    /// A building of the tile being pasted (FB-023, <see cref="Relocation"/>): its own def and recipe, its own cells count
+    /// as free, and there is no cost.
+    /// </param>
     public static PlaceResult Check(
         Simulation sim, TileState tile, int player, string buildingId, int x, int y, int rotation,
-        string? recipeId, out PlacementPlan plan, bool ignoreCost = false, bool ignoreRadius = false)
+        string? recipeId, out PlacementPlan plan, bool ignoreCost = false, bool ignoreRadius = false, PlacedBuilding? moving = null)
     {
         plan = default;
         var content = sim.Content;
         if (!Territory.HasPresence(sim, player, tile))
             return PlaceResult.NoPresence;
+        if (moving != null)
+            (buildingId, recipeId, ignoreCost) = (moving.DefId, moving.RecipeId, true);
         if (!content.Buildings.TryGetValue(buildingId, out var def))
             return PlaceResult.NoSuchBuilding;
         rotation &= 3;
@@ -67,7 +79,7 @@ public static class Placement
             if (Fits(content, grid, layer, x, y) is var fit and not PlaceResult.Ok)
                 return fit;
         }
-        else if (!grid.IsFree(x, y, w, h) || BlockedByLayer(grid, x, y, w, h))
+        else if (!grid.IsFree(x, y, w, h, moving) || BlockedByLayer(grid, x, y, w, h))
         {
             return PlaceResult.Blocked;
         }

@@ -94,6 +94,11 @@ public partial class Hud
 
         if (ShowBlueprintStatus())
             return;
+        if (BuildTool.Moving)
+        {
+            ShowMoveStatus();
+            return;
+        }
         if (BuildTool.Selected is not { } picked)
         {
             _placePanel.Visible = false;
@@ -105,6 +110,35 @@ public partial class Hud
             facing = BuildTool.HoveredZone >= 0 ? $"links to {Sim.Tiles[BuildTool.HoveredZone].Name}" : "outside any I/O zone";
         var result = BuildTool.Preview;
         _placeLine.Text = $"{picked.Label} · {facing} · {PlaceMessage(picked, result)}";
+        _placeLine.AddThemeColorOverride("font_color", result == PlaceResult.Ok ? Ui.Text : Ui.Bad);
+    }
+
+    /// <summary>Cut and paste (FB-023): what is cut, which way it faces, and why a paste here would be refused.</summary>
+    void ShowMoveStatus()
+    {
+        _placePanel.Visible = true;
+        var result = BuildTool.Preview;
+        string text;
+        if (BuildTool.Cut is { } cut)
+        {
+            string message = result switch
+            {
+                PlaceResult.Ok => "click to paste it here (on a unit's frame it rides along at lift-off)",
+                PlaceResult.OtherTile => "a building stays on its tile: graft it onto one of your landed units and fly it out",
+                _ => PlaceMessage(null, result),
+            };
+            text = $"Move {Content.Buildings[cut.DefId].Name} · facing {"→↓←↑"[BuildTool.BuildRotation]} · {message}";
+        }
+        else
+        {
+            text = "Move · " + result switch
+            {
+                PlaceResult.Ok => "click to cut this building",
+                PlaceResult.NotOwner => "not your building",
+                _ => "click one of your buildings to cut it",
+            };
+        }
+        _placeLine.Text = text;
         _placeLine.AddThemeColorOverride("font_color", result == PlaceResult.Ok ? Ui.Text : Ui.Bad);
     }
 
@@ -122,7 +156,7 @@ public partial class Hud
         return sb.ToString();
     }
 
-    string PlaceMessage(BuildTool.Tool tool, PlaceResult result)
+    string PlaceMessage(BuildTool.Tool? tool, PlaceResult result)
     {
         var tile = _host.ViewedTile;
         switch (result)
@@ -130,13 +164,13 @@ public partial class Hud
             case PlaceResult.Ok:
                 return "click or drag to place";
             case PlaceResult.CannotAfford:
-                var missing = ToolCost(tool).Where(kv => Funds.Available(tile, Me, kv.Key) < kv.Value)
+                var missing = ToolCost(tool!).Where(kv => Funds.Available(tile, Me, kv.Key) < kv.Value)
                     .Select(kv => $"{kv.Value - Funds.Available(tile, Me, kv.Key)} more {GameText.ItemName(Content, kv.Key)}");
                 return "needs " + string.Join(", ", missing) + " in your cores here";
             case PlaceResult.NeedsDeposit:
                 return "must sit on an ore deposit";
             case PlaceResult.Blocked:
-                return tool.IsFrame ? "already framed" : "something is in the way";
+                return tool is { IsFrame: true } ? "already framed" : "something is in the way";
             case PlaceResult.OutOfBounds:
                 return "off the edge of the tile";
             case PlaceResult.NotInPortZone:
@@ -152,6 +186,8 @@ public partial class Hud
                 return "out of range: build within the radius of your cores, factories, turrets or units here";
             case PlaceResult.EnemyCircle:
                 return "an enemy building holds this victory circle";
+            case PlaceResult.NotOwner:
+                return "not your building";
             default:
                 return result.ToString();
         }

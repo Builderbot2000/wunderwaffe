@@ -19,15 +19,16 @@ public sealed class PlacedBuilding(int id, BuildingDef def, int owner, int x, in
     /// <summary>Hit points left, out of <see cref="BuildingDef.Hp"/>. Kept while the building rides on a unit.</summary>
     public int Hp { get; internal set; } = hp ?? def.Hp;
 
-    public int X { get; } = x;
-    public int Y { get; } = y;
+    /// <summary>Top-left cell; changes only when the building is cut and pasted (FB-023, <see cref="Relocation"/>).</summary>
+    public int X { get; internal set; } = x;
+    public int Y { get; internal set; } = y;
 
     /// <summary>Footprint after rotation.</summary>
-    public int Width { get; } = width;
-    public int Height { get; } = height;
+    public int Width { get; internal set; } = width;
+    public int Height { get; internal set; } = height;
 
     /// <summary>0-3, quarter turns clockwise from east.</summary>
-    public int Rotation { get; } = rotation;
+    public int Rotation { get; internal set; } = rotation;
 
     /// <summary>Recipe this building runs, or null for buildings that don't produce (core, conveyor, ports).</summary>
     public string? RecipeId { get; } = recipe?.Id;
@@ -374,13 +375,14 @@ public sealed class TileGrid
         return true;
     }
 
-    public bool IsFree(int x, int y, int w, int h)
+    /// <summary>No building on the footprint other than <paramref name="except"/> (a building being moved, FB-023).</summary>
+    public bool IsFree(int x, int y, int w, int h, PlacedBuilding? except = null)
     {
         for (int cy = y; cy < y + h; cy++)
         {
             for (int cx = x; cx < x + w; cx++)
             {
-                if (_cells[cy * Width + cx] != 0)
+                if (_cells[cy * Width + cx] is int id and not 0 && id != except?.Id)
                     return false;
             }
         }
@@ -408,6 +410,18 @@ public sealed class TileGrid
         if (b.SupplyRadius > 0)
             _suppliers.Remove(b);
         BuildingCount--;
+        Revision++;
+    }
+
+    /// <summary>
+    /// Puts a building down at a new spot and rotation, keeping its id and all its state (FB-023). Kind lists stay in id
+    /// order, and the <see cref="Revision"/> bump rebuilds power and boosts and wakes sleeping machines.
+    /// </summary>
+    internal void Move(PlacedBuilding b, int x, int y, int w, int h, int rotation)
+    {
+        Fill(b, 0);
+        (b.X, b.Y, b.Width, b.Height, b.Rotation) = (x, y, w, h, rotation);
+        Fill(b, b.Id);
         Revision++;
     }
 
