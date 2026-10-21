@@ -70,7 +70,7 @@ See also the [glossary](glossary.md).
 
 | Mechanic | Must | Should | Could | Won't | Total | Done | In Progress | % Done | Conflict | Review |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [World Map](world-map.md) | 11 | 6 | 1 | 1 | 19 | 14 | 2 | 74% | 0 | 1 |
+| [World Map](world-map.md) | 11 | 6 | 1 | 1 | 19 | 15 | 3 | 79% | 0 | 1 |
 | [Factory & Logistics](factory-logistics.md) | 17 | 5 | 1 | 0 | 23 | 21 | 0 | 91% | 0 | 2 |
 | [Resources & Tech](resources-tech.md) | 7 | 2 | 1 | 0 | 10 | 5 | 0 | 50% | 0 | 2 |
 | [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
@@ -79,15 +79,15 @@ See also the [glossary](glossary.md).
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 7 | 0 | 54% | 0 | 0 |
 | [Multiplayer & Victory](multiplayer-victory.md) | 4 | 5 | 1 | 0 | 10 | 7 | 2 | 70% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 13 | 1 | 87% | 0 | 2 |
-| **Total** | 75 | 40 | 9 | 1 | 125 | 95 | 5 | 76% | 0 | 9 |
+| **Total** | 75 | 40 | 9 | 1 | 125 | 96 | 6 | 77% | 0 | 9 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 95 | 76% |
-| In Progress | 5 | 4% |
-| Approved | 3 | 2% |
+| Done | 96 | 77% |
+| In Progress | 6 | 5% |
+| Approved | 1 | 1% |
 | Proposed | 7 | 6% |
 | Deferred | 2 | 2% |
 | Rejected | 13 | 10% |
@@ -105,7 +105,7 @@ See also the [glossary](glossary.md).
 
 | Pillar | Name | Reqs | Must | Done |
 |---|---|---|---|---|
-| P1 | World map of tiles | 20 | 13 | 15 |
+| P1 | World map of tiles | 20 | 13 | 16 |
 | P2 | Tile = RTS factory map | 23 | 17 | 21 |
 | P3 | Inter-tile I/O | 10 | 5 | 8 |
 | P4 | Block-by-block unit design | 15 | 10 | 13 |
