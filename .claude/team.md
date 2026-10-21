@@ -87,6 +87,10 @@ rules on top. Branch from the Wave 0 (foundation) commit.
   only through `Territory.TakeOver` (claims: `ClaimNear` after placing or landing), which bumps `Revision`.
 
 
+- **Neutral sites (WM-010, WM-018):** each site's neutral player comes after every seat (`Simulation.IsNeutral`,
+  `SiteOf`). Anything that loops players for victory, lists, AI or input must use the setup's seats (`GameSetup.Players`)
+  or skip `IsNeutral`; `sim.Players` includes neutral players. Neutral players never own tiles or issue commands.
+
 ## Tick order inside `Simulation.Step`
 
 `Simulation.Step` (`src/Wunderwaffe.Sim/Simulation.cs`) runs these phases in this order. Today only the phases marked

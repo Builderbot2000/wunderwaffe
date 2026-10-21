@@ -5,7 +5,8 @@
 //   capture_to_build: the covered buildings ("buildings" and/or "kind") are built only once the seat has owned one it
 //                     didn't build (claiming an unclaimed one, WM-019); that exact building stays unlocked for good.
 //   buff:             "stat" (speed, power or build_speed) changes by "percent" for the covered buildings it owns.
-// "startPrefabs" (optional) replaces the default start. "hidden" keeps it out of the lobby and Random.
+// "startPrefabs" (optional) replaces the default start. "hidden" keeps it out of the lobby and Random; only a hidden
+// faction (the neutral guardians, sites.json) builds the buildings marked "neutral" in buildings.json.
 // The first faction is the default. Values are placeholders until the content and balance update.
 [
   { "id": "charter", "name": "Charter Company", "description": "The whole shared catalogue, no special rules." },
@@ -14,5 +15,6 @@
     "rules": [ { "type": "capture_to_build", "buildings": ["unit_factory", "core_large", "precision_jig"] } ] },
   { "id": "foundry", "name": "Foundry Guild", "description": "Machines run 20% faster. Builds the heavier Bulwark in place of the wall.",
     "variants": { "wall": "bulwark" },
-    "rules": [ { "type": "buff", "stat": "speed", "percent": 20, "kind": "machine" } ] }
+    "rules": [ { "type": "buff", "stat": "speed", "percent": 20, "kind": "machine" } ] },
+  { "id": "keepers", "name": "Keepers", "description": "Neutral guardians of the sites (WM-010). Not playable.", "hidden": true }
 ]

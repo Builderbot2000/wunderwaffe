@@ -28,6 +28,7 @@ internal sealed class StateHash
         s.MixScaling(sim);
         s.MixProjectiles(sim);
         s.MixSquads(sim.Squads);
+        s.MixSites(sim);
         return s._h;
     }
 
@@ -417,5 +418,21 @@ internal sealed class StateHash
         }
         foreach (int id in sim.InterruptedUnits.Keys)
             Mix(id);
+    }
+
+    /// <summary>Neutral sites (WM-010): who holds which, where, from what template. Their buildings and units are mixed as anyone's.</summary>
+    void MixSites(Simulation sim)
+    {
+        Mix(sim.Sites.Count);
+        foreach (var site in sim.Sites)
+        {
+            Mix(site.Player);
+            Mix(site.TileId);
+            Mix(site.X);
+            Mix(site.Y);
+            Mix(site.Template);
+            Mix(site.Name);
+            Mix(site.Patch);
+        }
     }
 }

@@ -29,7 +29,7 @@ public sealed class DepositPatch
     public int Cells { get; }
 
     /// <summary>What it held when found.</summary>
-    public long Start { get; }
+    public long Start { get; internal set; }
 
     /// <summary>What is left.</summary>
     public long Amount { get; internal set; }
@@ -205,6 +205,13 @@ public sealed class DepositPatches(TileGrid grid)
             }
         }
         Revision++;
+    }
+
+    /// <summary>Multiplies what a patch held and holds by <paramref name="percent"/>: a neutral site's richer deposit (WM-018).</summary>
+    internal void Enrich(DepositPatch p, int percent)
+    {
+        p.Start = Math.Max(1, p.Start * percent / 100);
+        SetAmount(p, Math.Max(1, p.Amount * percent / 100));
     }
 
     /// <summary>Takes a cell out of its patch (the patch keeps its amount and starting size).</summary>

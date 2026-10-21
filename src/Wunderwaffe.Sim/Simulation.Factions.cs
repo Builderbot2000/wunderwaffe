@@ -8,8 +8,8 @@ public sealed partial class Simulation
     FactionDef?[] _factions = [];
 
     /// <summary>
-    /// The faction <paramref name="player"/> plays: <see cref="GameSetup.FactionFor"/> of the setup, or the default for
-    /// hand-built sims. Derived from the setup, so not hashed.
+    /// The faction <paramref name="player"/> plays: a neutral player's site template's guardian faction (WM-010),
+    /// <see cref="GameSetup.FactionFor"/> of the setup, or the default for hand-built sims. Derived from the setup, so not hashed.
     /// </summary>
     public FactionDef FactionOf(int player)
     {
@@ -17,7 +17,8 @@ public sealed partial class Simulation
             return Content.DefaultFaction;
         if (player >= _factions.Length)
             Array.Resize(ref _factions, player + 1);
-        return _factions[player] ??= Setup?.FactionFor(player, Content) ?? Content.DefaultFaction;
+        return _factions[player] ??= SiteOf(player) is { } site ? Content.Factions[Content.Sites[site.Template].Faction]
+            : Setup?.FactionFor(player, Content) ?? Content.DefaultFaction;
     }
 
     /// <summary>Gives a seat of a hand-built sim a faction (tests).</summary>

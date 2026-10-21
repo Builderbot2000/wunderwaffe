@@ -52,7 +52,7 @@ public static class Expansion
             int winner = TileState.Unowned;
             foreach (int p in occupants)
             {
-                if (p == tile.Owner)
+                if (p == tile.Owner || sim.IsNeutral(p)) // neutral sites never claim (WM-010)
                     continue;
                 int ticks = tile.Claims.GetValueOrDefault(p) + 1;
                 tile.Claims[p] = ticks;

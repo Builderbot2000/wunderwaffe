@@ -21,7 +21,7 @@ public sealed class MatchSettings
 
     readonly LineEdit _seed;
     readonly OptionButton _size, _map;
-    readonly SpinBox _ai, _capture, _victory, _richness;
+    readonly SpinBox _ai, _capture, _victory, _richness, _sites;
     readonly VBoxContainer _heads;
     readonly List<OptionButton> _headPicks = [];
     readonly VBoxContainer _factionBox;
@@ -101,6 +101,8 @@ public sealed class MatchSettings
             "Own this share of all tiles to win; or be the last player with a core");
         _richness = Spin(grid, "Resource richness", GameSetup.MinRichness, GameSetup.MaxRichness, 25, initial.RichnessPercent, " %", onChange,
             "Deposit size compared with normal");
+        _sites = Spin(grid, "Neutral sites", 0, GameSetup.MaxSitesPercent, 1, initial.SitesPercent, " % of tiles", onChange,
+            "Guarded neutral sites (WM-018): rich deposits and tech no faction builds, stronger farther from the starts. 0 for none");
         Refresh();
         RebuildHeads();
         RebuildFactions();
@@ -115,6 +117,7 @@ public sealed class MatchSettings
         bool generated = Scenario == null;
         _seed.Editable = generated;
         _richness.Editable = generated;
+        _sites.Editable = generated;
         _size.Disabled = !generated;
         if (Scenario is { } s)
         {
@@ -215,7 +218,8 @@ public sealed class MatchSettings
                 CaptureSeconds = (int)_capture.Value, VictoryPercent = (int)_victory.Value, AiHeadStarts = headStarts, Factions = factions,
             };
         return new GameSetup(n, n, GameSetup.ParseSeed(_seed.Text.Length == 0 ? "3037" : _seed.Text), _humans + ai, ai,
-            (int)_capture.Value, (int)_victory.Value, (int)_richness.Value, AiHeadStarts: headStarts, Factions: factions);
+            (int)_capture.Value, (int)_victory.Value, (int)_richness.Value, AiHeadStarts: headStarts, Factions: factions,
+            SitesPercent: (int)_sites.Value);
     }
 
     /// <summary>A read-only summary for players waiting in someone else's lobby.</summary>
@@ -224,7 +228,7 @@ public sealed class MatchSettings
         var content = SimHost.Instance.Content;
         string map = s.Scenario is { } id
             ? $"Scenario {(content.Scenarios.TryGetValue(id, out var def) ? def.Name : $"'{id}' (you don't have it)")}"
-            : $"Map {s.Width} × {s.Height} · seed {s.Seed} · richness {s.RichnessPercent}%";
+            : $"Map {s.Width} × {s.Height} · seed {s.Seed} · richness {s.RichnessPercent}% · neutral sites {s.SitesPercent}%";
         var heads = Enumerable.Range(s.Players - s.AiPlayers, s.AiPlayers).Select(s.HeadStartFor).Where(h => h != null)
             .Select(h => content.HeadStarts.TryGetValue(h!, out var p) ? p.Name : h).ToList();
         var factions = Enumerable.Range(0, s.Players).Select(p => s.Factions is { } f && p < f.Length && f[p] == GameSetup.RandomFaction

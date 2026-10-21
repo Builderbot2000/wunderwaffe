@@ -77,7 +77,8 @@ public sealed record FactionDef(
     internal void Resolve(ContentDb content, IReadOnlyDictionary<string, string> baseOf)
     {
         _baseOf = new(baseOf);
-        var all = content.BuildingList.Select(b => b.Id);
+        // Neutral-only tech (WM-010) belongs to the hidden guardian factions alone.
+        var all = content.BuildingList.Where(b => Hidden || !b.Neutral).Select(b => b.Id);
         _subset = new SortedSet<string>(Buildings ?? all.Where(id => !baseOf.ContainsKey(id)), StringComparer.Ordinal);
         _subset.ExceptWith(Except ?? []);
         foreach (var (b, v) in Variants ?? [])
@@ -131,8 +132,10 @@ public sealed record FactionDef(
                 errors.Add($"{at}: give buildings or except, not both");
             foreach (var id in (f.Buildings ?? []).Concat(f.Except ?? []).Concat(f.Rules?.SelectMany(r => r.Buildings ?? []) ?? []))
             {
-                if (!defs.ContainsKey(id))
+                if (!defs.TryGetValue(id, out var d))
                     errors.Add($"{at}: unknown building '{id}'");
+                else if (d.Neutral && !f.Hidden && f.Buildings?.Contains(id) == true)
+                    errors.Add($"{at}: '{id}' is neutral-only; only a hidden faction builds it");
             }
             foreach (var (b, v) in f.Variants ?? [])
             {

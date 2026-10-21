@@ -46,6 +46,12 @@ public enum GameEventKind
     /// The player claimed an unclaimed building (WM-019) on the tile; <see cref="GameEvent.ItemId"/> is its building id.
     /// </summary>
     BuildingClaimed,
+
+    /// <summary>
+    /// A neutral site fell (WM-010): its neutral player (<see cref="GameEvent.Player"/>) lost its last core, so its
+    /// buildings are unclaimed. <see cref="GameEvent.ItemId"/> is the site's name.
+    /// </summary>
+    SiteFallen,
 }
 
 /// <summary>

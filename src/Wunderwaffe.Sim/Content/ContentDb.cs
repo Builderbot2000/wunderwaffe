@@ -100,9 +100,11 @@ public sealed class ContentDb
     /// <param name="headStarts">Head-start presets (MP-008), a JSON list; null for none.</param>
     /// <param name="scenarios">Scenarios (WM-017), one JSON object per text (one file each); null for none.</param>
     /// <param name="factions">Faction templates (MP-009), a JSON list, the first the default; null for one with everything.</param>
+    /// <param name="sites">Neutral site templates (WM-010, WM-018), a JSON list, weakest first; null for none (no sites).</param>
     public static ContentDb FromJson(
         string items, string recipes, string buildings, string? goals = null, string? terrain = null, string? layers = null,
-        IEnumerable<string>? prefabs = null, string? headStarts = null, IEnumerable<string>? scenarios = null, string? factions = null)
+        IEnumerable<string>? prefabs = null, string? headStarts = null, IEnumerable<string>? scenarios = null, string? factions = null,
+        string? sites = null)
     {
         var errors = new List<string>();
         var itemList = Parse<ItemDef>(items, "items");
@@ -123,6 +125,7 @@ public sealed class ContentDb
         db.LoadPrefabs(prefabs ?? [], errors);
         db.LoadHeadStarts(headStarts == null ? [] : Parse<HeadStartDef>(headStarts, "head_starts"), errors);
         db.LoadFactions(factions == null ? null : Parse<FactionDef>(factions, "factions"), errors);
+        db.LoadSites(sites == null ? [] : Parse<SiteDef>(sites, "sites"), errors);
         // Scenarios last: a trial build checks them against everything else.
         if (errors.Count == 0)
         {
@@ -184,6 +187,20 @@ public sealed class ContentDb
 
     /// <summary>What a seat plays when nothing picks a faction for it: the first of factions.json, or everything.</summary>
     public FactionDef DefaultFaction => FactionList[0];
+
+    /// <summary>Neutral site templates by id (WM-010, WM-018).</summary>
+    public IReadOnlyDictionary<string, SiteDef> Sites { get; private set; } = new SortedDictionary<string, SiteDef>(StringComparer.Ordinal);
+
+    /// <summary>Neutral site templates in file order, weakest first: generation hands them out by distance from the starts.</summary>
+    public IReadOnlyList<SiteDef> SiteList { get; private set; } = [];
+
+    void LoadSites(List<SiteDef> list, List<string> errors)
+    {
+        var map = Index(list, x => x.Id ?? "", "site", errors);
+        SiteDef.Validate(this, list, errors);
+        Sites = new SortedDictionary<string, SiteDef>(map, StringComparer.Ordinal);
+        SiteList = list;
+    }
 
     void LoadFactions(List<FactionDef>? list, List<string> errors)
     {

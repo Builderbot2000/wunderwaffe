@@ -67,6 +67,28 @@ public sealed partial class Simulation
         for (int p = 0; p < s.Seats.Count; p++)
             LoadSeat(p, s.Seats[p], $"{at} seat {p}", errors);
         Fail();
+        for (int i = 0; i < (s.Sites?.Count ?? 0); i++)
+            LoadSite(s.Sites![i], $"{at} site {i}", errors);
+        Fail();
+    }
+
+    /// <summary>A neutral site (WM-010): a new neutral player of its template's faction, its buildings and guards (on defensive stance).</summary>
+    void LoadSite(ScenarioSite site, string at, List<string> errors)
+    {
+        if (!Content.Sites.TryGetValue(site.Template ?? "", out var def) || TryGetTile(site.Tile) is not { } tile)
+        {
+            errors.Add($"{at}: unknown site template '{site.Template}' or tile {site.Tile}");
+            return;
+        }
+        if (site.Buildings is not { Count: > 0 } buildings || !buildings.Any(b => Content.Buildings.TryGetValue(b.DefId ?? "", out var d) && d.Kind == BuildingKind.Core))
+        {
+            errors.Add($"{at}: a site needs a core");
+            return;
+        }
+        var ns = AddSite(tile, def, site.X, site.Y, site.Name, tile.Grid.Patches.ById(site.Patch) is { } p ? p.Id : 0);
+        LoadSeat(ns.Player, new ScenarioSeat([], site.Buildings, site.Units), at, errors, neutral: true);
+        foreach (var u in _units.Where(u => u.Owner == ns.Player))
+            u.Stance = Stance.Defensive;
     }
 
     void LoadTile(TileState tile, ScenarioTile st, string at, List<string> errors)
@@ -168,7 +190,7 @@ public sealed partial class Simulation
         grid.Patches.Restore(Content, [.. patches.Select(p => (p.Item, p.Cells, p.Start, p.Amount))], runs);
     }
 
-    void LoadSeat(int p, ScenarioSeat seat, string at, List<string> errors)
+    void LoadSeat(int p, ScenarioSeat seat, string at, List<string> errors, bool neutral = false)
     {
         foreach (int id in seat.Tiles ?? [])
         {
@@ -211,6 +233,8 @@ public sealed partial class Simulation
 
         foreach (var u in seat.Units ?? [])
             LoadUnit(p, u, $"{at}: unit at ({u.X}, {u.Y}) on tile {u.Tile}", errors);
+        if (neutral)
+            return;
 
         int start = seat.Tiles is { Count: > 0 } t ? t[0]
             : seat.Buildings is { Count: > 0 } bs ? bs[0].Tile
@@ -291,26 +315,37 @@ public sealed partial class Simulation
             [.. t.Grid.Patches.All.Select(p => new PatchRecord(p.Item, p.Cells, p.Start, p.Amount))],
             CellGrid.Encode(t.Grid.Width, t.Grid.Height, t.Grid.Patches.IdAt))).ToList();
 
-        int seats = Math.Max(1, Math.Max(Setup?.Players ?? 0, _players.Count));
+        int seats = Math.Max(1, Math.Max(Setup?.Players ?? 0, _players.Count(p => !IsNeutral(p.Id))));
         var list = new List<ScenarioSeat>();
         for (int p = 0; p < seats; p++)
         {
             var owned = _tiles.Where(t => t.Owner == p).Select(t => t.Id).ToList();
             if (p < _startTileIds.Count && owned.Remove(_startTileIds[p]))
                 owned.Insert(0, _startTileIds[p]);
-            var buildings = _tiles.SelectMany(t => t.Grid.Buildings.Where(b => b.Owner == p).Select(b => new ScenarioBuilding(
-                t.Id, b.DefId, b.X, b.Y, b.Rotation, b.RecipeId, b.Hp < b.Def.Hp ? b.Hp : null, Items(b.Stock)))).ToList();
-            var units = _units.Where(u => u.Owner == p).Select(UnitOf).ToList();
+            var (buildings, units) = HeldBy(p);
             var faction = FactionOf(p) is var f && f != Content.DefaultFaction ? f.Id : null;
             list.Add(new ScenarioSeat(owned, buildings.Count > 0 ? buildings : null, units.Count > 0 ? units : null, faction));
         }
+
+        var sites = _sites.Where(s => !HasFallen(s)).Select(s => // a fallen site's buildings are unclaimed, as a scenario never has
+        {
+            var (b, u) = HeldBy(s.Player);
+            return new ScenarioSite(s.Template, s.TileId, s.X, s.Y, s.Name, b.Count > 0 ? b : null, u.Count > 0 ? u : null, s.Patch);
+        }).ToList();
 
         return new ScenarioDef(id, name, w, h,
             CellGrid.Encode(w, h, _map.TerrainAt, terrainIds),
             CellGrid.Encode(w, h, _map.TileAtCell),
             tiles, list, description,
-            Scenarios.EncodeElevation(i => _map.ElevationAt(i % w, i / w), w * h));
+            Scenarios.EncodeElevation(i => _map.ElevationAt(i % w, i / w), w * h),
+            sites.Count > 0 ? sites : null);
     }
+
+    /// <summary>A player's buildings (with core stock and damage) and units (at rest), as a scenario has them.</summary>
+    (List<ScenarioBuilding> Buildings, List<ScenarioUnit> Units) HeldBy(int p) =>
+        (_tiles.SelectMany(t => t.Grid.Buildings.Where(b => b.Owner == p).Select(b => new ScenarioBuilding(
+            t.Id, b.DefId, b.X, b.Y, b.Rotation, b.RecipeId, b.Hp < b.Def.Hp ? b.Hp : null, Items(b.Stock)))).ToList(),
+         _units.Where(u => u.Owner == p).Select(UnitOf).ToList());
 
     /// <summary>Each non-empty cell layer, its legend only the entries used.</summary>
     static SortedDictionary<string, CellGrid>? LayersOf(TileGrid g)

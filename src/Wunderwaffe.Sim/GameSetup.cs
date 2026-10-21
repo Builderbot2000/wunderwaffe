@@ -29,11 +29,15 @@ namespace Wunderwaffe.Sim;
 /// Faction id per seat (MP-009), <see cref="RandomFaction"/> for one picked from the seed, null or "" for the default.
 /// A scenario seat with a faction of its own ignores it.
 /// </param>
+/// <param name="SitesPercent">
+/// Neutral site density (WM-018, MP-005): percent of a generated world's tiles that get a site, 0 for none. Scenarios
+/// carry their own sites; content without site templates places none.
+/// </param>
 public sealed record GameSetup(
     int Width, int Height, ulong Seed, int Players = 1,
     int AiPlayers = 0, int CaptureSeconds = Balance.CaptureSeconds, int VictoryPercent = 60, int RichnessPercent = 100,
     string[][]? StartPrefabs = null, string? Scenario = null, ulong ScenarioHash = 0, string?[]? AiHeadStarts = null,
-    string?[]? Factions = null)
+    string?[]? Factions = null, int SitesPercent = GameSetup.DefaultSitesPercent)
 {
     /// <summary>The lobby's Random faction choice: resolved from the seed and seat, so every machine picks the same.</summary>
     public const string RandomFaction = "random";
@@ -73,6 +77,7 @@ public sealed record GameSetup(
     public const int MinCaptureSeconds = 5, MaxCaptureSeconds = 600;
     public const int MinVictoryPercent = 10, MaxVictoryPercent = 100;
     public const int MinRichness = 25, MaxRichness = 400;
+    public const int DefaultSitesPercent = 33, MaxSitesPercent = 50;
 
     /// <summary>True if <paramref name="player"/> is one of the AI seats.</summary>
     public bool IsAi(int player) => player >= Players - AiPlayers && player < Players;
@@ -93,6 +98,7 @@ public sealed record GameSetup(
         : CaptureSeconds is < MinCaptureSeconds or > MaxCaptureSeconds ? $"capture time {CaptureSeconds} s; {MinCaptureSeconds} to {MaxCaptureSeconds} allowed"
         : VictoryPercent is < MinVictoryPercent or > MaxVictoryPercent ? $"victory share {VictoryPercent}%; {MinVictoryPercent} to {MaxVictoryPercent} allowed"
         : RichnessPercent is < MinRichness or > MaxRichness ? $"richness {RichnessPercent}%; {MinRichness} to {MaxRichness} allowed"
+        : SitesPercent is < 0 or > MaxSitesPercent ? $"neutral sites {SitesPercent}%; 0 to {MaxSitesPercent} allowed"
         : StartPrefabs is { } s && s.Length > Players ? $"start prefabs for {s.Length} seats of {Players}"
         : AiHeadStarts is { } h && h.Length > AiPlayers ? $"head starts for {h.Length} AI seats of {AiPlayers}"
         : Factions is { } f && f.Length > Players ? $"factions for {f.Length} seats of {Players}"

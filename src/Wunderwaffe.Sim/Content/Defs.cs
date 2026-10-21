@@ -209,6 +209,9 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// Major buildings (cores, unit factories, defences): cells from its footprint within which its owner may build (WM-015,
 /// OQ-58), from the moment it is placed; 0 for minor buildings such as conveyors. Never reaches past its tile.
 /// </param>
+/// <param name="Neutral">
+/// Neutral-only tech (WM-010): only a hidden guardian faction builds it; players get one only by claiming it (WM-019).
+/// </param>
 public sealed record BuildingDef(
     string Id,
     string Name,
@@ -241,7 +244,8 @@ public sealed record BuildingDef(
     int Capacity = 0,
     int PowerRadius = 0,
     string? Layer = null,
-    int BuildRadius = 0)
+    int BuildRadius = 0,
+    bool Neutral = false)
 {
     /// <summary>Build menu tabs, in the order the HUD shows them (and Shift+1.. picks them).</summary>
     public static readonly string[] Menus = ["production", "logistics", "power", "units", "combat", "boosters"];

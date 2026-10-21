@@ -21,9 +21,10 @@ namespace Wunderwaffe.Sim.Content;
 /// </param>
 /// <param name="Tiles">Per tile id: name, victory circle, port zones and cell layers.</param>
 /// <param name="Seats">Per player: what they start with (MP-008: an AI seat takes over its own).</param>
+/// <param name="Sites">Neutral sites (WM-010), each its own neutral player after the seats; null for none.</param>
 public sealed record ScenarioDef(
     string Id, string Name, int Width, int Height, CellGrid Terrain, CellGrid TileMap, List<ScenarioTile> Tiles, List<ScenarioSeat> Seats,
-    string? Description = null, string? Elevation = null)
+    string? Description = null, string? Elevation = null, List<ScenarioSite>? Sites = null)
 {
     /// <summary>Hash of the scenario's content (<see cref="Scenarios.Hash"/>): a save records it so it replays the same map.</summary>
     [JsonIgnore]
@@ -50,6 +51,14 @@ public sealed record ScenarioTile(string Name, int CircleX, int CircleY, CellGri
 /// </summary>
 public sealed record ScenarioSeat(List<int> Tiles, List<ScenarioBuilding>? Buildings = null, List<ScenarioUnit>? Units = null,
     string? Faction = null);
+
+/// <summary>
+/// A neutral site (WM-010) built from site template <paramref name="Template"/> (its guardian faction), its layout's box
+/// at tile-local (X, Y) on <paramref name="Tile"/>: the site's buildings (a core at least) and guard units, placed as a
+/// seat's are. Its guards defend where they stand. <paramref name="Patch"/>: the tile's deposit patch it guards (1-based), or 0.
+/// </summary>
+public sealed record ScenarioSite(string Template, int Tile, int X, int Y, string? Name = null, List<ScenarioBuilding>? Buildings = null,
+    List<ScenarioUnit>? Units = null, int Patch = 0);
 
 /// <summary>
 /// A building at tile-local (X, Y), its footprint's top-left. <paramref name="Hp"/> null is full; <paramref name="Stock"/> is

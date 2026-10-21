@@ -21,6 +21,21 @@ public sealed record PlayerView(
 /// <summary>A tile as the world map shows it.</summary>
 /// <param name="Owner">Player id, or <see cref="TileState.Unowned"/>.</param>
 /// <param name="CenterX">World cell of the tile's centre of area.</param>
+/// <summary>
+/// A neutral site (WM-010) as players see it: where it stands, who holds it, how strong it is now and what it holds.
+/// </summary>
+/// <param name="Player">Its neutral player (never a seat).</param>
+/// <param name="Fallen">Its cores are all destroyed: what is left is unclaimed (WM-019).</param>
+/// <param name="Dps">Damage per second of its live turrets and guards; <paramref name="Hp"/> their hit points left.</param>
+/// <param name="Stock">Items in its cores (unclaimed cores once fallen).</param>
+/// <param name="Tech">Building ids standing there that the viewing seat's faction can't build (MP-009), in order.</param>
+/// <param name="Deposit">The item of the deposit patch it guards, or null; <paramref name="DepositAmount"/> left in it.</param>
+/// <param name="Strength">The template's strength and <paramref name="Value"/> its value (WM-018), for ranking sites.</param>
+public sealed record SiteView(
+    int Id, string Name, int Player, int TileId, int X, int Y, int Width, int Height, string Template, bool Fallen,
+    int Cores, int Turrets, int Guards, int Dps, int Hp, IReadOnlyDictionary<string, long> Stock, IReadOnlyList<string> Tech,
+    string? Deposit, long DepositAmount, long Strength, long Value);
+
 public sealed record TileSummary(
     int Id, string Name, int Owner, string Biome, int CenterX, int CenterY, IReadOnlyList<int> Neighbors, int Buildings);
 

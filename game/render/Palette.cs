@@ -103,12 +103,17 @@ public static class Palette
     /// <summary>A player's colour, hue spread by id: full brightness for units, darker for the world map's tile tint.</summary>
     public static Color Owner(int owner, float value = 1f)
     {
+        if (SimHost.Instance?.Sim?.IsNeutral(owner) == true)
+            return new Color(Neutral.R * value, Neutral.G * value, Neutral.B * value); // WM-010: every site alike
         var table = Mode switch { ColourMode.RedGreen => RedGreenPlayers, ColourMode.BlueYellow => BlueYellowPlayers, _ => null };
         if (table == null)
             return Color.FromHsv((0.45f + owner * 0.618034f) % 1f, 0.6f, value);
         var c = table[Math.Abs(owner) % table.Length];
         return new Color(c.R * value, c.G * value, c.B * value);
     }
+
+    /// <summary>Neutral sites' guardians (WM-010): a dull ochre no player colour uses, in every <see cref="Mode"/>.</summary>
+    public static readonly Color Neutral = new(0.72f, 0.58f, 0.32f);
 
     /// <summary>
     /// Unclaimed buildings (WM-019): a dull grey-violet no player colour uses; placeholder blocks are drawn in it and

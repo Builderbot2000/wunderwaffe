@@ -23,7 +23,14 @@ static class TestContent
     public static ContentDb WithFactions(string? factionsJson = null) =>
         Build(power: true, [], factionsJson: factionsJson ?? Read("factions.json"));
 
-    static ContentDb Build(bool power, string[] extraBuildings, string? buildingsJson = null, string? layersJson = null, string? factionsJson = null)
+    /// <summary>
+    /// The real content plus the test bank with the shipped factions and neutral site templates (WM-010, WM-018): only
+    /// sim tests about sites load them, so other generated worlds stay site-free.
+    /// </summary>
+    public static ContentDb WithSites() => Build(power: true, [], factionsJson: Read("factions.json"), sitesJson: Read("sites.json"));
+
+    static ContentDb Build(bool power, string[] extraBuildings, string? buildingsJson = null, string? layersJson = null, string? factionsJson = null,
+        string? sitesJson = null)
     {
         var buildings = JsonNode.Parse(buildingsJson ?? Read("buildings.json"), documentOptions: new() { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })!.AsArray();
         if (!power)
@@ -36,7 +43,7 @@ static class TestContent
         foreach (var json in extraBuildings)
             buildings.Add(JsonNode.Parse(json));
         return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), buildings.ToJsonString(), Read("goals.json"), Read("terrain.json"),
-            layersJson ?? Read("layers.json"), Prefabs(), Read("head_starts.json"), factions: factionsJson);
+            layersJson ?? Read("layers.json"), Prefabs(), Read("head_starts.json"), factions: factionsJson, sites: sitesJson);
     }
 
     /// <summary>The real content as shipped (no test bank) with <paramref name="extra"/> prefab JSON objects added.</summary>

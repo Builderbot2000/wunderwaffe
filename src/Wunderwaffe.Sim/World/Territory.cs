@@ -202,6 +202,8 @@ public static class Territory
             if (any)
                 sim.Raise(GameEventKind.BuildingsUnclaimed, player, tile.Id);
         }
+        if (sim.SiteOf(player) is { } site)
+            sim.Raise(GameEventKind.SiteFallen, player, site.TileId, itemId: site.Name); // WM-010
     }
 
     /// <summary>

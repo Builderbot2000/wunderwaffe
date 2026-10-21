@@ -112,6 +112,7 @@ public partial class Hud
             GameEventKind.TileClaimed => $"You took {tile}",
             GameEventKind.TileLost => $"You lost {tile}",
             GameEventKind.BuildingClaimed => $"{tile}: you claimed an unclaimed {Content.Buildings[e.ItemId!].Name}",
+            GameEventKind.SiteFallen => $"{e.ItemId} has fallen: its buildings are unclaimed",
             GameEventKind.PlayerEliminated => e.Player == Me ? "You were eliminated" : $"{PlayerName(e.Player)} was eliminated",
             _ => e.Kind.ToString(),
         };
@@ -154,6 +155,8 @@ public partial class Hud
     /// <summary>A player as the HUD names them: the lobby name online, else you / AI / player n.</summary>
     string PlayerName(int id)
     {
+        if (Sim.SiteOf(id) is { } site)
+            return site.Name; // a neutral site (WM-010), never a seat
         if (_host.IsMultiplayer && _host.Net.Lobby is { } lobby && id < lobby.Names.Count)
             return lobby.Names[id];
         if (id == Me)

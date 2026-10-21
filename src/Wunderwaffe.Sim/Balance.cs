@@ -65,4 +65,10 @@ public static class Balance
     /// (straight-line, nearest cells, as a build radius) of an unclaimed building claims it. Tuned in playtesting.
     /// </summary>
     public const int ClaimRadius = 8;
+
+    /// <summary>
+    /// Cells a neutral site's layout keeps clear of its tile's victory circle (WM-018): a turret's range plus a guard's
+    /// leash and range, so nothing of the site reaches the circle or anyone landing in it.
+    /// </summary>
+    public const int SiteCircleClearance = 40;
 }

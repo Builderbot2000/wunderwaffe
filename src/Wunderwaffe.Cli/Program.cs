@@ -13,7 +13,7 @@ try
         Directory.GetFiles(Path.Combine(dir, "prefabs"), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText),
         Read("head_starts.json"),
         Directory.GetFiles(Path.Combine(dir, "scenarios"), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText),
-        Read("factions.json"));
+        Read("factions.json"), Read("sites.json"));
 }
 catch (Exception e) when (e is IOException or ContentException)
 {

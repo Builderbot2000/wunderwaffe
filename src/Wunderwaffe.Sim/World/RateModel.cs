@@ -214,7 +214,7 @@ public static class RateModel
             {
                 foreach (var b in _nets[ni].MembersOn(tile.Id))
                 {
-                    if (_kind[index[b.Id]] is NodeKind.Extractor or NodeKind.Crafter)
+                    if (!index.TryGetValue(b.Id, out int bi) || _kind[bi] is NodeKind.Extractor or NodeKind.Crafter) // unclaimed: not in the graph (WM-019)
                         continue;
                     _fixedSupply[ni] += PowerNet.SupplyOf(b);
                     _fixedDemand[ni] += PowerNet.DrawOf(b);

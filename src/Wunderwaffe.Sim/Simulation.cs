@@ -81,6 +81,7 @@ public sealed partial class Simulation(ContentDb content)
         sim.GenerateWorld(setup.Width, setup.Height, setup.Seed, setup.Players, richnessPercent: setup.RichnessPercent);
         for (int p = 0; p < setup.Players; p++)
             sim.SettleStartingTile(sim.Tiles[sim.StartTileIds[p]], p);
+        sim.PlaceSites(setup.SitesPercent, setup.Seed); // WM-018
         return sim;
     }
 

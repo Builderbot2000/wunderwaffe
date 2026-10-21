@@ -41,7 +41,7 @@ public sealed partial class GameQuery(Simulation sim, int player)
     /// <summary>Every player of the match (from <see cref="GameSetup.Players"/>, or those that exist), in id order.</summary>
     public IReadOnlyList<PlayerView> Players()
     {
-        int count = Math.Max(sim.Setup?.Players ?? 0, sim.Players.Count);
+        int count = Math.Max(sim.Setup?.Players ?? 0, sim.Players.Count(p => !sim.IsNeutral(p.Id))); // seats only, not sites (WM-010)
         var tiles = new int[count];
         var units = new int[count];
         foreach (var t in sim.Tiles)

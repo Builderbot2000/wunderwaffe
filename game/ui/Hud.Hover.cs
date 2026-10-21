@@ -73,6 +73,8 @@ public partial class Hud
 
         void Line(string text, Color? color = null) => _hover.AddChild(Ui.Label(text, Ui.SmallFont, color ?? Ui.Muted, SideWidth - 24));
 
+        if (Sim.SiteOf(b.Owner) is { } site)
+            Line($"Held by {site.Name} (neutral). Destroy its cores to leave it unclaimed.", Render.Palette.Neutral.Lightened(0.3f));
         if (Territory.IsUnclaimed(b))
         {
             // WM-019: stands idle until someone builds or lands near it.

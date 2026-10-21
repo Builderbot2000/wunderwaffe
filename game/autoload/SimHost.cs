@@ -466,7 +466,8 @@ public partial class SimHost : Node
         static IEnumerable<string> Files(string dir) =>
             DirAccess.GetFilesAt(dir).Where(f => f.EndsWith(".json")).Order(StringComparer.Ordinal).Select(f => FileAccess.GetFileAsString($"{dir}/{f}"));
         var content = ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"),
-            Read("layers.json"), Files("res://data/prefabs"), Read("head_starts.json"), Files("res://data/scenarios"), Read("factions.json"));
+            Read("layers.json"), Files("res://data/prefabs"), Read("head_starts.json"), Files("res://data/scenarios"), Read("factions.json"),
+            Read("sites.json"));
         // The player's own scenarios: one that no longer fits the content is skipped, not fatal.
         if (DirAccess.DirExistsAbsolute(ScenarioDir))
         {

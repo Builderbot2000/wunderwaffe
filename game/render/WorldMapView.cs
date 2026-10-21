@@ -220,6 +220,7 @@ public partial class WorldMapView : Node2D
                 _overlay.DrawMultiline(Outline(tile), Contested, 4);
             DrawCircle(tile, capture);
         }
+        DrawSites(sim);
         if (sim.TryGetTile(SelectedTileId) is { } selected)
             _overlay.DrawMultiline(Outline(selected), Selected, 3);
 
@@ -319,6 +320,30 @@ public partial class WorldMapView : Node2D
             float t = Mathf.Clamp((float)ticks / capture, 0f, 1f);
             _overlay.DrawArc(c, inner, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * t, 48, Palette.Owner(player), 5f);
             inner -= 6;
+        }
+    }
+
+    /// <summary>
+    /// Each neutral site (WM-010) as a diamond at its layout's centre: filled while it stands, hollow once fallen (its
+    /// buildings unclaimed), with its template's name below.
+    /// </summary>
+    void DrawSites(Sim.Simulation sim)
+    {
+        var font = ThemeDB.FallbackFont;
+        foreach (var site in sim.Sites)
+        {
+            var tile = sim.Tiles[site.TileId];
+            var c = new Vector2(tile.OriginX + site.CentreX + 0.5f, tile.OriginY + site.CentreY + 0.5f) * CellPx;
+            float r = 14;
+            Vector2[] diamond = [c + new Vector2(0, -r), c + new Vector2(r, 0), c + new Vector2(0, r), c + new Vector2(-r, 0)];
+            bool fallen = sim.HasFallen(site);
+            if (fallen)
+                _overlay.DrawPolyline([.. diamond, diamond[0]], Palette.Unclaimed.Lightened(0.3f), 2);
+            else
+                _overlay.DrawColoredPolygon(diamond, Palette.Neutral);
+            string name = sim.Content.Sites.TryGetValue(site.Template, out var def) ? def.Name : site.Name; // the tile's label names the tile
+            _overlay.DrawString(font, c + new Vector2(-90, r + FontSize), name, HorizontalAlignment.Center, 180, FontSize - 2,
+                fallen ? Palette.Unclaimed.Lightened(0.3f) : Palette.Neutral.Lightened(0.3f));
         }
     }
 
