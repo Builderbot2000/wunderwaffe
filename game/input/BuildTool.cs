@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Wunderwaffe.Game.Render;
+using Wunderwaffe.Sim.Api;
 using Wunderwaffe.Sim;
 using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
@@ -199,6 +200,7 @@ public partial class BuildTool : Node2D
         if (_selected < 0 || OverUi())
             return;
         float px = Palette.CellPx;
+        DrawBuildRadii(this, _host);
         if (PickedIsPort)
             DrawPortZone(px);
         var (x, y, w, h) = Footprint(HoveredCell());
@@ -217,6 +219,31 @@ public partial class BuildTool : Node2D
             return;
         }
         DrawRect(new Rect2(x * px, y * px, w * px, h * px), tint);
+    }
+
+    /// <summary>
+    /// The local player's build radii on the viewed tile (WM-015, <see cref="GameQuery.BuildRadii"/>), outlined in their
+    /// colour: each footprint grown by its radius with round corners, the exact edge of where they may build. Drawn while
+    /// the build or blueprint tool is active.
+    /// </summary>
+    public static void DrawBuildRadii(CanvasItem canvas, SimHost host)
+    {
+        float px = Palette.CellPx;
+        var line = Palette.Owner(host.LocalPlayer) with { A = 0.7f };
+        foreach (var b in new GameQuery(host.Sim, host.LocalPlayer).BuildRadii(host.ViewedTile.Id))
+        {
+            // The covered cells' outer edge: r + 1/2 cell out from the footprint's edge cells' centres.
+            float r = (b.Radius + 0.5f) * px;
+            float x0 = (b.X + 0.5f) * px, y0 = (b.Y + 0.5f) * px, x1 = (b.X + b.Width - 0.5f) * px, y1 = (b.Y + b.Height - 0.5f) * px;
+            canvas.DrawLine(new Vector2(x0, y0 - r), new Vector2(x1, y0 - r), line, 2);
+            canvas.DrawLine(new Vector2(x0, y1 + r), new Vector2(x1, y1 + r), line, 2);
+            canvas.DrawLine(new Vector2(x0 - r, y0), new Vector2(x0 - r, y1), line, 2);
+            canvas.DrawLine(new Vector2(x1 + r, y0), new Vector2(x1 + r, y1), line, 2);
+            canvas.DrawArc(new Vector2(x0, y0), r, Mathf.Pi, Mathf.Pi * 1.5f, 24, line, 2);
+            canvas.DrawArc(new Vector2(x1, y0), r, Mathf.Pi * 1.5f, Mathf.Pi * 2, 24, line, 2);
+            canvas.DrawArc(new Vector2(x1, y1), r, 0, Mathf.Pi * 0.5f, 24, line, 2);
+            canvas.DrawArc(new Vector2(x0, y1), r, Mathf.Pi * 0.5f, Mathf.Pi, 24, line, 2);
+        }
     }
 
     /// <summary>

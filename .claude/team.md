@@ -61,9 +61,15 @@ rules on top. Branch from the Wave 0 (foundation) commit.
 
 ## Territory rules (silo A)
 
-- **Presence, not ownership, gates acting on a tile** (WM-015): `Territory.HasPresence(sim, player, tile)` (owns it, or
-  has a building or unit there). Nobody builds or lands with a cell in an enemy-owned circle while a building not of
-  theirs stands there (`Territory.EnemyCircleBlocks`). New placement-like checks should use these, not `tile.Owner`.
+- **Presence, not ownership, gates entering, landing and lift-off** (WM-015): `Territory.HasPresence(sim, player, tile)`
+  (owns it, or has a building or unit there). Nobody builds or lands with a cell in an enemy-owned circle while a
+  building not of theirs stands there (`Territory.EnemyCircleBlocks`). New checks should use these, not `tile.Owner`.
+- **Build radius gates every building operation** (WM-015, OQ-58): each cell touched must lie inside one of the
+  player's radii on that tile (`Territory.InBuildRadius`; `Placement.Check` → `PlaceResult.OutOfRange`). Sources: major
+  buildings (`BuildingDef.BuildRadius` > 0, from the footprint) and flying units (`UnitStats.BuildRadius`, live blocks).
+  Placing, frames, blueprints, removal, taking up layers and wreck salvage use it; new operations (FB-023 cut, paste,
+  graft) must too. Only a unit factory inside its own radius, match-setup stamps and scenario loads pass
+  `ignoreRadius`. Drivers read `GameQuery.BuildRadii`; the planner stays inside radii and `Planner.Reach` extends them.
 - **Who pays (FB-019, OQ-38, OQ-39):** `World/Funds.cs`. Paying on tile T (buildings, frames, blueprints, repairs) comes
   only from the player's cores standing on T, in id order, all or nothing: `Funds.CanPay` (read-only, for UI, AI,
   `GameQuery.CanAfford`) and `Funds.TryPay`. Never from neighbours, cores on units or other players. Refunds and drained

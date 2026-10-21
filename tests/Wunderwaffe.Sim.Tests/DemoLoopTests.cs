@@ -91,7 +91,9 @@ public class DemoLoopTests(ITestOutputHelper output)
         Assert.Equal(carried, landed.Stock!.Get("copper_ore"));
         Assert.True(RunUntil(() => coal.Owner == Me, Balance.CaptureSeconds + 1), "the coal tile was never claimed");
 
-        // Goal 5: ship coal home through a port pair in lane 47, paid from what the landed core brought.
+        // Goal 5: ship coal home through a port pair in lane 47, paid from what the landed core brought. The landed core's
+        // build radius (WM-015) doesn't reach the west edge: a second core on the way does.
+        Place(coal, "core", landed.X - 24, landed.Y);
         Place(coal, "drill", 1, 46);
         Place(coal, "export_port", 0, 47, West);
         // The landed core powers the tile (FB-005). Wire the coal drill to the cell under the core: down column 1,
@@ -105,12 +107,14 @@ public class DemoLoopTests(ITestOutputHelper output)
             wires.Add((landed.X, y));
         foreach (var (x, y) in wires)
             Place(coal, "wire", x, y);
+        // A third core at home reaches the east edge, where the port and the steel mill go.
+        Place(home, "core", 76, 49);
         Place(home, "import_port", 95, 47, East);
         // A belt from beside the future steel mill back to the base core carries steel (and some copper ore) home.
         for (int x = 62; x <= 91; x++)
             Place(home, "conveyor", x, 48, West);
         sim.Step();
-        Assert.Equal(5, coal.Grid.BuildingCount);
+        Assert.Equal(6, coal.Grid.BuildingCount);
         Assert.Equal(wires.Count, coal.Grid.CountOn(BuildingKind.Wire));
         Assert.Same(coal.Grid.Power.NetworkOf(landed), coal.Grid.Power.NetworkOf(coal.Grid.BuildingAt(1, 46)!));
 

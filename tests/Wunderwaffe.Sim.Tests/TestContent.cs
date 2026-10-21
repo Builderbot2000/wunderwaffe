@@ -58,11 +58,11 @@ static class TestContent
         """{ "id": "test_factory", "name": "Test Factory", "menu": "production", "kind": "wall", "category": "factory", "width": 3, "height": 3, "power": 0, "hp": 100, "cost": {} }""";
 
     /// <summary>
-    /// A test-only 1x1 core with no power and room for anything: the funds of hand-built test tiles
-    /// (<see cref="Harness.Bank"/>), kept out of power networks and layouts.
+    /// A test-only 1x1 core with no power, room for anything and a build radius over any tile (WM-015): the funds and
+    /// reach of hand-built test tiles (<see cref="Harness.Bank"/>), kept out of power networks and layouts.
     /// </summary>
     public const string Bank =
-        """{ "id": "bank", "name": "Bank", "menu": "logistics", "kind": "core", "width": 1, "height": 1, "power": 0, "capacity": 1000000000, "hp": 1000, "cost": { "copper_ore": 1 } }""";
+        """{ "id": "bank", "name": "Bank", "menu": "logistics", "kind": "core", "width": 1, "height": 1, "power": 0, "capacity": 1000000000, "buildRadius": 4096, "hp": 1000, "cost": { "copper_ore": 1 } }""";
 
     /// <summary>
     /// The shipped content (no test bank) with every item, recipe and building id replaced by an opaque one (<c>i0</c>,

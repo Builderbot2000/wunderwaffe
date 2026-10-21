@@ -296,21 +296,24 @@ public sealed partial class GameQuery(Simulation sim, int player)
 
     /// <summary>See <see cref="Planner.FindSpot"/>.</summary>
     public Spot? FindSpot(int tileId, string buildingId, string? recipeId = null, string? onDeposit = null, int touching = -1,
-        int nearX = -1, int nearY = -1, int zone = -1) =>
-        sim.TryGetTile(tileId) is { } t ? Planner.FindSpot(sim, t, Player, buildingId, recipeId, onDeposit, touching, nearX, nearY, zone) : null;
+        int nearX = -1, int nearY = -1, int zone = -1, bool anywhere = false) =>
+        sim.TryGetTile(tileId) is { } t ? Planner.FindSpot(sim, t, Player, buildingId, recipeId, onDeposit, touching, nearX, nearY, zone, anywhere) : null;
+
+    /// <summary>Where a core carries the build radius toward cell (x, y) (WM-015); see <see cref="Planner.Reach"/>.</summary>
+    public Spot? ReachSpot(int tileId, int x, int y) => sim.TryGetTile(tileId) is { } t ? Planner.Reach(sim, t, Player, x, y) : null;
 
     /// <summary>See <see cref="Planner.RouteBelt"/>.</summary>
     public IReadOnlyList<BeltStep>? RouteBelt(int tileId, int fromBuilding, int toBuilding) =>
-        sim.TryGetTile(tileId) is { } t ? Planner.RouteBelt(sim, t, fromBuilding, toBuilding) : null;
+        sim.TryGetTile(tileId) is { } t ? Planner.RouteBelt(sim, t, Player, fromBuilding, toBuilding) : null;
 
     /// <summary>See <see cref="Planner.FindFrame"/>.</summary>
     public Spot? FindFrame(int tileId, int width, int height) =>
-        sim.TryGetTile(tileId) is { } t ? Planner.FindFrame(sim, t, width, height) : null;
+        sim.TryGetTile(tileId) is { } t ? Planner.FindFrame(sim, t, Player, width, height) : null;
 
     /// <summary>See <see cref="Planner.PlanLine"/>.</summary>
     public IReadOnlyList<PlannedBuilding>? PlanLine(int tileId, string? depositItem, int source, IReadOnlyList<Stage> stages, int sink,
-        int zone = -1) =>
-        sim.TryGetTile(tileId) is { } t ? Planner.PlanLine(sim, t, Player, depositItem, source, stages, sink, zone) : null;
+        int zone = -1, bool anywhere = false) =>
+        sim.TryGetTile(tileId) is { } t ? Planner.PlanLine(sim, t, Player, depositItem, source, stages, sink, zone, anywhere) : null;
 
     /// <summary>The building whose output ends up in (see <see cref="Planner.OutletOf"/>), or -1.</summary>
     public int OutletOf(int tileId, int buildingId) =>

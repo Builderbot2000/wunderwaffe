@@ -53,6 +53,9 @@ public sealed class TileState(int id, int originX, int originY, TileGrid grid)
     /// <summary>Whose buildings are in the circle, cached until <see cref="TileGrid.Revision"/> changes.</summary>
     internal (int Revision, int[] Players) CircleCache = (-1, []);
 
+    /// <summary>Buildings with a build radius (WM-015), every player's, in id order; cached until <see cref="TileGrid.Revision"/> changes.</summary>
+    internal (int Revision, PlacedBuilding[] Majors) RadiusCache = (-1, []);
+
     /// <summary>Whether local cell (x, y) is in the victory circle: its centre is within the radius of the circle's centre.</summary>
     public bool InCircle(int x, int y)
     {

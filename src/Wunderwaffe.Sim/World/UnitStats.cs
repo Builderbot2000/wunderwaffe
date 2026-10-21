@@ -34,6 +34,16 @@ public sealed record UnitStats(
     /// <summary>Big enough to count as a Wunderwaffe (WW-001). Same rules otherwise.</summary>
     public bool IsWunderwaffe => Cells > Balance.WunderwaffeCells;
 
+    /// <summary>
+    /// A flying unit's build radius in cells (WM-015, OQ-58), from its live blocks (Hp above 0), so lost blocks shrink it:
+    /// <see cref="Balance.VehicleRadiusBase"/> + <see cref="Balance.VehicleRadiusPerBlock"/> per block, capped.
+    /// </summary>
+    public static int BuildRadius(Unit unit) => BuildRadius(unit.Blocks.Count(b => b.Hp > 0));
+
+    /// <inheritdoc cref="BuildRadius(Unit)"/>
+    public static int BuildRadius(int liveBlocks) =>
+        liveBlocks <= 0 ? 0 : Math.Min(Balance.VehicleRadiusMax, Balance.VehicleRadiusBase + Balance.VehicleRadiusPerBlock * liveBlocks);
+
     public static UnitStats Of(ContentDb content, Unit unit) =>
         Of(content, unit.Blocks.Select(b => (b.DefId, b.Hp)), unit.Cells.Count);
 

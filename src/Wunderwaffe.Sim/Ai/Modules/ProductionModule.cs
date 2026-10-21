@@ -92,7 +92,10 @@ public sealed class ProductionModule : IAiModule
             if (c.ExportPort is { } def)
             {
                 var (_, _, x, y) = ExportRun(c, from, h, chain.Deposit);
-                if (c.Place($"{key}:export", score, from, def.Id, c.Q.FindSpot(from, def.Id, nearX: x, nearY: y, zone: h)) is { } p)
+                // Out of reach (WM-015): a core toward where the port would go.
+                if ((c.Place($"{key}:export", score, from, def.Id, c.Q.FindSpot(from, def.Id, nearX: x, nearY: y, zone: h))
+                     ?? (c.Q.FindSpot(from, def.Id, nearX: x, nearY: y, zone: h, anywhere: true) is { } far
+                         ? c.Reach($"{key}:export", score, from, [(far.X, far.Y, def.Footprint(0))], (far.X, far.Y)) : null)) is { } p)
                     yield return p;
             }
             yield break;

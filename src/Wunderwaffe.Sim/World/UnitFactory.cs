@@ -196,7 +196,7 @@ public static class UnitFactory
         if (blueprint == null)
             return ProjectResult.Ok;
 
-        var result = Blueprints.Check(sim, tile, player, blueprint, ox, oy, rotation, flip, out var p);
+        var result = Blueprints.Check(sim, tile, player, blueprint, ox, oy, rotation, flip, out var p, ignoreRadius: true);
         plan = p;
         if (result == BlueprintResult.Empty)
             return ProjectResult.Empty;
@@ -398,7 +398,7 @@ public static class UnitFactory
         else
         {
             var b = bp.Blocks[step.Block];
-            Blueprints.CheckBlock(sim, tile, factory.Owner, b, step.X, step.Y, out var p, ignoreCost: true);
+            Blueprints.CheckBlock(sim, tile, factory.Owner, b, step.X, step.Y, out var p, ignoreCost: true, ignoreRadius: true);
             var recipe = p.RecipeId == null ? null : sim.Content.Recipes[p.RecipeId];
             tile.Grid.Add(p.Def, factory.Owner, p.X, p.Y, p.Width, p.Height, p.Rotation, recipe);
         }
@@ -410,8 +410,8 @@ public static class UnitFactory
     static bool CanPlace(Simulation sim, TileState tile, PlacedBuilding factory, Blueprint bp, FactoryStep step) =>
         step.Block < 0
             ? tile.Grid.Has(BuildingKind.Frame, step.X, step.Y)
-              || (tile.Grid.BuildingAt(step.X, step.Y) == null && UnitAssembly.CheckFrame(sim, tile, factory.Owner, step.X, step.Y, ignoreCost: true) == PlaceResult.Ok)
-            : Blueprints.CheckBlock(sim, tile, factory.Owner, bp.Blocks[step.Block], step.X, step.Y, out _, ignoreCost: true) == PlaceResult.Ok;
+              || (tile.Grid.BuildingAt(step.X, step.Y) == null && UnitAssembly.CheckFrame(sim, tile, factory.Owner, step.X, step.Y, ignoreCost: true, ignoreRadius: true) == PlaceResult.Ok)
+            : Blueprints.CheckBlock(sim, tile, factory.Owner, bp.Blocks[step.Block], step.X, step.Y, out _, ignoreCost: true, ignoreRadius: true) == PlaceResult.Ok;
 
     static bool Has(SortedDictionary<string, int> buffer, IReadOnlyDictionary<string, int> cost) =>
         cost.All(kv => buffer.GetValueOrDefault(kv.Key) >= kv.Value);

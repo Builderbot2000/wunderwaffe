@@ -26,6 +26,9 @@ public enum PlaceResult
 
     /// <summary>The footprint touches an enemy-owned victory circle while a building not of the player's stands in it (WM-015).</summary>
     EnemyCircle,
+
+    /// <summary>Some cell lies outside every build radius of the player's on the tile (WM-015, <see cref="Territory.InBuildRadius"/>).</summary>
+    OutOfRange,
 }
 
 /// <summary>A placement that passed every check, ready to apply. The player's cores on the tile pay (<see cref="Funds"/>).</summary>
@@ -39,7 +42,7 @@ public static class Placement
 {
     public static PlaceResult Check(
         Simulation sim, TileState tile, int player, string buildingId, int x, int y, int rotation,
-        string? recipeId, out PlacementPlan plan, bool ignoreCost = false)
+        string? recipeId, out PlacementPlan plan, bool ignoreCost = false, bool ignoreRadius = false)
     {
         plan = default;
         var content = sim.Content;
@@ -53,6 +56,10 @@ public static class Placement
         TileGrid grid = tile.Grid;
         if (!grid.InBounds(x, y, w, h))
             return PlaceResult.OutOfBounds;
+        // Every cell inside one of the player's build radii (WM-015), unless the caller has its own reach (a unit
+        // factory's projection radius, UD-006) or puts it there by fiat (scenarios).
+        if (!ignoreRadius && !Territory.InBuildRadius(sim, player, tile, x, y, w, h))
+            return PlaceResult.OutOfRange;
         // Layer buildings (frame, cables, platforms) follow their layer's stacking rules (FB-022).
         int layer = content.Layers.Of(def).Layer;
         if (layer >= 0)

@@ -191,7 +191,8 @@ public sealed partial class Simulation(ContentDb content)
 
     /// <summary>
     /// Removes a building of the player's and refunds it (FB-002), or, on a cell with no building, the topmost layer
-    /// building there (cable, frame, platform: FB-022), if nothing stands on it that needs it.
+    /// building there (cable, frame, platform: FB-022), if nothing stands on it that needs it. Needs the whole footprint
+    /// inside one of the player's build radii (WM-015).
     /// A player's last core stays (WM-016). The refund and whatever it held go to the player's nearest core on the tile
     /// (<see cref="Funds.Refund(TileState, int, int, int, int, int, IReadOnlyDictionary{string, int}, int)"/>), or are lost.
     /// </summary>
@@ -200,7 +201,8 @@ public sealed partial class Simulation(ContentDb content)
         var grid = tile.Grid;
         if (grid.BuildingAt(x, y) is not { } b)
             return grid.WreckAt(x, y) != null ? Combat.ClearWreck(this, tile, player, x, y) : TryLift(tile, player, TopLayer(grid, x, y), x, y);
-        if (b.Owner != player || (b.Kind == BuildingKind.Core && CoreCount(player) <= 1))
+        if (b.Owner != player || (b.Kind == BuildingKind.Core && CoreCount(player) <= 1)
+            || !Territory.InBuildRadius(this, player, tile, b.X, b.Y, b.Width, b.Height))
             return false;
 
         grid.Remove(b);
@@ -224,12 +226,12 @@ public sealed partial class Simulation(ContentDb content)
 
     /// <summary>
     /// Takes up the entry of a building layer at a cell and refunds it (FB-022). Layer buildings are ownerless: anyone
-    /// with presence may, unless something standing on it needs it (<see cref="Placement.CanLift"/>).
+    /// with a build radius over the cell may (WM-015), unless something standing on it needs it (<see cref="Placement.CanLift"/>).
     /// </summary>
     internal bool TryLift(TileState tile, int player, int layer, int x, int y)
     {
         var grid = tile.Grid;
-        if (grid.LaidAt(layer, x, y) is not { } def || !Territory.HasPresence(this, player, tile) || !Placement.CanLift(Content, grid, layer, x, y))
+        if (grid.LaidAt(layer, x, y) is not { } def || !Territory.InBuildRadius(this, player, tile, x, y) || !Placement.CanLift(Content, grid, layer, x, y))
             return false;
         grid.SetEntry(layer, x, y, 0);
         Funds.Refund(tile, player, x, y, 1, 1, def.Cost, Balance.RefundPercent);

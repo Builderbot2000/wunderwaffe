@@ -62,13 +62,14 @@ public static class UnitAssembly
 
     /// <summary>
     /// Laying a cell of the content's frame (<see cref="ContentDb.Frame"/>, a building on the frame layer, FB-022): the
-    /// ordinary placement check, so it needs presence on the tile (WM-015), stays out of a blocked enemy circle, and is
-    /// paid by the player's cores on the tile (<see cref="Funds"/>).
+    /// ordinary placement check, so it needs one of the player's build radii (WM-015), stays out of a blocked enemy
+    /// circle, and is paid by the player's cores on the tile (<see cref="Funds"/>).
     /// </summary>
     /// <param name="ignoreCost">Skip the cost check, for callers that pay a total themselves.</param>
-    public static PlaceResult CheckFrame(Simulation sim, TileState tile, int player, int x, int y, bool ignoreCost = false) =>
+    /// <param name="ignoreRadius">Skip the build radius, for a unit factory inside its own projection radius (UD-006).</param>
+    public static PlaceResult CheckFrame(Simulation sim, TileState tile, int player, int x, int y, bool ignoreCost = false, bool ignoreRadius = false) =>
         sim.Content.Frame is { } frame
-            ? Placement.Check(sim, tile, player, frame.Id, x, y, 0, null, out _, ignoreCost)
+            ? Placement.Check(sim, tile, player, frame.Id, x, y, 0, null, out _, ignoreCost, ignoreRadius)
             : PlaceResult.NoSuchBuilding;
 
     internal static void PlaceFrame(Simulation sim, TileState tile, int player, int x, int y)
@@ -79,7 +80,7 @@ public static class UnitAssembly
         tile.Grid.Lay(sim.Content.Frame, x, y);
     }
 
-    /// <summary>Frames are ownerless: anyone with presence may take one up, even under a building; the refund goes to their nearest core there, if any.</summary>
+    /// <summary>Frames are ownerless: anyone with a build radius over the cell may take one up, even under a building; the refund goes to their nearest core there, if any.</summary>
     internal static void RemoveFrame(Simulation sim, TileState tile, int player, int x, int y) =>
         sim.TryLift(tile, player, tile.Grid.Layers.Of(BuildingKind.Frame), x, y);
 

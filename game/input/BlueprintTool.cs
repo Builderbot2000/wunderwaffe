@@ -297,13 +297,15 @@ public partial class BlueprintTool : Node2D
 
     static string ProblemText(BlueprintPlan? plan) =>
         plan?.Problems.FirstOrDefault() is { } first
-            ? $"{GameText.Plural(plan.Problems.Count, "block", "blocks")} can't go here ({first.Result})"
+            ? $"{GameText.Plural(plan.Problems.Count, "block", "blocks")} can't go here ({(first.Result == PlaceResult.OutOfRange ? "out of build range" : first.Result)})"
             : "can't go here";
 
     public override void _Draw()
     {
         float px = Palette.CellPx;
         var tile = _host.ViewedTile;
+        if (Mode == BlueprintMode.Place && !OverUi())
+            BuildTool.DrawBuildRadii(this, _host); // WM-015: every block must land inside one
         if (SelectedFactory is { } factory)
         {
             DrawFactory(tile, factory, px);

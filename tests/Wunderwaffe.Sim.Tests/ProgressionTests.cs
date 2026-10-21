@@ -21,7 +21,7 @@ public class ProgressionTests
 
     const string Buildings = """
         [
-          { "id": "core", "name": "Core", "menu": "production", "kind": "core", "width": 1, "height": 1, "power": 0, "capacity": 100, "hp": 100, "cost": { "ore": 1 } },
+          { "id": "core", "name": "Core", "menu": "production", "kind": "core", "width": 1, "height": 1, "power": 0, "capacity": 100, "buildRadius": 20, "hp": 100, "cost": { "ore": 1 } },
           { "id": "drill", "name": "Drill", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
           { "id": "furnace", "name": "Furnace", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} },
           { "id": "wall", "name": "Wall", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "cost": {} }
@@ -35,12 +35,13 @@ public class ProgressionTests
         ]
         """;
 
-    /// <summary>A 10x10 tile owned by <see cref="Harness.Me"/> with an ore deposit under (0, 0).</summary>
+    /// <summary>A 10x10 tile owned by <see cref="Harness.Me"/> with an ore deposit under (0, 0) and a core of theirs in the far corner (its build radius covers the tile).</summary>
     static (Simulation Sim, TileState Tile) Small()
     {
         var sim = new Simulation(ContentDb.FromJson(Items, Recipes, Buildings, Goals));
         var tile = sim.AddTile(0, 0, Me, size: 10);
         tile.Grid.SetDeposit(0, 0, "ore");
+        PutCore(sim, tile, Me, 9, 9);
         return (sim, tile);
     }
 

@@ -358,6 +358,8 @@ public sealed class ContentDb
                 errors.Add($"building '{b.Id}': a core needs a capacity > 0 and a cost (nothing is free, OQ-37)");
             if (b.Kind != BuildingKind.Core && b.Capacity != 0)
                 errors.Add($"building '{b.Id}': only cores have a capacity");
+            if (b.BuildRadius < 0 || (b.Layer != null && b.BuildRadius != 0))
+                errors.Add($"building '{b.Id}': buildRadius must be >= 0, and layer buildings (no owner) have none");
         }
 
         // A recipe with no outputs only makes sense as fuel for a generator (FB-005).

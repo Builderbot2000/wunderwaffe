@@ -47,4 +47,16 @@ public static class Balance
 
     /// <summary>Ticks between upkeep payments; upkeep is declared per minute (UD-013).</summary>
     public const int UpkeepPeriod = 60 * Simulation.TicksPerSecond;
+
+    /// <summary>
+    /// A flying unit's build radius in cells (WM-015, OQ-58): this base plus <see cref="VehicleRadiusPerBlock"/> per live
+    /// block, at most <see cref="VehicleRadiusMax"/>. The three-block scout reaches 12 cells.
+    /// </summary>
+    public const int VehicleRadiusBase = 6;
+
+    /// <inheritdoc cref="VehicleRadiusBase"/>
+    public const int VehicleRadiusPerBlock = 2;
+
+    /// <inheritdoc cref="VehicleRadiusBase"/>
+    public const int VehicleRadiusMax = 32;
 }

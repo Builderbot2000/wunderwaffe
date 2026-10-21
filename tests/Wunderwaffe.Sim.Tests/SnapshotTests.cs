@@ -37,31 +37,31 @@ public class SnapshotTests(ITestOutputHelper output)
 
             // Drills on the tile's own deposits (generated from the seed, so a replay has them too): copper straight into a
             // core of its own, iron through a smelter into another.
-            var copper = Spot(_home, "copper_ore", 6);
+            var copper = Spot(Sim, _home, "copper_ore", 6);
             Place(Sim, _home, "drill", copper.X, copper.Y);
             Place(Sim, _home, "core_large", copper.X + 2, copper.Y);
-            var iron = Spot(_home, "iron_ore", 8);
+            var iron = Spot(Sim, _home, "iron_ore", 8);
             Place(Sim, _home, "drill", iron.X, iron.Y);
             Place(Sim, _home, "smelter", iron.X + 2, iron.Y, recipe: "smelt_iron");
             Place(Sim, _home, "core_large", iron.X + 4, iron.Y);
             Sim.Step();
             Assert.Equal(before + 5, _home.Grid.BuildingCount);
 
-            var (x, y) = Open(_home, 4, 2);
+            var (x, y) = Open(_home, 4, 2, Sim);
             _unit = Harness.Scout(Sim, _home, x + 1, y);
             _here = (_home.CenterX - _home.OriginX, _home.CenterY - _home.OriginY);
             _there = (_east.CenterX - _east.OriginX, _east.CenterY - _east.OriginY);
         }
 
         /// <summary>A free run of <paramref name="width"/> x 3 buildable cells whose first 2 x 2 lies on <paramref name="item"/>.</summary>
-        static (int X, int Y) Spot(TileState tile, string item, int width)
+        static (int X, int Y) Spot(Simulation sim, TileState tile, string item, int width)
         {
             var g = tile.Grid;
             for (int y = 0; y < g.Height - 2; y++)
             {
                 for (int x = 0; x < g.Width - width; x++)
                 {
-                    if (g.InBounds(x, y, width, 3) && g.Buildable(x, y, width, 3) && g.IsFree(x, y, width, 3)
+                    if (g.InBounds(x, y, width, 3) && g.Buildable(x, y, width, 3) && g.IsFree(x, y, width, 3) && Territory.InBuildRadius(sim, Me, tile, x, y, width, 3)
                         && g.DepositAt(x, y) == item && g.DepositAt(x + 1, y) == item && g.DepositAt(x, y + 1) == item && g.DepositAt(x + 1, y + 1) == item)
                         return (x, y);
                 }
@@ -213,7 +213,7 @@ public class SnapshotTests(ITestOutputHelper output)
         sim.Step();
 
         var core = home.Grid.Buildings.First(b => b.Kind == BuildingKind.Core);
-        var (x, y) = Open(home, 14, 6);
+        var (x, y) = Open(home, 14, 6, sim);
         void Put(string id, int dx, int dy, int rotation = 0, string? recipe = null) =>
             sim.Enqueue(new PlaceBuildingCommand(Me, home.Id, id, x + dx, y + dy, rotation, recipe));
         // A battery, a fuel generator, a laser turret and a second core on the core's network: each touching it.

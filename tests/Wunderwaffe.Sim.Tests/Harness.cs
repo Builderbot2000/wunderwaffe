@@ -47,13 +47,22 @@ static class Harness
     public static void Stock(PlacedBuilding core, string item, long n) => core.Stock!.Add(item, n);
 
     /// <summary>
-    /// The player's first core on the tile, which pays first (OQ-38); if they have none, an empty bank put unpaid on the
-    /// free buildable unframed cell nearest the bottom-right corner, out of the way of test layouts.
+    /// The player's first core on the tile, which pays first (OQ-38). Funding also gives reach: unless the player has a
+    /// bank there already, an empty one is put unpaid on the free buildable unframed cell nearest the bottom-right corner,
+    /// out of the way of test layouts, so its build radius covers the tile (WM-015); with no core before, it is the one returned.
     /// </summary>
     public static PlacedBuilding Fund(Simulation sim, TileState tile, int player = Me)
     {
-        if (Funds.Cores(tile, player).FirstOrDefault() is { } core)
-            return core;
+        var first = Funds.Cores(tile, player).FirstOrDefault();
+        if (first != null && tile.Grid.Cores.Any(c => c.Owner == player && c.DefId == "bank"))
+            return first;
+        var bank = Corner(sim, tile, player);
+        return first ?? bank;
+    }
+
+    /// <summary>An empty bank on the free buildable unframed cell nearest the bottom-right corner.</summary>
+    static PlacedBuilding Corner(Simulation sim, TileState tile, int player)
+    {
         var g = tile.Grid;
         for (int y = g.Height - 1; y >= 0; y--)
         {
@@ -81,6 +90,12 @@ static class Harness
         core.Stock!.Add(items);
         return core;
     }
+
+    /// <summary>
+    /// An empty bank of <paramref name="player"/>'s at (x, y), unpaid: a build radius over the whole tile (WM-015) but no
+    /// funds. Stands in for having landed there; put it far from the cells a test pays or refunds at.
+    /// </summary>
+    public static PlacedBuilding Foothold(Simulation sim, TileState tile, int player, int x, int y) => sim.AddCore(tile, player, x, y, "bank");
 
     /// <summary>A core of <paramref name="player"/>'s at (x, y), put down unpaid and empty (see <see cref="Stock"/>).</summary>
     public static PlacedBuilding PutCore(Simulation sim, TileState tile, int player, int x, int y, string? defId = null) =>
@@ -130,17 +145,19 @@ static class Harness
     }
 
     /// <summary>
-    /// Top-left of the first w x h block of free, buildable cells, row by row. For generated tiles, whose shape and
+    /// Top-left of the first w x h block of free, buildable cells, row by row; with <paramref name="reach"/>, only inside
+    /// <paramref name="player"/>'s build radii there (WM-015), for sessions built by commands alone. For generated tiles, whose shape and
     /// terrain depend on the seed.
     /// </summary>
-    public static (int X, int Y) Open(TileState tile, int w, int h)
+    public static (int X, int Y) Open(TileState tile, int w, int h, Simulation? reach = null, int player = Me)
     {
         var g = tile.Grid;
         for (int y = 0; y < g.Height; y++)
         {
             for (int x = 0; x < g.Width; x++)
             {
-                if (g.InBounds(x, y, w, h) && g.Buildable(x, y, w, h) && g.IsFree(x, y, w, h))
+                if (g.InBounds(x, y, w, h) && g.Buildable(x, y, w, h) && g.IsFree(x, y, w, h)
+                    && (reach == null || Territory.InBuildRadius(reach, player, tile, x, y, w, h)))
                     return (x, y);
             }
         }

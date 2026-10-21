@@ -5,8 +5,18 @@ namespace Wunderwaffe.Sim.Api;
 /// <summary>Territory queries (silo A): presence, victory circles, claims, Contested tiles and who pays.</summary>
 public sealed partial class GameQuery
 {
-    /// <summary>Whether <see cref="Player"/> may build or lay frame on the tile (WM-015).</summary>
+    /// <summary>Whether <see cref="Player"/> has a building or unit on the tile, or owns it: enough to enter it and land (WM-015).</summary>
     public bool HasPresence(int tileId) => Sim.TryGetTile(tileId) is { } t && Territory.HasPresence(Sim, Player, t);
+
+    /// <summary>
+    /// <see cref="Player"/>'s build radii on the tile (WM-015): major buildings' footprints and flying units' centre cells
+    /// with their radius in cells, tile-local. Building operations need every cell inside one.
+    /// </summary>
+    public IReadOnlyList<BuildRadius> BuildRadii(int tileId) => Sim.TryGetTile(tileId) is { } t ? Territory.BuildRadii(Sim, Player, t) : [];
+
+    /// <summary>Whether every cell of the area is inside one of <see cref="Player"/>'s build radii on the tile (WM-015).</summary>
+    public bool InBuildRadius(int tileId, int x, int y, int width = 1, int height = 1) =>
+        Sim.TryGetTile(tileId) is { } t && Territory.InBuildRadius(Sim, Player, t, x, y, width, height);
 
     /// <summary>Whether local cell (x, y) of the tile is in its victory circle (WM-014).</summary>
     public bool InCircle(int tileId, int x, int y) => Sim.TryGetTile(tileId) is { } t && t.InCircle(x, y);

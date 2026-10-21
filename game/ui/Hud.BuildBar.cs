@@ -148,6 +148,8 @@ public partial class Hud
                 return "a wreck is in the way: right-click it with a building picked to salvage it";
             case PlaceResult.NoPresence:
                 return "land a unit here first: you need a building or unit on a tile to build on it";
+            case PlaceResult.OutOfRange:
+                return "out of range: build within the radius of your cores, factories, turrets or units here";
             case PlaceResult.EnemyCircle:
                 return "an enemy building holds this victory circle";
             default:

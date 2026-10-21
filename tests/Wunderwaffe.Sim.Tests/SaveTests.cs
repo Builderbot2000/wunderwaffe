@@ -21,7 +21,7 @@ public class SaveTests(ITestOutputHelper output)
         var home = sim.Tiles[sim.StartTileId];
         // Home's shape and terrain depend on the seed, so build on the first open ground: belts on its top row, the
         // unit three rows down.
-        var (x0, y0) = Harness.Open(home, 12, 6);
+        var (x0, y0) = Harness.Open(home, 12, 6, sim);
         int ux = x0, uy = y0 + 3;
         void At(int seconds, params Command[] commands)
         {

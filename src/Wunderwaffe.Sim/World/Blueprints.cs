@@ -139,7 +139,8 @@ public static class Blueprints
     /// (<see cref="Funds.CanPay"/>). All or nothing.
     /// </summary>
     public static BlueprintResult Check(
-        Simulation sim, TileState tile, int player, Blueprint blueprint, int x, int y, int rotation, bool flip, out BlueprintPlan plan)
+        Simulation sim, TileState tile, int player, Blueprint blueprint, int x, int y, int rotation, bool flip, out BlueprintPlan plan,
+        bool ignoreRadius = false)
     {
         var defs = sim.Content.Buildings;
         var bp = Transform(defs, blueprint, rotation, flip);
@@ -156,7 +157,7 @@ public static class Blueprints
         {
             var b = bp.Blocks[i];
             int bx = x + b.X, by = y + b.Y;
-            var result = CheckBlock(sim, tile, player, b, bx, by, out var placed, ignoreCost: true);
+            var result = CheckBlock(sim, tile, player, b, bx, by, out var placed, ignoreCost: true, ignoreRadius);
             if (result == PlaceResult.Ok && !Claim(taken, placed))
                 result = PlaceResult.Blocked;
             if (result != PlaceResult.Ok)
@@ -173,7 +174,7 @@ public static class Blueprints
             int fx = x + f.X, fy = y + f.Y;
             if (tile.Grid.InBounds(fx, fy) && tile.Grid.Has(BuildingKind.Frame, fx, fy))
                 continue;
-            var result = UnitAssembly.CheckFrame(sim, tile, player, fx, fy, ignoreCost: true);
+            var result = UnitAssembly.CheckFrame(sim, tile, player, fx, fy, ignoreCost: true, ignoreRadius);
             if (result != PlaceResult.Ok)
             {
                 problems.Add(new BlueprintProblem(-1, fx, fy, result));
@@ -193,10 +194,11 @@ public static class Blueprints
     /// the deposit under it, so a recorded drill mines whatever it lands on.
     /// </summary>
     internal static PlaceResult CheckBlock(
-        Simulation sim, TileState tile, int player, BlueprintBlock b, int x, int y, out PlacementPlan plan, bool ignoreCost)
+        Simulation sim, TileState tile, int player, BlueprintBlock b, int x, int y, out PlacementPlan plan, bool ignoreCost,
+        bool ignoreRadius = false)
     {
         string? recipe = b.RecipeId is { } id && sim.Content.Recipes.TryGetValue(id, out var r) && r.Inputs.Count == 0 ? null : b.RecipeId;
-        return Placement.Check(sim, tile, player, b.DefId, x, y, b.Rotation, recipe, out plan, ignoreCost);
+        return Placement.Check(sim, tile, player, b.DefId, x, y, b.Rotation, recipe, out plan, ignoreCost, ignoreRadius);
     }
 
     static bool Claim(HashSet<(int, int)> taken, PlacementPlan p)
@@ -251,12 +253,13 @@ public static class Blueprints
 
     /// <summary>
     /// Match setup (FB-021): lays a prefab with its top-left at (x, y) for free, its first core holding the prefab's
-    /// items. The spot must already be free and buildable; anything the placement rules refuse there is a content or
+    /// items, with or without a build radius there (WM-015). The spot must already be free and buildable; anything the
+    /// placement rules refuse there is a content or
     /// setup error and throws.
     /// </summary>
     internal static void Stamp(Simulation sim, TileState tile, int player, Content.PrefabDef prefab, int x, int y)
     {
-        var result = Check(sim, tile, player, prefab.Blueprint, x, y, 0, false, out var plan);
+        var result = Check(sim, tile, player, prefab.Blueprint, x, y, 0, false, out var plan, ignoreRadius: true);
         if (result is not (BlueprintResult.Ok or BlueprintResult.CannotAfford))
             throw new InvalidOperationException(
                 $"prefab '{prefab.Id}' doesn't fit at ({x}, {y}) on tile {tile.Id}: {string.Join(", ", plan.Problems.Select(p => p.Result))}");

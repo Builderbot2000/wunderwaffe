@@ -205,6 +205,10 @@ public sealed class SnakeCaseEnumConverter() : JsonStringEnumConverter(JsonNamin
 /// <param name="Layer">
 /// Platforms, cables and frames: the cell layer (layers.json, FB-022) the building is laid on instead of the building grid.
 /// </param>
+/// <param name="BuildRadius">
+/// Major buildings (cores, unit factories, defences): cells from its footprint within which its owner may build (WM-015,
+/// OQ-58), from the moment it is placed; 0 for minor buildings such as conveyors. Never reaches past its tile.
+/// </param>
 public sealed record BuildingDef(
     string Id,
     string Name,
@@ -236,7 +240,8 @@ public sealed record BuildingDef(
     string Menu = "",
     int Capacity = 0,
     int PowerRadius = 0,
-    string? Layer = null)
+    string? Layer = null,
+    int BuildRadius = 0)
 {
     /// <summary>Build menu tabs, in the order the HUD shows them (and Shift+1.. picks them).</summary>
     public static readonly string[] Menus = ["production", "logistics", "power", "units", "combat", "boosters"];

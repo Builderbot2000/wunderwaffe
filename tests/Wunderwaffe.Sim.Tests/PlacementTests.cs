@@ -73,9 +73,10 @@ public class PlacementTests
     public void RotationSwapsFootprint()
     {
         var content = Content.ContentDb.FromJson(
-            "[]", "[]", """[ { "id": "wall", "name": "Wall", "menu": "production", "width": 1, "height": 3, "power": 0, "hp": 10, "cost": {} } ]""");
+            "[]", "[]", """[ { "id": "wall", "name": "Wall", "menu": "production", "width": 1, "height": 3, "power": 0, "buildRadius": 20, "hp": 10, "cost": {} } ]""");
         var sim = new Simulation(content);
         var tile = sim.AddTile(0, 0, Player, size: 10);
+        PutCore(sim, tile, Player, 5, 5, "wall"); // Only for its build radius (WM-015).
 
         Placement.Check(sim, tile, Player, "wall", 0, 0, 1, null, out var plan);
         Assert.Equal((3, 1), (plan.Width, plan.Height));

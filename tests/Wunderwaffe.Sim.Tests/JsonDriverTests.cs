@@ -67,8 +67,21 @@ public class JsonDriverTests(ITestOutputHelper output)
             c.Step(1);
             return true;
         }
-        JsonArray? Line(int tile, string? deposit, object[] stages, int sink, int zone = -1) =>
-            c.Query("PlanLine", new { tileId = tile, depositItem = deposit, source = -1, stages, sink, zone })?.AsArray();
+        // Building needs a build radius (WM-015): cores toward a cell until it is in reach.
+        void Reach(int tile, int x, int y)
+        {
+            while (c.Query("ReachSpot", new { tileId = tile, x, y }) is { } s)
+                Assert.True(Build(tile, [new JsonObject { ["BuildingId"] = "core", ["X"] = (int)s["X"]!, ["Y"] = (int)s["Y"]!, ["Rotation"] = 0 }]));
+        }
+        // A line in reach; if there is none, the radius is first carried to every building of one planned anywhere.
+        JsonArray? Line(int tile, string? deposit, object[] stages, int sink, int zone = -1)
+        {
+            if (c.Query("PlanLine", new { tileId = tile, depositItem = deposit, source = -1, stages, sink, zone })?.AsArray() is { } plan)
+                return plan;
+            foreach (var p in c.Query("PlanLine", new { tileId = tile, depositItem = deposit, source = -1, stages, sink, zone, anywhere = true })?.AsArray() ?? [])
+                Reach(tile, (int)p!["X"]!, (int)p["Y"]!);
+            return c.Query("PlanLine", new { tileId = tile, depositItem = deposit, source = -1, stages, sink, zone })?.AsArray();
+        }
         void RunUntil(Func<bool> done, int maxSeconds)
         {
             for (int s = 0; s < maxSeconds && !done(); s += 10)
@@ -120,6 +133,8 @@ public class JsonDriverTests(ITestOutputHelper output)
 
         // Goal 5: coal drill into an export port facing home, paid from what the landed scout's core brought; import
         // port and steel mill at home, belt to the base core.
+        var far = c.Query("FindSpot", new { tileId = coal, buildingId = "export_port", zone = home, anywhere = true })!;
+        Reach(coal, (int)far["X"]!, (int)far["Y"]!);
         var spot = c.Query("FindSpot", new { tileId = coal, buildingId = "export_port", zone = home })!;
         Assert.True(Build(coal, [new JsonObject { ["BuildingId"] = "export_port", ["X"] = (int)spot["X"]!, ["Y"] = (int)spot["Y"]!, ["Rotation"] = 0 }]));
         int export = (int)c.Query("FindBuilding", new { tileId = coal, defId = "export_port" })!["Id"]!;

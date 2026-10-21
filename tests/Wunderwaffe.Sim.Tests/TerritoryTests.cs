@@ -32,23 +32,14 @@ public class TerritoryTests
 
     static int Capture(Simulation sim) => Expansion.CaptureTicks(sim);
 
-    // --- presence and paying (WM-015) ---
-
-    [Fact]
-    public void BuildingNeedsABuildingOrUnitOnTheTile()
-    {
-        var (sim, _, east) = TwoTiles();
-        Assert.Equal(PlaceResult.NoPresence, Placement.Check(sim, east, Me, "conveyor", 0, 0, 0, null, out _));
-        Plant(sim, east, Me, "conveyor", 0, 0);
-        Assert.NotEqual(PlaceResult.NoPresence, Placement.Check(sim, east, Me, "conveyor", 1, 0, 0, null, out _));
-    }
+    // --- paying (FB-019); where one may build is BuildRadiusTests (WM-015) ---
 
     [Fact]
     public void ANeighboursStockNeverPaysOnlyCoresOnTheTileDo()
     {
         // FB-019: home is mine and stocked, but east is paid only from my cores standing on east.
         var (sim, home, east) = TwoTiles();
-        Plant(sim, east, Me, "conveyor", 0, 0);
+        Foothold(sim, east, Me, Size - 1, Size - 1);
         long homeCopper = Items(home, "copper_ore");
         Assert.Equal(PlaceResult.CannotAfford, Placement.Check(sim, east, Me, "conveyor", 1, 0, 0, null, out _));
         Place(sim, east, "conveyor", 1, 0);
@@ -87,17 +78,17 @@ public class TerritoryTests
         Stock(second, "copper_ore", 20);
         Stock(second, "iron_ore", 30);
         // A smelter costs 20 copper ore and 10 iron ore.
-        Place(sim, tile, "smelter", 2, 2, recipe: "smelt_iron");
+        Place(sim, tile, "smelter", 4, 4, recipe: "smelt_iron");
         sim.Step();
-        Assert.Equal("smelter", tile.Grid.BuildingAt(2, 2)?.DefId);
+        Assert.Equal("smelter", tile.Grid.BuildingAt(4, 4)?.DefId);
         Assert.Equal(0, first.Stock!.Get("copper_ore"));
         Assert.Equal((15L, 20L), (second.Stock!.Get("copper_ore"), second.Stock.Get("iron_ore")));
 
         // 15 copper ore left in all: a second smelter is refused and nothing is taken.
-        Assert.Equal(PlaceResult.CannotAfford, Placement.Check(sim, tile, Me, "smelter", 5, 5, 0, "smelt_iron", out _));
-        Place(sim, tile, "smelter", 5, 5, recipe: "smelt_iron");
+        Assert.Equal(PlaceResult.CannotAfford, Placement.Check(sim, tile, Me, "smelter", 7, 7, 0, "smelt_iron", out _));
+        Place(sim, tile, "smelter", 7, 7, recipe: "smelt_iron");
         sim.Step();
-        Assert.Null(tile.Grid.BuildingAt(5, 5));
+        Assert.Null(tile.Grid.BuildingAt(7, 7));
         Assert.Equal((15L, 20L), (second.Stock!.Get("copper_ore"), second.Stock.Get("iron_ore")));
     }
 
@@ -117,8 +108,9 @@ public class TerritoryTests
         sim.Step();
         Assert.Equal((99L, 1L), (west.Stock!.Get("copper_ore"), east.Stock!.Get("copper_ore")));
 
-        // With no core of mine on the tile, removal still works and the refund is lost.
+        // With no core of mine on the tile (a turret's build radius reaches it), removal still works and the refund is lost.
         var bare = sim.AddTile(1, 0, Me, Size);
+        Plant(sim, bare, Me, "gun_turret", 6, 3);
         Plant(sim, bare, Me, "conveyor", 3, 3);
         sim.Enqueue(new RemoveBuildingCommand(Me, bare.Id, 3, 3));
         sim.Step();
@@ -154,7 +146,7 @@ public class TerritoryTests
         Tile(sim, 0, 0, Size);
         sim.AddTile(1, 0, size: Size);
         var far = sim.AddTile(2, 0, size: Size);
-        Plant(sim, far, Me, "conveyor", 0, 0);
+        Foothold(sim, far, Me, Size - 1, Size - 1);
         Assert.Equal(PlaceResult.CannotAfford, Placement.Check(sim, far, Me, "conveyor", 1, 0, 0, null, out _));
     }
 
@@ -209,6 +201,7 @@ public class TerritoryTests
         var (sim, _, east) = TwoTiles();
         int cx = east.CircleX, cy = east.CircleY;
         Plant(sim, east, Me, "conveyor", cx, cy);
+        Foothold(sim, east, Me, 0, 0);
         Run(sim, 100);
         Assert.Equal(100, Expansion.Progress(east, Me));
         sim.Enqueue(new RemoveBuildingCommand(Me, east.Id, cx, cy));
@@ -268,7 +261,8 @@ public class TerritoryTests
         // The starting items came along in the core and pay for building here now (FB-019).
         Assert.Equal(StartItems(sim)["copper_ore"], Items(east, "copper_ore"));
         Assert.Equal(0, Items(home, "copper_ore"));
-        Assert.Equal(PlaceResult.Ok, Placement.Check(sim, east, Me, "conveyor", 0, 0, 0, null, out _));
+        var landed = east.Grid.Cores.Single();
+        Assert.Equal(PlaceResult.Ok, Placement.Check(sim, east, Me, "conveyor", landed.X, landed.Y + 3, 0, null, out _));
     }
 
     [Fact]
@@ -539,7 +533,7 @@ public class TerritoryTests
     public void FramesOnATileYouDontOwnArePaidFromYourCoresThere()
     {
         var (sim, home, east) = TwoTiles();
-        Plant(sim, east, Me, "conveyor", 2, 2);
+        Foothold(sim, east, Me, Size - 1, Size - 1);
         long iron = Items(home, "iron_ore");
         Assert.Equal(PlaceResult.NoPresence, UnitAssembly.CheckFrame(sim, east, Them, 5, 5));
         Assert.Equal(PlaceResult.CannotAfford, UnitAssembly.CheckFrame(sim, east, Me, 5, 5));
@@ -561,7 +555,7 @@ public class TerritoryTests
     public void ABlueprintOnATileYouDontOwnIsPaidFromYourCoresThere()
     {
         var (sim, home, east) = TwoTiles();
-        Plant(sim, east, Me, "conveyor", 2, 2);
+        Foothold(sim, east, Me, Size - 1, Size - 1);
         long copper = Items(home, "copper_ore");
         var belts = new Blueprint([new BlueprintBlock("conveyor", 0, 0, 0), new BlueprintBlock("conveyor", 1, 0, 0)], []);
         Assert.Equal(BlueprintResult.CannotAfford, Blueprints.Check(sim, east, Me, belts, 5, 5, 0, false, out _));
@@ -570,7 +564,7 @@ public class TerritoryTests
         Assert.Equal(BlueprintResult.Ok, Blueprints.Check(sim, east, Me, belts, 5, 5, 0, false, out var plan));
         sim.Enqueue(new PlaceBlueprintCommand(Me, east.Id, belts, 5, 5));
         sim.Step();
-        Assert.Equal(3, east.Grid.Buildings.Count(b => b.DefId == "conveyor"));
+        Assert.Equal(2, east.Grid.Buildings.Count(b => b.DefId == "conveyor"));
         Assert.Equal(10 - plan.Cost["copper_ore"], mine.Stock!.Get("copper_ore"));
         Assert.Equal(copper, Items(home, "copper_ore"));
         Assert.Equal(BlueprintResult.Blocked, Blueprints.Check(sim, east, Them, belts, 8, 8, 0, false, out _));

@@ -16,10 +16,11 @@ public sealed class SaveException(string message) : Exception(message);
 public sealed record SaveFile(int Version, GameSetup Setup, long Tick, ulong Hash, string Label, List<LoggedCommand> Commands, Snapshot? Snapshot = null)
 {
     /// <summary>
-    /// 8: the setup names a scenario (with its hash) or a seed, and AI head starts (WM-017, MP-008). No compatibility
+    /// 9: building needs a build radius (WM-015), so old command logs replay differently. 8: the setup names a scenario
+    /// (with its hash) or a seed, and AI head starts (WM-017, MP-008). No compatibility
     /// with older saves (OQ-34).
     /// </summary>
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 9;
 
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 

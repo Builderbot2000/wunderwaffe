@@ -58,24 +58,47 @@ public static class StressScene
 
     /// <summary>
     /// Queues <see cref="BuildingsPerTile"/> 2 x 2 producers on the tile: drills on ore, iron smelters elsewhere. The game
-    /// passes its own <paramref name="send"/> (lockstep); default <see cref="Simulation.Enqueue"/>.
+    /// passes its own <paramref name="send"/> (lockstep); default <see cref="Simulation.Enqueue"/>. Building needs a build
+    /// radius (WM-015), so it fills outward from the player's first radius, nearest first, and puts a core on any spot in
+    /// reach but at least two thirds of a core's radius from every radius so far; the queued cores extend the reach of
+    /// the spots after them (commands apply in order).
     /// </summary>
     public static void Fill(Simulation sim, TileState tile, int player = 0, Action<Command>? send = null)
     {
         send ??= sim.Enqueue;
-        int placed = 0;
-        for (int y = 0; y < tile.Grid.Height - 1 && placed < BuildingsPerTile; y += 2)
+        var g = tile.Grid;
+        var core = sim.Content.DefaultCore!;
+        int spacing = core.BuildRadius * 2 / 3;
+        var radii = Territory.BuildRadii(sim, player, tile);
+        var (cx, cy) = radii.Count > 0 ? (radii[0].X, radii[0].Y) : (g.Width / 2, g.Height / 2);
+        var spots = new List<(int X, int Y)>();
+        for (int y = 0; y < g.Height - 1; y += 2)
         {
-            for (int x = 0; x < tile.Grid.Width - 1 && placed < BuildingsPerTile; x += 2)
+            for (int x = 0; x < g.Width - 1; x += 2)
             {
-                if (!tile.Grid.IsFree(x, y, 2, 2))
-                    continue;
-                bool drill = Placement.Check(sim, tile, player, "drill", x, y, 0, null, out _) == PlaceResult.Ok;
-                send(drill
-                    ? new PlaceBuildingCommand(player, tile.Id, "drill", x, y)
-                    : new PlaceBuildingCommand(player, tile.Id, "smelter", x, y, RecipeId: "smelt_iron"));
-                placed++;
+                if (g.IsFree(x, y, 2, 2))
+                    spots.Add((x, y));
             }
+        }
+        int placed = 0;
+        foreach (var (x, y) in spots.OrderBy(p => (long)(p.X - cx) * (p.X - cx) + (long)(p.Y - cy) * (p.Y - cy)).ThenBy(p => p.Y).ThenBy(p => p.X))
+        {
+            if (placed >= BuildingsPerTile)
+                break;
+            if (!Territory.Covered(radii, x, y, 2, 2))
+                continue;
+            placed++;
+            if (!radii.Any(r => (r with { Radius = spacing }).Covers(x, y))
+                && Placement.Check(sim, tile, player, core.Id, x, y, 0, null, out _, ignoreCost: true, ignoreRadius: true) == PlaceResult.Ok)
+            {
+                send(new PlaceBuildingCommand(player, tile.Id, core.Id, x, y));
+                radii.Add(new BuildRadius(x, y, core.Width, core.Height, core.BuildRadius, -1, -1));
+                continue;
+            }
+            bool drill = Placement.Check(sim, tile, player, "drill", x, y, 0, null, out _, ignoreRadius: true) == PlaceResult.Ok;
+            send(drill
+                ? new PlaceBuildingCommand(player, tile.Id, "drill", x, y)
+                : new PlaceBuildingCommand(player, tile.Id, "smelter", x, y, RecipeId: "smelt_iron"));
         }
     }
 

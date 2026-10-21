@@ -196,7 +196,7 @@ public sealed partial class Simulation
             // The placement rules, but for free and with the seat counted as present: the scenario puts it there.
             int owner = tile.Owner;
             tile.Owner = p;
-            var result = Placement.Check(this, tile, p, def.Id, b.X, b.Y, b.Rotation, b.RecipeId, out var plan, ignoreCost: true);
+            var result = Placement.Check(this, tile, p, def.Id, b.X, b.Y, b.Rotation, b.RecipeId, out var plan, ignoreCost: true, ignoreRadius: true);
             tile.Owner = owner;
             if (result != PlaceResult.Ok)
             {

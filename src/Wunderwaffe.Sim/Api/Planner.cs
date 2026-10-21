@@ -16,7 +16,7 @@ public sealed record Stage(string BuildingId, string? RecipeId = null);
 /// items where they belong: nothing it adds would push items into, or take items from, a building of another line
 /// (machines dump into every neighbour that accepts, so a careless neighbour steals or jams). Deterministic: candidates
 /// are tried nearest first, ties by row then column. Lines come with the wire that joins their machines to a powered
-/// network (FB-005), when the tile has one.
+/// network (FB-005), when the tile has one. Every cell they use lies inside one of the player's build radii (WM-015).
 /// </summary>
 public static class Planner
 {
@@ -27,13 +27,14 @@ public static class Planner
     /// A legal spot for one building: on a deposit of <paramref name="onDeposit"/> (extractors), touching building
     /// <paramref name="touching"/> (which may feed it), inside the I/O zone facing tile <paramref name="zone"/> (ports),
     /// nearest (<paramref name="nearX"/>, <paramref name="nearY"/>) or the tile's core. Null if there is none.
+    /// <paramref name="anywhere"/> ignores the build radii (WM-015), to see where reach is needed (<see cref="Reach"/>).
     /// </summary>
     public static Spot? FindSpot(Simulation sim, TileState tile, int player, string buildingId, string? recipeId = null,
-        string? onDeposit = null, int touching = -1, int nearX = -1, int nearY = -1, int zone = -1)
+        string? onDeposit = null, int touching = -1, int nearX = -1, int nearY = -1, int zone = -1, bool anywhere = false)
     {
         if (!sim.Content.Buildings.TryGetValue(buildingId, out var def))
             return null;
-        var layout = new Layout(sim, tile);
+        var layout = new Layout(sim, tile, player, anywhere);
         Node? feeder = touching >= 0 ? layout.Real(touching) : null;
         if (touching >= 0 && feeder == null)
             return null;
@@ -46,13 +47,38 @@ public static class Planner
     }
 
     /// <summary>
+    /// Where the default core (<see cref="ContentDb.DefaultCore"/>) would carry <paramref name="player"/>'s build radius
+    /// (WM-015) toward local cell (<paramref name="x"/>, <paramref name="y"/>): the legal spot in reach nearest it, if
+    /// that stands nearer it than every radius they have. Null if the cell is in reach already or nothing gets nearer
+    /// (water in the way). Drivers find the cell with an <c>anywhere</c> <see cref="PlanLine"/> or <see cref="FindSpot"/>,
+    /// place the core, then plan again.
+    /// </summary>
+    public static Spot? Reach(Simulation sim, TileState tile, int player, int x, int y)
+    {
+        var radii = Territory.BuildRadii(sim, player, tile);
+        if (radii.Count == 0 || Territory.Covered(radii, x, y) || sim.Content.DefaultCore is not { } core
+            || FindSpot(sim, tile, player, core.Id, nearX: x, nearY: y) is not { } spot)
+            return null;
+        long gap = Gap(spot.X, spot.Y, core.Width, core.Height, x, y);
+        return radii.All(r => Gap(r.X, r.Y, r.Width, r.Height, x, y) > gap) ? spot : null;
+
+        static long Gap(int x, int y, int w, int h, int px, int py)
+        {
+            long dx = Math.Max(0, Math.Max(x - px, px - (x + w - 1)));
+            long dy = Math.Max(0, Math.Max(y - py, py - (y + h - 1)));
+            return dx * dx + dy * dy;
+        }
+    }
+
+    /// <summary>
     /// A belt from building <paramref name="from"/> to building <paramref name="to"/>: the shortest run of free cells
     /// that starts beside <paramref name="from"/>, ends facing <paramref name="to"/> (or merging into a belt that already
-    /// ends there) and passes nothing else that would push items onto it. Empty if they already touch; null if there is no way.
+    /// ends there) and passes nothing else that would push items onto it, inside <paramref name="player"/>'s build radii.
+    /// Empty if they already touch; null if there is no way.
     /// </summary>
-    public static IReadOnlyList<BeltStep>? RouteBelt(Simulation sim, TileState tile, int from, int to)
+    public static IReadOnlyList<BeltStep>? RouteBelt(Simulation sim, TileState tile, int player, int from, int to)
     {
-        var layout = new Layout(sim, tile);
+        var layout = new Layout(sim, tile, player);
         return layout.Real(from) is { } a && layout.Real(to) is { } b ? layout.Route(a, b) : null;
     }
 
@@ -61,12 +87,13 @@ public static class Planner
     /// <paramref name="source"/>, or (with neither) the first stage anywhere, inside the I/O zone facing tile
     /// <paramref name="zone"/> if given; then each of <paramref name="stages"/> touching the one before, then a belt
     /// into building <paramref name="sink"/>, then wire from any machine that would sit off the power to the nearest
-    /// powered network. Null if no layout fits. The caller places them in order in one tick.
+    /// powered network. Null if no layout fits. The caller places them in order in one tick. <paramref name="anywhere"/>
+    /// ignores the build radii (WM-015): such a plan shows where reach is needed (<see cref="Reach"/>), not what to place.
     /// </summary>
     public static IReadOnlyList<PlannedBuilding>? PlanLine(Simulation sim, TileState tile, int player, string? depositItem, int source,
-        IReadOnlyList<Stage> stages, int sink, int zone = -1)
+        IReadOnlyList<Stage> stages, int sink, int zone = -1, bool anywhere = false)
     {
-        var layout = new Layout(sim, tile);
+        var layout = new Layout(sim, tile, player, anywhere);
         if (layout.Real(sink) is not { } target)
             return null;
         var (sx, sy) = (target.X + target.W / 2, target.Y + target.H / 2);
@@ -115,16 +142,18 @@ public static class Planner
 
     /// <summary>
     /// Top-left of a <paramref name="width"/> x <paramref name="height"/> block of free, buildable, unframed cells with a
-    /// clear cell of margin all round (so a unit built on it can lift off), nearest the tile's core. Null if none.
+    /// clear cell of margin all round (so a unit built on it can lift off), inside <paramref name="player"/>'s build radii,
+    /// nearest their core on the tile. Null if none.
     /// </summary>
-    public static Spot? FindFrame(Simulation sim, TileState tile, int width, int height)
+    public static Spot? FindFrame(Simulation sim, TileState tile, int player, int width, int height)
     {
-        var layout = new Layout(sim, tile);
+        var layout = new Layout(sim, tile, player);
         var (cx, cy) = layout.CoreCentre();
         var g = tile.Grid;
+        var radii = Territory.BuildRadii(sim, player, tile);
         foreach (var (x, y) in Nearest(g.Width, g.Height, cx - width / 2, cy - height / 2))
         {
-            if (!g.InBounds(x, y, width, height) || !g.Buildable(x, y, width, height))
+            if (!g.InBounds(x, y, width, height) || !g.Buildable(x, y, width, height) || !Territory.Covered(radii, x, y, width, height))
                 continue;
             bool clear = true;
             for (int yy = y - 1; yy <= y + height && clear; yy++)
@@ -230,9 +259,10 @@ public static class Planner
     }
 
     /// <summary>The tile's buildings plus a stack of planned ones not placed yet.</summary>
-    sealed class Layout(Simulation sim, TileState tile)
+    sealed class Layout(Simulation sim, TileState tile, int player, bool anywhere = false)
     {
         readonly TileGrid _g = tile.Grid;
+        readonly List<BuildRadius> _radii = Territory.BuildRadii(sim, player, tile);
         readonly List<Node> _planned = [];
         readonly Dictionary<int, Node> _real = [];
 
@@ -260,7 +290,8 @@ public static class Planner
 
         public (int X, int Y) CoreCentre()
         {
-            var core = _g.Buildings.FirstOrDefault(b => b.Kind == BuildingKind.Core);
+            var core = _g.Buildings.FirstOrDefault(b => b.Kind == BuildingKind.Core && b.Owner == player)
+                ?? _g.Buildings.FirstOrDefault(b => b.Kind == BuildingKind.Core);
             return core == null ? (_g.Width / 2, _g.Height / 2) : (core.X + core.Width / 2, core.Y + core.Height / 2);
         }
 
@@ -274,7 +305,8 @@ public static class Planner
             return _g.BuildingAt(x, y) is { } b ? Wrap(b) : null;
         }
 
-        bool Free(int x, int y) => _g.InBounds(x, y) && _g.Buildable(x, y) && !_g.Has(BuildingKind.Frame, x, y) && At(x, y) == null;
+        bool Free(int x, int y) =>
+            _g.InBounds(x, y) && _g.Buildable(x, y) && !_g.Has(BuildingKind.Frame, x, y) && At(x, y) == null && (anywhere || Territory.Covered(_radii, x, y));
 
         /// <summary>Top-left positions worth trying for <paramref name="def"/>, best first.</summary>
         public IEnumerable<(int X, int Y)> Candidates(BuildingDef def, string? onDeposit, Node? touching, int nearX, int nearY)
@@ -328,7 +360,7 @@ public static class Planner
         /// </summary>
         public Node? TryNode(int player, BuildingDef def, int x, int y, string? recipeId, string? onDeposit, Node? feeder, Node? target)
         {
-            var r = Placement.Check(sim, tile, player, def.Id, x, y, 0, recipeId, out var plan);
+            var r = Placement.Check(sim, tile, player, def.Id, x, y, 0, recipeId, out var plan, ignoreRadius: anywhere);
             if (r is not (PlaceResult.Ok or PlaceResult.CannotAfford))
                 return null;
             var recipe = plan.RecipeId == null ? null : sim.Content.Recipes[plan.RecipeId];
@@ -528,7 +560,7 @@ public static class Planner
         }
 
         bool WireCell(int player, BuildingDef wire, int x, int y) =>
-            Free(x, y) && Placement.Check(sim, tile, player, wire.Id, x, y, 0, null, out _) is PlaceResult.Ok or PlaceResult.CannotAfford;
+            Free(x, y) && Placement.Check(sim, tile, player, wire.Id, x, y, 0, null, out _, ignoreRadius: anywhere) is PlaceResult.Ok or PlaceResult.CannotAfford;
 
         static bool Touches(Node n, int x, int y) =>
             (x >= n.X && x < n.X + n.W && (y == n.Y - 1 || y == n.Y + n.H)) || (y >= n.Y && y < n.Y + n.H && (x == n.X - 1 || x == n.X + n.W));

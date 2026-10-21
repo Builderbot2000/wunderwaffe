@@ -191,8 +191,8 @@ public sealed class AiContext
     /// <summary>
     /// A line on <paramref name="tile"/> from a <paramref name="deposit"/> (with none: from the existing building
     /// <paramref name="source"/>, or the first stage placed anywhere, inside the I/O zone facing tile <paramref name="zone"/>
-    /// if given) through <paramref name="stages"/> into <paramref name="sink"/>, if the planner finds room. Whether one is
-    /// wanted is the caller's question.
+    /// if given) through <paramref name="stages"/> into <paramref name="sink"/>, if the planner finds room; if not, a core
+    /// that carries the build radius toward the deposit or zone (<see cref="Reach"/>). Whether one is wanted is the caller's question.
     /// </summary>
     public Proposal? Line(string key, int score, int tile, string? deposit, IReadOnlyList<Stage> stages, BuildingView? sink,
         int source = -1, int zone = -1)
@@ -201,11 +201,44 @@ public sealed class AiContext
             return null;
         string planKey = $"{deposit}/{source}/{zone}/{string.Join(",", stages.Select(s => s.BuildingId + s.RecipeId))}/{sink.Id}";
         if (_plans.Get(Q, tile, "line:" + planKey, () => Q.PlanLine(tile, deposit, source, stages, sink.Id, zone)) is not { } plan)
-            return null;
+        {
+            var anywhere = _plans.Get(Q, tile, "anywhere:" + planKey, () => Q.PlanLine(tile, deposit, source, stages, sink.Id, zone, anywhere: true));
+            return anywhere == null ? null
+                : Reach(key, score, tile, anywhere.Select(p => (p.X, p.Y, Q.Content.Buildings[p.BuildingId].Footprint(p.Rotation))),
+                    (sink.X + sink.Width / 2, sink.Y + sink.Height / 2));
+        }
         var commands = plan.Select(p => (Command)new PlaceBuildingCommand(Player, tile, p.BuildingId, p.X, p.Y, p.Rotation, p.RecipeId)).ToList();
         var cost = Sum(plan.Select(p => Q.Content.Buildings[p.BuildingId].Cost));
         string what = stages.Count > 0 ? stages[^1].RecipeId ?? stages[^1].BuildingId : deposit ?? "";
         return new Proposal($"{key}@{tile}", score, commands, $"{what} line into {sink.DefId}, {plan.Count} buildings", tile, cost, [Proposal.Layout(tile)]);
+    }
+
+    /// <summary>
+    /// The AI's way to build further out (WM-015): a core that carries the build radius toward the out-of-reach cell of
+    /// <paramref name="wanted"/> (footprints planned ignoring reach) nearest cell <paramref name="near"/> (<see cref="GameQuery.ReachSpot"/>).
+    /// Null if they are all in reach (the plan fails for something else) or nothing gets nearer.
+    /// </summary>
+    public Proposal? Reach(string key, int score, int tile, IEnumerable<(int X, int Y, (int W, int H) Size)> wanted, (int X, int Y) near)
+    {
+        var radii = Q.BuildRadii(tile);
+        var (nx, ny) = near;
+        (int X, int Y)? target = null;
+        long best = long.MaxValue;
+        foreach (var (x, y, (w, h)) in wanted)
+        {
+            for (int cy = y; cy < y + h; cy++)
+            {
+                for (int cx = x; cx < x + w; cx++)
+                {
+                    long d = (long)(cx - nx) * (cx - nx) + (long)(cy - ny) * (cy - ny);
+                    if (d < best && !radii.Any(r => r.Covers(cx, cy)))
+                        (best, target) = (d, (cx, cy));
+                }
+            }
+        }
+        return target is (int tx, int ty)
+            ? Place($"{key}:reach", score, tile, CoreDef.Id, _plans.Get(Q, tile, $"reach:{tx},{ty}", () => Q.ReachSpot(tile, tx, ty)))
+            : null;
     }
 
     /// <summary>One building at <paramref name="spot"/>, if the sim's placement check passes (affordability is the framework's).</summary>

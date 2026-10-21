@@ -431,12 +431,12 @@ public partial class UiTour : Node
         if (spots.Count < 2)
             throw new InvalidOperationException("no ore near the middle of the tile");
         _host.Send(new PlaceBuildingCommand(me, tile.Id, "drill", spots[0].X, spots[0].Y));
-        // A 7x5 block of open ground nearest the middle: the smelter on top, a belt along the bottom.
+        // A 7x5 block of open ground in build range (WM-015) nearest the middle: the smelter on top, a belt along the bottom.
         var g = tile.Grid;
         int cx = tile.CenterX - tile.OriginX, cy = tile.CenterY - tile.OriginY;
         var open = Enumerable.Range(0, g.Width * g.Height)
             .Select(i => (X: i % g.Width, Y: i / g.Width))
-            .Where(p => g.InBounds(p.X, p.Y, 7, 5) && g.Buildable(p.X, p.Y, 7, 5) && g.IsFree(p.X, p.Y, 7, 5)
+            .Where(p => g.InBounds(p.X, p.Y, 7, 5) && g.Buildable(p.X, p.Y, 7, 5) && g.IsFree(p.X, p.Y, 7, 5) && Territory.InBuildRadius(sim, me, tile, p.X, p.Y, 7, 5)
                 && spots.All(s => s.X + 2 <= p.X || s.X >= p.X + 7 || s.Y + 2 <= p.Y || s.Y >= p.Y + 5))
             .OrderBy(p => Math.Abs(p.X - cx) + Math.Abs(p.Y - cy))
             .First();

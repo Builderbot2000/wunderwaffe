@@ -181,12 +181,12 @@ public static class Combat
     }
 
     /// <summary>
-    /// Deconstructs the wreck on a cell (CB-006), like removing a building: anyone with presence on the tile may, and
+    /// Deconstructs the wreck on a cell (CB-006), like removing a building: anyone with a build radius over the cell may (WM-015), and
     /// <see cref="Balance.WreckRefundPercent"/> of its cost goes to the player's nearest core there, or is lost.
     /// </summary>
     internal static bool ClearWreck(Simulation sim, TileState tile, int player, int x, int y)
     {
-        if (!Territory.HasPresence(sim, player, tile) || tile.Grid.WreckAt(x, y) is not { } w)
+        if (!Territory.InBuildRadius(sim, player, tile, x, y) || tile.Grid.WreckAt(x, y) is not { } w)
             return false;
         tile.Grid.RemoveWreck(w);
         Funds.Refund(tile, player, w.X, w.Y, w.Width, w.Height, sim.Content.Buildings[w.DefId].Cost, Balance.WreckRefundPercent);

@@ -49,6 +49,14 @@ public class ContentTests
     }
 
     [Fact]
+    public void RejectsANegativeBuildRadius()
+    {
+        const string buildings = """[ { "id": "wall", "name": "Wall", "menu": "production", "width": 1, "height": 1, "power": 0, "hp": 10, "buildRadius": -1, "cost": {} } ]""";
+        var ex = Assert.Throws<ContentException>(() => ContentDb.FromJson(Items, "[]", buildings));
+        Assert.Contains(ex.Errors, e => e.Contains("buildRadius"));
+    }
+
+    [Fact]
     public void EveryRealBuildingHasHitPoints() =>
         Assert.All(TestContent.Load().BuildingList, b => Assert.True(b.Hp > 0, b.Id));
 }
