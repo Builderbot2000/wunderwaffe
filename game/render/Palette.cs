@@ -110,6 +110,12 @@ public static class Palette
         return new Color(c.R * value, c.G * value, c.B * value);
     }
 
+    /// <summary>
+    /// Unclaimed buildings (WM-019): a dull grey-violet no player colour uses; placeholder blocks are drawn in it and
+    /// sprites tinted with it, in every <see cref="Mode"/>.
+    /// </summary>
+    public static readonly Color Unclaimed = new(0.52f, 0.48f, 0.58f);
+
     public static Color Deposit(string itemId) => Deposits.GetValueOrDefault(itemId, Colors.Magenta);
 
     public static Color Building(string buildingId) => Buildings.GetValueOrDefault(buildingId, Colors.Magenta);

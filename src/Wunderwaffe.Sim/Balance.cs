@@ -59,4 +59,10 @@ public static class Balance
 
     /// <inheritdoc cref="VehicleRadiusBase"/>
     public const int VehicleRadiusMax = 32;
+
+    /// <summary>
+    /// Claim radius in cells (WM-019): placing a building or landing a unit with any cell within this distance
+    /// (straight-line, nearest cells, as a build radius) of an unclaimed building claims it. Tuned in playtesting.
+    /// </summary>
+    public const int ClaimRadius = 8;
 }

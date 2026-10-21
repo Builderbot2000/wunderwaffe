@@ -179,7 +179,9 @@ public sealed partial class Simulation(ContentDb content)
             return result;
 
         Funds.TryPay(tile, player, plan.Def.Cost);
+        Territory.ClaimNear(this, tile, player, plan.X, plan.Y, plan.Width, plan.Height); // WM-019
         if (plan.Def.Layer != null)
+
         {
             tile.Grid.Lay(plan.Def, plan.X, plan.Y);
             return PlaceResult.Ok;

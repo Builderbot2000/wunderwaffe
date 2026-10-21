@@ -425,6 +425,16 @@ public sealed class TileGrid
         Revision++;
     }
 
+    /// <summary>
+    /// A building changed hands (WM-019): bumps <see cref="Revision"/> so radii, circle occupants, power, rates and
+    /// sleeping machines see the new owner.
+    /// </summary>
+    internal void SetOwner(PlacedBuilding b, int owner)
+    {
+        b.Owner = owner;
+        Revision++;
+    }
+
     List<PlacedBuilding>? KindList(BuildingKind kind) => kind switch
     {
         BuildingKind.Conveyor => _belts,

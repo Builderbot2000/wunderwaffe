@@ -11,7 +11,8 @@ namespace Wunderwaffe.Sim.Core;
 /// hashed in <see cref="StateHash"/>; <c>SnapshotTests</c> check the two agree.
 /// </summary>
 public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, List<PlayerSnap> Players, List<UnitSnap> Units,
-    List<AbstractSnap> Abstract, SquadsSnap Squads, int NextProjectileId, List<ProjectileSnap> Projectiles, List<int> Interrupted)
+    List<AbstractSnap> Abstract, SquadsSnap Squads, int NextProjectileId, List<ProjectileSnap> Projectiles, List<int> Interrupted,
+    int Winner = -1, long EndTick = -1, VictoryReason EndReason = VictoryReason.None)
 {
     public static Snapshot Capture(Simulation sim) => new(
         sim.Tick,
@@ -23,7 +24,8 @@ public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, L
         SquadsSnap.Of(sim.Squads),
         sim.NextProjectileId,
         sim.Projectiles.Select(ProjectileSnap.Of).ToList(),
-        [.. sim.InterruptedUnits.Keys]);
+        [.. sim.InterruptedUnits.Keys],
+        sim.Winner, sim.EndTick, sim.EndReason);
 
     /// <summary>
     /// A match in the snapshot's state: the world rebuilt from <paramref name="setup"/>, then everything that changes
@@ -43,6 +45,7 @@ public sealed record Snapshot(long Tick, int NextUnitId, List<TileSnap> Tiles, L
         foreach (int id in Interrupted)
             sim.InterruptedUnits[id] = sim.UnitById(id)!.Order;
         sim.RestoreProjectiles(Projectiles.Select(p => p.Restore()), NextProjectileId);
+        (sim.Winner, sim.EndTick, sim.EndReason) = (Winner, EndTick, EndReason);
         sim.RestoreClock(Tick, NextUnitId, log);
         sim.LatestSnapshot = this;
         return sim;
@@ -270,10 +273,11 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
     }
 }
 
-public sealed record PlayerSnap(int Id, Dictionary<string, long> Produced, long Shipped, long Launched, List<long> GoalTicks, int ViewedTile)
+public sealed record PlayerSnap(int Id, Dictionary<string, long> Produced, long Shipped, long Launched, List<long> GoalTicks, int ViewedTile,
+    long EliminatedTick = -1)
 {
     internal static PlayerSnap Of(PlayerState p) =>
-        new(p.Id, p.Produced.ToDictionary(kv => kv.Key, kv => kv.Value), p.Shipped, p.Launched, [.. p.GoalTicks], p.ViewedTile);
+        new(p.Id, p.Produced.ToDictionary(kv => kv.Key, kv => kv.Value), p.Shipped, p.Launched, [.. p.GoalTicks], p.ViewedTile, p.EliminatedTick);
 
     internal void Restore(PlayerState p)
     {
@@ -287,7 +291,9 @@ public sealed record PlayerSnap(int Id, Dictionary<string, long> Produced, long 
         foreach (long t in GoalTicks.Skip(p.GoalsDone))
             p.CompleteGoal(t);
         p.ViewedTile = ViewedTile;
+        p.EliminatedTick = EliminatedTick;
     }
+
 }
 
 public sealed record CellSnap(int GX, int GY, int Mass);

@@ -33,6 +33,8 @@ internal static class TileEntities
             sleep.Visit(i);
             var b = machines[i];
             var m = b.Machine!;
+            if (b.Owner < 0)
+                continue; // unclaimed (WM-019): stopped, see Territory.AfterCoreLost
             // Draw and supply change only when these flip (PowerNet.DrawOf, SupplyOf): report only then (NF-001).
             bool drew = m.Working || m.IdleTicks == 0, worked = m.Working;
             if (Work(tile, b, m) is { } made && tile.Owner != TileState.Unowned)
@@ -45,22 +47,41 @@ internal static class TileEntities
                 sleep.Sleep(m);
         }
         sleep.End();
+        // Unclaimed buildings (WM-019, Owner < 0) don't run: nothing moves on or out of them.
         foreach (var b in grid.ImportPorts)
-            Dump(sim, tile, b, b.Machine!);
+        {
+            if (b.Owner >= 0)
+                Dump(sim, tile, b, b.Machine!);
+        }
         foreach (var b in grid.Storages)
-            Dump(sim, tile, b, b.Storage!);
+        {
+            if (b.Owner >= 0)
+                Dump(sim, tile, b, b.Storage!);
+        }
         foreach (var b in grid.Relays)
-            Relay(sim, tile, b);
+        {
+            if (b.Owner >= 0)
+                Relay(sim, tile, b);
+        }
 
         // Items advance within their cells first, then front items cross into the next building. Crossing
         // checks the state after everyone has moved, so a belt hands over as soon as the next cell has room.
         foreach (var b in grid.Belts)
-            Advance(b.Belt!);
+        {
+            if (b.Owner >= 0)
+                Advance(b.Belt!);
+        }
         foreach (var b in grid.Belts)
-            Handoff(sim, tile, b);
+        {
+            if (b.Owner >= 0)
+                Handoff(sim, tile, b);
+        }
 
         foreach (var b in grid.ExportPorts)
-            Deliver(sim, tile, b);
+        {
+            if (b.Owner >= 0)
+                Deliver(sim, tile, b);
+        }
     }
 
     /// <summary>
@@ -222,7 +243,10 @@ internal static class TileEntities
     /// <summary>Offers an item to a building. True if it took it.</summary>
     static bool TryInsert(Simulation sim, TileState tile, PlacedBuilding target, string item, PlacedBuilding source, int depth = 0)
     {
+        if (target.Owner < 0)
+            return false; // unclaimed (WM-019) takes nothing
         switch (target.Kind)
+
         {
             case BuildingKind.Core:
                 if (!Funds.Accepts(target, item))
