@@ -236,10 +236,45 @@ public sealed class AiContext
                 }
             }
         }
-        return target is (int tx, int ty)
-            ? Place($"{key}:reach", score, tile, CoreDef.Id, _plans.Get(Q, tile, $"reach:{tx},{ty}", () => Q.ReachSpot(tile, tx, ty)))
-            : null;
+        if (target is not (int tx, int ty))
+            return null;
+        var spot = _plans.Get(Q, tile, $"reach:{tx},{ty}", () => Q.ReachSpot(tile, tx, ty));
+        // A vehicle costs nothing to move: it goes when no core spot works or the core can't be paid for now.
+        if ((spot == null || !Q.CanAfford(tile, CoreDef.Cost)) && Vehicle(key, score, tile, tx, ty) is { } move)
+            return move;
+        return Place($"{key}:reach", score, tile, CoreDef.Id, spot);
     }
+
+    /// <summary>
+    /// The other way to build further out (WM-015): an idle flying unit with a build radius moved over local cell
+    /// (<paramref name="x"/>, <paramref name="y"/>) of the tile, carrying reach there while it hovers. The nearest one
+    /// that can get there, units already on the tile first; null if none can.
+    /// </summary>
+    public Proposal? Vehicle(string key, int score, int tile, int x, int y)
+    {
+        var (_, ox, oy) = Facts(tile);
+        long wx = ox + x, wy = oy + y;
+        var unit = IdleUnits().Where(u => Q.UnitBuildRadius(u.Id) > 0)
+            .OrderBy(u => u.TileId == tile ? 0 : 1).ThenBy(u => (u.CellX - wx) * (u.CellX - wx) + (u.CellY - wy) * (u.CellY - wy)).ThenBy(u => u.Id)
+            .FirstOrDefault(u => Q.Travel(u.Id, tile, x, y) != null);
+        return unit == null ? null
+            : new Proposal($"{key}:vehicle@{tile}", score, [new MoveUnitsCommand(Player, [unit.Id], tile, x, y)],
+                $"unit {unit.Id} carries reach to {x},{y}", Locks: [Proposal.UnitLock(unit.Id)]);
+    }
+
+    /// <summary>
+    /// Capture targets (MP-010): the buildings the seat's faction builds only once captured and it hasn't yet
+    /// (<see cref="FactionView.Locked"/>). Empty for a faction without capture to build.
+    /// </summary>
+    public IReadOnlySet<string> CaptureTargets => _capture ??= Q.Faction().Locked.ToHashSet();
+
+    HashSet<string>? _capture;
+
+    /// <summary>True if any of the buildings is a <see cref="CaptureTargets"/> building.</summary>
+    public bool HoldsCaptureTarget(IEnumerable<BuildingView> buildings) => CaptureTargets.Count > 0 && buildings.Any(b => CaptureTargets.Contains(b.DefId));
+
+    /// <summary>World-cell distance between two points, rounded down.</summary>
+    public static int Distance(long ax, long ay, long bx, long by) => (int)IntMath.ISqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
 
     /// <summary>One building at <paramref name="spot"/>, if the sim's placement check passes (affordability is the framework's).</summary>
     public Proposal? Place(string key, int score, int tile, string building, Spot? spot)

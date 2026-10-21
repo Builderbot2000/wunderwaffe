@@ -17,5 +17,5 @@ public interface IAiModule
 public static class AiModules
 {
     public static IReadOnlyList<IAiModule> Default() =>
-        [new EconomyModule(), new ExpansionModule(), new ProductionModule(), new DefenceModule(), new AttackModule()];
+        [new EconomyModule(), new ExpansionModule(), new ProductionModule(), new DefenceModule(), new AttackModule(), new ClaimModule()];
 }

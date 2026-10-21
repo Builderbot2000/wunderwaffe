@@ -167,4 +167,132 @@ public class AiModuleTests
             Assert.True(carry[id] >= n);
         Assert.True(carry["copper_ore"] >= defs["export_port"].Cost["copper_ore"] + defs["drill"].Cost["copper_ore"] + belt + wire);
     }
+
+    [Fact]
+    public void ReachComesByVehicleWhenACoreCantBePaidFor()
+    {
+        // WM-015: home's only core is empty, so a core toward the far cell can't be paid for; the idle scout flies there.
+        var sim = NewSim();
+        var tile = sim.AddTile(0, 0, Me, 64);
+        var core = PutCore(sim, tile, Me, 2, 2);
+        var bank = Bank(sim, tile, Me, 63, 63);
+        var scout = Scout(sim, tile, 6, 8);
+        Combat.DestroyBuilding(sim, tile, bank);
+
+        var p = AiContext.Observe(sim, Me).Reach("far", 100, tile.Id, [(50, 50, (1, 1))], (3, 3))!;
+        var move = Assert.IsType<MoveUnitsCommand>(Assert.Single(p.Commands));
+        Assert.Equal([scout.Id], move.UnitIds);
+        Assert.Equal((tile.Id, 50, 50), (move.TileId, move.X, move.Y));
+
+        // Once the core can be paid for, a core is built toward it instead.
+        Stock(core, "copper_ore", 100);
+        Stock(core, "iron_ore", 100);
+        p = AiContext.Observe(sim, Me).Reach("far", 100, tile.Id, [(50, 50, (1, 1))], (3, 3))!;
+        Assert.Equal("core", Assert.IsType<PlaceBuildingCommand>(Assert.Single(p.Commands)).BuildingId);
+    }
+
+    /// <summary>My home (0,0) with a bank and three gun ships; an unowned tile east (1,0) and south (0,1).</summary>
+    static (Simulation Sim, TileState Home, TileState East, TileState South) SiteFront()
+    {
+        var sim = new Simulation(TestContent.WithSites());
+        var home = Tile(sim, 0, 0, 64);
+        var east = sim.AddTile(1, 0, TileState.Unowned, 64);
+        var south = sim.AddTile(0, 1, TileState.Unowned, 64);
+        for (int i = 0; i < AttackModule.Group; i++)
+        {
+            LayUnit(sim, home, 6, 6 + 6 * i, Me, "gun_turret", "gun_turret");
+            LiftOff(sim, home, 6, 6 + 6 * i);
+        }
+        return (sim, home, east, south);
+    }
+
+    [Fact]
+    public void AttackTakesOnASiteItOutmatchesButNeverACitadel()
+    {
+        var (sim, _, east, south) = SiteFront();
+        var weak = sim.BuildSite(east, sim.Content.Sites["outpost"], 20, 20);
+        var citadel = sim.BuildSite(south, sim.Content.Sites["citadel"], 20, 20);
+        var q = new Api.GameQuery(sim, Me);
+        long dps = sim.Units.Where(u => u.Owner == Me).Sum(u => (long)q.UnitStatsOf(u.Id)!.Dps);
+        long hp = q.Units(Me).Sum(u => (long)u.Hp);
+        Assert.False(AttackModule.Outmatches(dps, hp, q.SiteOf(weak.Player)!));    // four cannons are too many
+        Assert.False(AttackModule.Outmatches(dps, hp, q.SiteOf(citadel.Player)!));
+
+        foreach (var t in east.Grid.Buildings.Where(b => b.Owner == weak.Player && b.Kind == Content.BuildingKind.Weapon).ToList())
+            Combat.DestroyBuilding(sim, east, t);
+        var c = AiContext.Observe(sim, Me);
+        Assert.Equal([weak.Id], AttackModule.SiteTargets(c, dps, hp, 32, 32).Select(s => s.Id));
+
+        AttackMoveCommand? sent = null;
+        var attack = new AttackModule();
+        for (int i = 0; i < 4 && sent == null; i++)
+        {
+            foreach (var p in attack.Propose(AiContext.Observe(sim, Me)))
+            {
+                foreach (var command in p.Commands)
+                {
+                    sent ??= command as AttackMoveCommand;
+                    sim.Enqueue(command);
+                }
+            }
+            sim.Step();
+        }
+        Assert.NotNull(sent);
+        Assert.Equal(east.Id, sent.TileId);
+        Assert.Equal(AttackModule.Group, sent.UnitIds.Length);
+
+        // With only the citadel left the squad stays home: no enemy seat to attack either.
+        Eliminate(sim, weak.Player);
+        Assert.DoesNotContain(attack.Propose(AiContext.Observe(sim, Me)), p => p.Commands.Any(x => x is AttackMoveCommand));
+    }
+
+    [Fact]
+    public void AFallenSiteIsClaimedByLandingBesideIt()
+    {
+        var sim = new Simulation(TestContent.WithSites());
+        var home = Tile(sim, 0, 0, 64);
+        var east = sim.AddTile(1, 0, TileState.Unowned, 64);
+        Scout(sim, home, 50, 30);
+        var site = sim.BuildSite(east, sim.Content.Sites["outpost"], 20, 20);
+        Eliminate(sim, site.Player);
+        Assert.NotEmpty(Territory.UnclaimedOn(east));
+
+        var claim = new ClaimModule();
+        var target = Assert.Single(ClaimModule.Targets(AiContext.Observe(sim, Me)));
+        Assert.Equal(east.Id, target.Tile);
+        for (int i = 0; i < 60 && Territory.UnclaimedOn(east).Count > 0; i++)
+        {
+            foreach (var p in claim.Propose(AiContext.Observe(sim, Me)))
+            {
+                foreach (var command in p.Commands)
+                    sim.Enqueue(command);
+            }
+            Run(sim, 60);
+        }
+        Assert.Empty(Territory.UnclaimedOn(east));
+        Assert.Contains(east.Grid.Buildings, b => b.Owner == Me && b.Kind == Content.BuildingKind.Weapon);
+    }
+
+    [Theory]
+    [InlineData("nomads", true)]
+    [InlineData("charter", false)]
+    public void ACaptureToBuildFactionPrefersACaptureTarget(string faction, bool factoryFirst)
+    {
+        // MP-010: their fallen base leaves a unit factory east and seven gun turrets (worth more) south, as far from home.
+        var sim = FactionSim(faction);
+        Tile(sim, 0, 0, 64);
+        var east = Tile(sim, 1, 0, 64, owner: Them);
+        var south = sim.AddTile(0, 1, Them, 64);
+        Bank(sim, south, Them, 63, 63);
+        sim.Enqueue(new PlaceBuildingCommand(Them, east.Id, "unit_factory", 9, 29));
+        for (int i = 0; i < 7; i++)
+            sim.Enqueue(new PlaceBuildingCommand(Them, south.Id, "gun_turret", 30 + i, 10));
+        sim.Step();
+        Eliminate(sim, Them);
+        Assert.Equal(8, Territory.UnclaimedOn(east).Count + Territory.UnclaimedOn(south).Count);
+
+        var best = ClaimModule.Targets(AiContext.Observe(sim, Me)).First();
+        Assert.Equal(factoryFirst ? east.Id : south.Id, best.Tile);
+        Assert.Equal(factoryFirst, best.Capture);
+    }
 }
