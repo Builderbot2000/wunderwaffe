@@ -136,4 +136,4 @@ A building whose seat lost its last core. It belongs to no one and does nothing 
 
 ### Build radius
 
-The area around each of a player's vehicles, flying or landed, inside which they may build (WM-015).
+The area around each of a player's major buildings (factories, cores, defences; set per building) and vehicles (from their block count), inside which they may build (WM-015).

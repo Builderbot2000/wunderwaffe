@@ -166,13 +166,13 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 ### WM-015 Build radius
 
-**Requirement:** A player may build only within the build radius of one of their vehicles, flying or landed, and never inside an enemy-owned tile's victory circle while any enemy building stands in that circle.
+**Requirement:** A player may build only within the build radius of one of their major placed buildings (factories, cores, defences; not minor ones such as conveyors and junctions) or vehicles, flying or landed, and never inside an enemy-owned tile's victory circle while any enemy building stands in that circle.
 
-**Acceptance criteria:** Placing a building, frame, blueprint, paste or graft (FB-023) is refused unless every cell of it lies within the build radius of one of the player's vehicles on that tile (OQ-58); the enemy-circle refusal stays as it is. One sim check (Placement.Check) decides it for the command, the UI preview and the AI. The radius shows when a vehicle is selected and while placing. The AI's planner searches only spots inside a radius, and the AI moves a vehicle to where it wants to build (MP-006, MP-007).
+**Acceptance criteria:** Placing a building, frame, blueprint, paste or graft (FB-023) is refused unless every cell of it lies within the build radius of one of the player's major buildings or vehicles on that tile (OQ-58); the enemy-circle refusal stays as it is. A building's radius depends on what building it is (a build radius per building in buildings.json; minor buildings have none) and takes effect the moment it is placed, so placing a major building extends where its owner can build. A vehicle's radius comes from a formula on its block count (Balance). Unclaimed buildings give none (WM-019). One sim check (Placement.Check) decides it for the command, the UI preview and the AI. Radii show when a building or vehicle is selected and while placing. The AI's planner searches only spots inside a radius, and the AI extends its radius by building or moves a vehicle to where it wants to build (MP-006, MP-007).
 
 **As built:** Territory.HasPresence and EnemyCircleBlocks, used by Placement.Check, frames, blueprints and landing (tested). Building on a tile you don't own is paid from an owned neighbour (Territory.Payer; replaced by FB-019). No build radius yet: any building or unit on the tile gives presence.
 
-**Notes:** Was: 'A player may build anywhere on any tile where they already have a building or unit, except inside an enemy-owned tile's victory circle while any enemy building stands in that circle.' / 'Placement is refused on a tile with none of the player's buildings or units, and inside an enemy-owned circle that holds an enemy building; it is allowed again once those buildings are destroyed.'. Owner, 2026-10-20: building only within the radius of a vehicle (OQ-58). Decided 2026-10-10. Conflicts with today's rule that building and landing need an owned tile.
+**Notes:** Was: 'A player may build anywhere on any tile where they already have a building or unit, except inside an enemy-owned tile's victory circle while any enemy building stands in that circle.' / 'Placement is refused on a tile with none of the player's buildings or units, and inside an enemy-owned circle that holds an enemy building; it is allowed again once those buildings are destroyed.'. Owner, 2026-10-20: building only within the radius of a vehicle, then of major buildings too, by building type and, for vehicles, by block count (OQ-58). Decided 2026-10-10. Conflicts with today's rule that building and landing need an owned tile.
 
 ### WM-016 Cores and elimination
 
@@ -231,7 +231,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [OQ-51](#oq-51-are-maps-hand-authored-or-generated) | Are maps hand-authored or generated? | WM-017, WM-009, MP-008 | Decided | Owner | 2026-10-18 |
 | [OQ-54](#oq-54-when-does-a-neutral-sites-equipment-become-a-players) | When does a neutral site's equipment become a player's? | WM-010, FB-023, MP-010, WM-006 | Decided | Owner | 2026-10-20 |
 | [OQ-57](#oq-57-where-do-neutral-sites-spawn-and-how-strong-are-their-guards) | Where do neutral sites spawn, and how strong are their guards? | WM-018, WM-010, WM-005, MP-005 | Decided | Owner | 2026-10-20 |
-| [OQ-58](#oq-58-what-sets-a-vehicles-build-radius-and-what-needs-one) | What sets a vehicle's build radius, and what needs one? | WM-015, UD-002, UD-006, FB-023, WM-019 | Open |  | 2026-10-20 |
+| [OQ-58](#oq-58-what-sets-a-vehicles-build-radius-and-what-needs-one) | What sets a vehicle's build radius, and what needs one? | WM-015, UD-002, UD-006, FB-023, WM-019 | Provisional | Owner; confirm scope | 2026-10-20 |
 
 ### OQ-1 Square or hex tiles on the world map?
 
@@ -315,4 +315,4 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Options / notes:** Size: one Balance constant for every vehicle; a `buildRadius` on core variants in buildings.json (a vehicle's radius is its largest core's); or a dedicated constructor block whose radius adds to the unit's stats (UD-002), like a power node's radius. Measured from the core's footprint (nearest cells, as power nodes are) or the unit's centre. What needs it: placing buildings, frames, blueprints, pastes and grafts; perhaps removal and cutting too; unit factories projecting a design inside their own radius (UD-006) could be exempt. Claiming an unclaimed building by building near it (WM-019) then needs a vehicle nearby as well. Leaning: `buildRadius` on core variants, measured from the core's footprint like a power node; flying and landed vehicles both count; everything placed, cut or removed needs it; factories exempt inside their own radius.
 
-**Decision:** Open.
+**Decision:** Major placed buildings (factories, cores, defences) and vehicles exert a build radius; minor buildings (conveyors, junctions and the like) don't. A building's radius depends on what building it is (content) and takes effect the moment it is placed; a vehicle's comes from a formula on its block count. Proposed, to confirm: placing, pasting and grafting need a radius, cutting and removal don't; a vehicle's radius follows its live block count, so lost blocks shrink it; radii stay within their tile.

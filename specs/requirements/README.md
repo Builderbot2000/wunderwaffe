@@ -44,7 +44,7 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 - Unclaimed buildings: when a seat (neutral or player) loses its last core, its buildings become unclaimed; building or landing near one claims it (WM-019).
 - Faction templates: each seat's faction highlights a subset of a hidden master tech tree, gated by resource, with variant replacements and rules: capture to build ('nomad', a narrow exception to TT-001) and buffs; picked in the lobby (Random allowed) or by the scenario; blueprints shared across factions, filtered by player tags (MP-009, MP-010; OQ-55, OQ-56).
 - Neutral guardian factions hold sites placed by world generation, guarding valuable deposits and tech; a site falls when its neutral player's cores are destroyed (WM-010 rewritten, WM-018; OQ-54, OQ-57).
-- Build radius: building is allowed only within the radius of one of your vehicles, flying or landed, replacing tile-wide presence (WM-015; OQ-58).
+- Build radius: building is allowed only within the radius of one of your major buildings (per building type, from the moment it's placed) or vehicles (by block count), replacing tile-wide presence (WM-015; OQ-58).
 - Follow cursor: a mode in which selected vehicles keep moving towards the mouse (UC-010).
 - Every player starts with a small vehicle beside the landed big one (WM-005).
 
