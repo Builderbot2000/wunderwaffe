@@ -128,7 +128,7 @@ An installation of the neutral guardian faction, placed at world generation or i
 
 ### Relocation
 
-Cutting a building you own and pasting it, intact, elsewhere on a tile you own, neither refunded nor paid for again; to leave its tile, it is grafted onto a landed unit and flown out (FB-023).
+Cutting a building you own and pasting it, intact, elsewhere on the same tile, neither refunded nor paid for again; it never pastes onto another tile, so to leave its tile it is grafted onto a landed unit and flown out (FB-023).
 
 ### Unclaimed building
 

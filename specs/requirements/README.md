@@ -40,9 +40,9 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 
 ## Requirement additions (2026-10-20)
 
-- Building relocation: cut a building you own and paste it, intact, on a tile you own; to leave a tile, graft it onto a landed unit and fly it out (FB-023; OQ-53).
+- Building relocation: cut a building you own and paste it, intact, on the same tile (owned or not); to leave a tile, graft it onto a landed unit and fly it out (FB-023; OQ-53).
 - Unclaimed buildings: when a seat (neutral or player) loses its last core, its buildings become unclaimed; building or landing near one claims it (WM-019).
-- Faction templates: each seat's faction highlights a subset of a hidden master tech tree, gated by resource, with variant replacements and rules: capture to build ('nomad', a narrow exception to TT-001) and buffs (MP-009, MP-010; OQ-55, OQ-56).
+- Faction templates: each seat's faction highlights a subset of a hidden master tech tree, gated by resource, with variant replacements and rules: capture to build ('nomad', a narrow exception to TT-001) and buffs; picked in the lobby (Random allowed) or by the scenario; blueprints shared across factions, filtered by player tags (MP-009, MP-010; OQ-55, OQ-56).
 - Neutral guardian factions hold sites placed by world generation, guarding valuable deposits and tech; a site falls when its neutral player's cores are destroyed (WM-010 rewritten, WM-018; OQ-54, OQ-57).
 
 ## Mechanics

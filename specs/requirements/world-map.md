@@ -118,7 +118,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Requirement:** The world shall hold neutral sites: installations of a neutral guardian faction that defends them but never expands, attacks beyond its sites, claims or wins. Each site guards something worth taking: rich or rare deposits, and buildings or blocks from the catalogue that player factions can't build (MP-009).
 
-**Acceptance criteria:** Each site is held by its own neutral player of the guardian faction, with one or more cores. Neutral players are seats outside victory (MP-001) and the AI director; their turrets and guard units fire on any player's units and buildings in range and don't leave their site. A site is won by destroying all of its neutral player's cores (OQ-54): its buildings become unclaimed and players take them by claiming (WM-019), to use in place or move (FB-023). Sites come from world generation (WM-018) and scenarios (WM-017). Neutral state is hashed and snapshotted like any seat's.
+**Acceptance criteria:** Each site is held by its own neutral player of the guardian faction, with one or more cores; sites never share a neutral player. Neutral players are seats outside victory (MP-001) and the AI director; their turrets and guard units fire on any player's units and buildings in range and don't leave their site. A site is won by destroying all of its neutral player's cores (OQ-54): its buildings become unclaimed and players take them by claiming (WM-019), to use in place or move (FB-023). Sites come from world generation (WM-018) and scenarios (WM-017). Neutral state is hashed and snapshotted like any seat's.
 
 **As built:** Not built.
 
