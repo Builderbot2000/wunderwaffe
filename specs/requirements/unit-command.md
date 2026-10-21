@@ -17,6 +17,7 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 | [UC-007](#uc-007-pathfinding) | Pathfinding | Must | Done | Yes | MVP | Non-Functional | P5 | UD-004 |  |  |
 | [UC-008](#uc-008-unit-collisions) | Unit collisions | Should | Done | Yes | MVP | Functional | P5 | UD-012 | New |  |
 | [UC-009](#uc-009-abstract-travel) | Abstract travel | Must | Done | Yes | MVP | Functional | P3 | UC-001, UD-004, FB-013 | Updated |  |
+| [UC-010](#uc-010-follow-cursor-mode) | Follow cursor mode | Should | Approved | No | Alpha | Functional | P5 | UC-001, UC-003, NF-004 | New |  |
 
 ### UC-001 Unit selection & orders
 
@@ -99,6 +100,16 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 **As built:** World/AbstractTravel.cs: rendered = viewed by a player or Contested (OQ-36). A physical unit becomes a node the tick it crosses onto a tile that isn't rendered (UnitPhysics hook), a unit ordered off the rendered tile is one from the start; nodes move along planned waypoints at cruise speed with no physics and materialise where they are, keeping their order, on a rendered tile, going abstract again on leaving it. A travelling node that materialises on a Contested tile with enemy units on it halts if UnitSim.StopsToFight (aggressive, defensive), keeping its order, and resumes once no enemy unit is left on the tile (Simulation.InterruptedUnits, hashed and snapshotted); passive and hold fire keep their course. A stopped node stays exactly where it is until its tile is opened. All tested; turrets can't see nodes. Full-sim travel time matches the abstract estimate within AbstractTravel.TolerancePercent (tested; the steering no longer weaves, so a scout flies within about 1% of it).
 
 **Notes:** Was: 'A unit outside every rendered tile shall travel as an abstract node ... It materialises at its exact world position when its tile is opened or becomes Contested.' OQ-15 decided 2026-10-10. Unwatched skirmishes run on automatic control, so stances (UC-004) matter. Rewritten after playtesting 2026-10-17: units switch at the border, keep travelling abstractly until they stop, and waiting at borders is gone (UC-005, OQ-36). Owner, same day: passing through the rendered tile renders the unit but keeps its course; meeting enemies interrupts travel for a skirmish, with the stance deciding course or standstill.
+
+### UC-010 Follow cursor mode
+
+**Requirement:** The player shall be able to switch the selected vehicles into a mode where they keep moving towards the mouse cursor until the mode ends.
+
+**Acceptance criteria:** A key (rebindable, UI-005) toggles the mode for the selection; while it is on, the selection heads for the cell under the cursor and follows it as it moves, and squads keep their formation (UC-003). It ends on the key again, on any other order, or when the selection is cleared. Target updates are ordinary commands, sent only when the cursor has moved and at most a few times a second, so lockstep and replays work (NF-004) and the command log stays small. Works on the tile view and the world map.
+
+**As built:** Not built.
+
+**Notes:** Owner, 2026-10-20.
 
 ## Decisions & open questions
 

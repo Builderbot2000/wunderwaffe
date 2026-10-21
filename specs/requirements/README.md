@@ -44,6 +44,9 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 - Unclaimed buildings: when a seat (neutral or player) loses its last core, its buildings become unclaimed; building or landing near one claims it (WM-019).
 - Faction templates: each seat's faction highlights a subset of a hidden master tech tree, gated by resource, with variant replacements and rules: capture to build ('nomad', a narrow exception to TT-001) and buffs; picked in the lobby (Random allowed) or by the scenario; blueprints shared across factions, filtered by player tags (MP-009, MP-010; OQ-55, OQ-56).
 - Neutral guardian factions hold sites placed by world generation, guarding valuable deposits and tech; a site falls when its neutral player's cores are destroyed (WM-010 rewritten, WM-018; OQ-54, OQ-57).
+- Build radius: building is allowed only within the radius of one of your vehicles, flying or landed, replacing tile-wide presence (WM-015; OQ-58).
+- Follow cursor: a mode in which selected vehicles keep moving towards the mouse (UC-010).
+- Every player starts with a small vehicle beside the landed big one (WM-005).
 
 ## Mechanics
 
@@ -67,24 +70,24 @@ See also the [glossary](glossary.md).
 
 | Mechanic | Must | Should | Could | Won't | Total | Done | In Progress | % Done | Conflict | Review |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [World Map](world-map.md) | 11 | 6 | 1 | 1 | 19 | 15 | 0 | 79% | 0 | 2 |
+| [World Map](world-map.md) | 11 | 6 | 1 | 1 | 19 | 13 | 2 | 68% | 0 | 1 |
 | [Factory & Logistics](factory-logistics.md) | 17 | 5 | 1 | 0 | 23 | 20 | 0 | 87% | 0 | 2 |
 | [Resources & Tech](resources-tech.md) | 7 | 2 | 1 | 0 | 10 | 5 | 0 | 50% | 0 | 2 |
 | [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
 | [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 14 | 0 | 74% | 0 | 2 |
-| [Unit Command](unit-command.md) | 5 | 4 | 0 | 0 | 9 | 9 | 0 | 100% | 0 | 0 |
+| [Unit Command](unit-command.md) | 5 | 5 | 0 | 0 | 10 | 9 | 0 | 90% | 0 | 0 |
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 7 | 0 | 54% | 0 | 0 |
 | [Multiplayer & Victory](multiplayer-victory.md) | 4 | 5 | 1 | 0 | 10 | 6 | 1 | 60% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 13 | 1 | 87% | 0 | 2 |
-| **Total** | 75 | 39 | 9 | 1 | 124 | 94 | 2 | 76% | 0 | 10 |
+| **Total** | 75 | 40 | 9 | 1 | 125 | 92 | 4 | 74% | 0 | 9 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 94 | 76% |
-| In Progress | 2 | 2% |
-| Approved | 6 | 5% |
+| Done | 92 | 74% |
+| In Progress | 4 | 3% |
+| Approved | 7 | 6% |
 | Proposed | 7 | 6% |
 | Deferred | 2 | 2% |
 | Rejected | 13 | 10% |
@@ -94,19 +97,19 @@ See also the [glossary](glossary.md).
 | Flag | Count |
 |---|---|
 | Conflict | 0 |
-| Review | 10 |
-| Updated | 26 |
+| Review | 9 |
+| Updated | 28 |
 | New | 28 |
 
 ### Design pillar coverage
 
 | Pillar | Name | Reqs | Must | Done |
 |---|---|---|---|---|
-| P1 | World map of tiles | 20 | 13 | 17 |
+| P1 | World map of tiles | 20 | 13 | 15 |
 | P2 | Tile = RTS factory map | 23 | 17 | 20 |
 | P3 | Inter-tile I/O | 10 | 5 | 8 |
 | P4 | Block-by-block unit design | 15 | 10 | 13 |
-| P5 | Squad command | 10 | 5 | 10 |
+| P5 | Squad command | 11 | 5 | 10 |
 | P6 | No Rush | 6 | 4 | 0 |
 | P7 | Resource-gated tech | 8 | 6 | 3 |
 | P8 | World domination | 21 | 10 | 14 |

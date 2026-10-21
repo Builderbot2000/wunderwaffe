@@ -12,7 +12,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-002](#wm-002-tile-attributes) | Tile attributes | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
 | [WM-003](#wm-003-tile-adjacency) | Tile adjacency | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
 | [WM-004](#wm-004-tile-ownership) | Tile ownership | Must | Done | Yes | MVP | Functional | P1 | WM-001 | Updated |  |
-| [WM-005](#wm-005-starting-tile) | Starting tile | Must | Done | Yes | MVP | Functional | P1 | WM-004 | Review |  |
+| [WM-005](#wm-005-starting-tile) | Starting tile | Must | In Progress | Partial | MVP | Functional | P1 | WM-004, FB-021 | Updated |  |
 | [WM-006](#wm-006-tile-claim-by-victory-circle) | Tile claim by victory circle | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-015 | Updated |  |
 | [WM-007](#wm-007-zoom-between-layers) | Zoom between layers | Must | Done | Yes | MVP | Functional | P1 | WM-001, FB-001, FB-013 | Updated |  |
 | [WM-008](#wm-008-fog-of-war-world) | Fog of war (world) | Won't | Rejected | No | Alpha | Functional | P1 | WM-004 |  |  |
@@ -22,7 +22,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-012](#wm-012-tile-names) | Tile names | Could | Done | Yes | MVP | Functional | P1 | WM-009 | New |  |
 | [WM-013](#wm-013-world-map-overview) | World map overview | Should | Done | Yes | MVP | Functional | P1 | WM-007 | New |  |
 | [WM-014](#wm-014-victory-circles) | Victory circles | Must | Done | Yes | MVP | Functional | P1 | WM-009 | New |  |
-| [WM-015](#wm-015-building-presence) | Building presence | Must | Done | Yes | MVP | Functional | P1 | WM-014 | New |  |
+| [WM-015](#wm-015-build-radius) | Build radius | Must | In Progress | Partial | MVP | Functional | P1 | WM-014, UD-010 | Updated |  |
 | [WM-016](#wm-016-cores-and-elimination) | Cores and elimination | Must | Done | Yes | MVP | Functional | P8 | WM-005, CB-001, UD-010 | Review |  |
 | [WM-017](#wm-017-scenarios) | Scenarios | Should | Done | Yes | Alpha | Functional | P1 | WM-009, FB-021, NF-002 |  |  |
 | [WM-018](#wm-018-neutral-site-generation) | Neutral site generation | Should | Approved | No | Alpha | Functional | P1 | WM-009, WM-010, WM-014, FB-021 | New |  |
@@ -66,13 +66,13 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 ### WM-005 Starting tile
 
-**Requirement:** Each player shall start owning exactly one tile, with a starting unit already deployed (landed) inside that tile's victory circle (WM-014). Its core is the player's first core (WM-016): it is given at the start, not built.
+**Requirement:** Each player shall start owning exactly one tile, with two vehicles: a big starting vehicle already landed inside that tile's victory circle (WM-014), whose core is the player's first core (WM-016), and a small starting vehicle beside it, ready for orders. Both are given at the start, not built.
 
-**Acceptance criteria:** On new game each player owns 1 tile and has a landed starting unit whose core stands inside the victory circle and holds the starting items; it can lift off like any unit; with several players, starts are spread fairly (OQ-22).
+**Acceptance criteria:** On new game each player owns 1 tile; their big vehicle stands landed with its core inside the victory circle, holding the starting items, and can lift off like any unit; their small vehicle is a unit beside it with its own core (so it counts for elimination, WM-016) and a build radius of its own (WM-015). Both come from start prefabs named in content (FB-021), set per faction (MP-009) and by scenarios (WM-017). With several players, starts are spread fairly (OQ-22).
 
-**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (the setup's start prefabs, FB-021; default game/data/prefabs/scout.json: thruster, 2x2 core, thruster on a 4x2 frame), whose core holds the prefab's items, 600 copper ore + 300 iron ore (doubled for 256-cell tiles, OQ-35); it passes lift-off validation. Tested (SimulationTests, TerritoryTests).
+**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (the setup's start prefabs, FB-021; default game/data/prefabs/scout.json: thruster, 2x2 core, thruster on a 4x2 frame), whose core holds the prefab's items, 600 copper ore + 300 iron ore (doubled for 256-cell tiles, OQ-35); it passes lift-off validation. Tested (SimulationTests, TerritoryTests). No small starting vehicle yet.
 
-**Notes:** Was: 'Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22). Start as a deployed unit instead of a free core, 2026-10-17 (OQ-37).
+**Notes:** Was: 'Each player shall start owning exactly one tile, with a starting unit already deployed (landed) inside that tile's victory circle (WM-014). Its core is the player's first core (WM-016): it is given at the start, not built.' / 'On new game each player owns 1 tile and has a landed starting unit whose core stands inside the victory circle and holds the starting items; it can lift off like any unit; with several players, starts are spread fairly (OQ-22).'. Was: 'Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22). Start as a deployed unit instead of a free core, 2026-10-17 (OQ-37). Owner, 2026-10-20: add a small starting vehicle for every player beside the landed big one.
 
 ### WM-006 Tile claim by victory circle
 
@@ -164,15 +164,15 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Notes:** OQ-3 decided 2026-10-10. Radius placeholder: 1/8 of a nominal tile (12 cells at 96, 32 at 256; OQ-35) until playtested. Ocean/unbuildable tiles: OQ-24. OQ-24 decided 2026-10-10: ocean and unbuildable tiles get circles too and can be claimed, which needs buildings that stand on water (FB-017).
 
-### WM-015 Building presence
+### WM-015 Build radius
 
-**Requirement:** A player may build anywhere on any tile where they already have a building or unit, except inside an enemy-owned tile's victory circle while any enemy building stands in that circle.
+**Requirement:** A player may build only within the build radius of one of their vehicles, flying or landed, and never inside an enemy-owned tile's victory circle while any enemy building stands in that circle.
 
-**Acceptance criteria:** Placement is refused on a tile with none of the player's buildings or units, and inside an enemy-owned circle that holds an enemy building; it is allowed again once those buildings are destroyed.
+**Acceptance criteria:** Placing a building, frame, blueprint, paste or graft (FB-023) is refused unless every cell of it lies within the build radius of one of the player's vehicles on that tile (OQ-58); the enemy-circle refusal stays as it is. One sim check (Placement.Check) decides it for the command, the UI preview and the AI. The radius shows when a vehicle is selected and while placing. The AI's planner searches only spots inside a radius, and the AI moves a vehicle to where it wants to build (MP-006, MP-007).
 
-**As built:** Territory.HasPresence and EnemyCircleBlocks, used by Placement.Check, frames, blueprints and landing (tested). Building on a tile you don't own is paid from an owned neighbour (Territory.Payer; replaced by FB-019).
+**As built:** Territory.HasPresence and EnemyCircleBlocks, used by Placement.Check, frames, blueprints and landing (tested). Building on a tile you don't own is paid from an owned neighbour (Territory.Payer; replaced by FB-019). No build radius yet: any building or unit on the tile gives presence.
 
-**Notes:** Decided 2026-10-10. Conflicts with today's rule that building and landing need an owned tile.
+**Notes:** Was: 'A player may build anywhere on any tile where they already have a building or unit, except inside an enemy-owned tile's victory circle while any enemy building stands in that circle.' / 'Placement is refused on a tile with none of the player's buildings or units, and inside an enemy-owned circle that holds an enemy building; it is allowed again once those buildings are destroyed.'. Owner, 2026-10-20: building only within the radius of a vehicle (OQ-58). Decided 2026-10-10. Conflicts with today's rule that building and landing need an owned tile.
 
 ### WM-016 Cores and elimination
 
@@ -208,7 +208,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Requirement:** When a seat's last core is destroyed, whether a neutral player's or an active player's, every building it still has becomes unclaimed. A player claims an unclaimed building by placing one of their own buildings, or landing one of their units, near it; it is then theirs, to use where it stands or move (FB-023).
 
-**Acceptance criteria:** The last core counts cores on units as well as on tiles (WM-016). Unclaimed buildings belong to no seat: they keep their HP and held items, can still be damaged, but don't run or fire and don't count towards presence (WM-015), victory circles (WM-006) or domination (MP-001). Placing a building or landing a unit within the claim radius (a Balance constant, tuned in playtesting) of unclaimed buildings claims every one in range; when two players claim the same building on one tick, the first command applied wins. A claim raises an event (UI-003) and counts as a capture for capture to build (MP-010). Unclaimed state and owners are sim state (hashed, snapshotted) and readable through GameQuery, so the AI can go after them. Placing and landing show the claim radius and what it would claim.
+**Acceptance criteria:** The last core counts cores on units as well as on tiles (WM-016). Unclaimed buildings belong to no seat: they keep their HP and held items, can still be damaged, but don't run or fire, give no build radius (WM-015) and don't count towards victory circles (WM-006) or domination (MP-001). Placing a building or landing a unit within the claim radius (a Balance constant, tuned in playtesting) of unclaimed buildings claims every one in range; when two players claim the same building on one tick, the first command applied wins. A claim raises an event (UI-003) and counts as a capture for capture to build (MP-010). Unclaimed state and owners are sim state (hashed, snapshotted) and readable through GameQuery, so the AI can go after them. Placing and landing show the claim radius and what it would claim.
 
 **As built:** Not built.
 
@@ -231,6 +231,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [OQ-51](#oq-51-are-maps-hand-authored-or-generated) | Are maps hand-authored or generated? | WM-017, WM-009, MP-008 | Decided | Owner | 2026-10-18 |
 | [OQ-54](#oq-54-when-does-a-neutral-sites-equipment-become-a-players) | When does a neutral site's equipment become a player's? | WM-010, FB-023, MP-010, WM-006 | Decided | Owner | 2026-10-20 |
 | [OQ-57](#oq-57-where-do-neutral-sites-spawn-and-how-strong-are-their-guards) | Where do neutral sites spawn, and how strong are their guards? | WM-018, WM-010, WM-005, MP-005 | Decided | Owner | 2026-10-20 |
+| [OQ-58](#oq-58-what-sets-a-vehicles-build-radius-and-what-needs-one) | What sets a vehicle's build radius, and what needs one? | WM-015, UD-002, UD-006, FB-023, WM-019 | Open |  | 2026-10-20 |
 
 ### OQ-1 Square or hex tiles on the world map?
 
@@ -309,3 +310,9 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 **Options / notes:** Placement: a share of tiles, more of them far from the starts; never on a start tile, perhaps not on its neighbours; inside or outside the victory circle; on ocean tiles (FB-017). Strength: guard value from the value held, rising with distance from the starts, so the nearest sites are early-game targets and the far ones need an army. Treasure: richer patches of the tile's deposits, regional or rare items (RS-003), neutral-only buildings and blocks, stock. Leaning: one site per three tiles, none on or beside a start, outside the circle, value and guards rising with distance.
 
 **Decision:** As proposed: about one site per three tiles, none on or beside a start, outside the victory circle, the value held and the guards rising with distance from the starts (WM-018).
+
+### OQ-58 What sets a vehicle's build radius, and what needs one?
+
+**Options / notes:** Size: one Balance constant for every vehicle; a `buildRadius` on core variants in buildings.json (a vehicle's radius is its largest core's); or a dedicated constructor block whose radius adds to the unit's stats (UD-002), like a power node's radius. Measured from the core's footprint (nearest cells, as power nodes are) or the unit's centre. What needs it: placing buildings, frames, blueprints, pastes and grafts; perhaps removal and cutting too; unit factories projecting a design inside their own radius (UD-006) could be exempt. Claiming an unclaimed building by building near it (WM-019) then needs a vehicle nearby as well. Leaning: `buildRadius` on core variants, measured from the core's footprint like a power node; flying and landed vehicles both count; everything placed, cut or removed needs it; factories exempt inside their own radius.
+
+**Decision:** Open.

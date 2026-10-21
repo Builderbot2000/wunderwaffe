@@ -133,3 +133,7 @@ Cutting a building you own and pasting it, intact, elsewhere on the same tile, n
 ### Unclaimed building
 
 A building whose seat lost its last core. It belongs to no one and does nothing until a player claims it by building or landing a unit near it (WM-019).
+
+### Build radius
+
+The area around each of a player's vehicles, flying or landed, inside which they may build (WM-015).
