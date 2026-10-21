@@ -30,7 +30,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [FB-020](#fb-020-power-layer-nodes-and-cross-tile-power) | Power layer, nodes and cross-tile power | Must | Done | Yes | MVP | Functional | P3 | FB-005, IO-002 | New |  |
 | [FB-021](#fb-021-prefab-blueprints) | Prefab blueprints | Must | Done | Yes | MVP | Functional | P2 | FB-009, WM-005 | New |  |
 | [FB-022](#fb-022-generic-cell-layers) | Generic cell layers | Should | Done | Yes | Alpha | Non-Functional | P2 | FB-001, FB-017, FB-020, UD-010 |  |  |
-| [FB-023](#fb-023-building-relocation) | Building relocation | Should | Approved | No | Alpha | Functional | P2 | FB-002, UD-010, WM-010 | New |  |
+| [FB-023](#fb-023-building-relocation) | Building relocation | Should | Approved | No | Alpha | Functional | P2 | FB-002, UD-010, WM-019 | New |  |
 
 ### FB-001 Tile local map
 
@@ -250,13 +250,13 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 ### FB-023 Building relocation
 
-**Requirement:** The player shall be able to move a building, intact, to another place instead of removing it for a refund and building it again. This covers their own buildings and those taken from a cleared neutral site (WM-010), including buildings and unit blocks their faction cannot build (MP-009).
+**Requirement:** The player shall be able to cut a building they own and paste it, intact, elsewhere on a tile they own, instead of removing it for a refund and building it again. To take a building off its tile, they graft it onto a vehicle: paste it onto one of their landed units and fly it out. This covers buildings they claimed (WM-019), including buildings and unit blocks their faction cannot build (MP-009).
 
-**Acceptance criteria:** A moved building keeps its type, HP, recipe and settings, and is neither refunded nor paid for again. The destination is checked by the placement rules (presence, bounds, overlap, layers, terrain, port zones; not cost or the faction's catalogue), previewed from the same check, and a refused move leaves the building where it was. A building can reach another tile (how: OQ-53). A building the mover's faction cannot build can still be moved and placed, and as a unit block it still works in a unit (UD-003); a blueprint holding it can be recorded, but only placed where a moved one is available. Moves are commands, so they replay and stay in sync (NF-004).
+**Acceptance criteria:** Cut and paste keeps the building's type, HP, recipe, settings and held items; it is neither refunded nor paid for again. Pasting on the ground needs a tile the player owns (WM-004); on any other tile a building they own can only be grafted onto one of their landed units there. A graft is pasted onto the unit's frame as a block, and the unit must still pass lift-off validation (UD-003) to fly it out; after landing it can be cut off again. The paste spot is checked by the placement rules (presence, bounds, overlap, layers, terrain, port zones; not cost or the faction's catalogue) and previewed from the same check; a refused paste leaves the building where it was. A building the player's faction cannot build still works where it is pasted, on the ground or as a unit block; a blueprint holding it can be recorded, but only placed where one they own is pasted. Cut and paste are commands, so they replay and stay in sync (NF-004).
 
 **As built:** Not built.
 
-**Notes:** Owner, 2026-10-20: lets players take buildings and blocks from defeated neutral factions instead of only salvaging them for resources (CB-006, RS-005), since they may hold tech that can't be built otherwise. Also the way a capture-to-build faction gets its first copy of a building (MP-010). Open: OQ-53.
+**Notes:** Owner, 2026-10-20: lets players take buildings and blocks from defeated neutral factions instead of only salvaging them for resources (CB-006, RS-005), since they may hold tech that can't be built otherwise. Also the way a capture-to-build faction gets its first copy of a building (MP-010). Cut and paste; leaving a tile means grafting onto a vehicle (OQ-53).
 
 ## Decisions & open questions
 
@@ -272,7 +272,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 | [OQ-39](#oq-39-where-do-refunds-go-and-what-happens-to-a-lost-cores-items) | Where do refunds go, and what happens to a lost core's items? | FB-019, WM-016, FB-002 | Decided | Owner | 2026-10-17 |
 | [OQ-42](#oq-42-can-power-cross-tiles-and-do-cables-share-the-building-layer) | Can power cross tiles, and do cables share the building layer? | FB-005, FB-020, IO-002 | Decided | Owner | 2026-10-17 |
 | [OQ-52](#oq-52-are-cell-layers-hand-coded-or-generic) | Are cell layers hand-coded or generic? | FB-022, FB-017, FB-020, RS-004, WM-017 | Decided | Owner | 2026-10-18 |
-| [OQ-53](#oq-53-how-does-a-moved-building-get-to-its-new-place) | How does a moved building get to its new place? | FB-023, UD-010, IO-002, MP-010 | Open |  | 2026-10-20 |
+| [OQ-53](#oq-53-how-does-a-moved-building-get-to-its-new-place) | How does a moved building get to its new place? | FB-023, UD-010, IO-002, MP-010 | Decided | Owner | 2026-10-20 |
 
 ### OQ-11 Are unvisited tiles fully simulated or abstracted to rates?
 
@@ -338,4 +338,4 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **Options / notes:** (a) Pick up and put down on the same tile only: simplest, but a site's tech could never leave its tile. (b) Pack it: picking a building up turns it into a packed item (one per building type, carrying its HP) held by the nearest own core on the tile or the unit standing on it; it travels like any item, in unit cargo (UD-010) or over port links (IO-002), and is put down from the build menu for free. Reuses inventories, cargo, links, hashing and snapshots; the held items drain as on removal (OQ-39). (c) A unit carries it physically, as a slung load adding mass: the most visible, the most work (physics, UD-003 validation, a new attachment rule). Also to decide: whether a move takes time or a fee, whether HP is kept, and whether a building can be picked up under fire or inside an enemy-held circle. Leaning: (b), picking up needs presence (WM-015) and is instant, no fee, HP kept.
 
-**Decision:** Open.
+**Decision:** Cut and paste. Once a player owns a building (built it, or claimed it unclaimed, WM-019), they can cut it and paste it elsewhere on a tile they own. Taking it off a tile means grafting it onto a vehicle: pasted onto a landed unit, which then flies it out (FB-023).

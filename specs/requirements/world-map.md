@@ -17,7 +17,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-007](#wm-007-zoom-between-layers) | Zoom between layers | Must | Done | Yes | MVP | Functional | P1 | WM-001, FB-001, FB-013 | Updated |  |
 | [WM-008](#wm-008-fog-of-war-world) | Fog of war (world) | Won't | Rejected | No | Alpha | Functional | P1 | WM-004 |  |  |
 | [WM-009](#wm-009-procedural-world-generation) | Procedural world generation | Should | Done | Yes | Alpha | Functional | P1 | WM-002 |  |  |
-| [WM-010](#wm-010-neutral-guardian-faction) | Neutral guardian faction | Should | Approved | No | Alpha | Functional | P1 | WM-006, CB-001, MP-009 | Updated |  |
+| [WM-010](#wm-010-neutral-guardian-faction) | Neutral guardian faction | Should | Approved | No | Alpha | Functional | P1 | WM-006, CB-001, MP-009, WM-019 | Updated |  |
 | [WM-011](#wm-011-terrain--buildability) | Terrain & buildability | Must | Done | Yes | MVP | Functional | P1 | WM-002 | New |  |
 | [WM-012](#wm-012-tile-names) | Tile names | Could | Done | Yes | MVP | Functional | P1 | WM-009 | New |  |
 | [WM-013](#wm-013-world-map-overview) | World map overview | Should | Done | Yes | MVP | Functional | P1 | WM-007 | New |  |
@@ -26,6 +26,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-016](#wm-016-cores-and-elimination) | Cores and elimination | Must | Done | Yes | MVP | Functional | P8 | WM-005, CB-001, UD-010 | Review |  |
 | [WM-017](#wm-017-scenarios) | Scenarios | Should | Done | Yes | Alpha | Functional | P1 | WM-009, FB-021, NF-002 |  |  |
 | [WM-018](#wm-018-neutral-site-generation) | Neutral site generation | Should | Approved | No | Alpha | Functional | P1 | WM-009, WM-010, WM-014, FB-021 | New |  |
+| [WM-019](#wm-019-unclaimed-buildings) | Unclaimed buildings | Should | Approved | No | Alpha | Functional | P8 | WM-016, MP-001 | New |  |
 
 ### WM-001 Tiled world map
 
@@ -117,11 +118,11 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Requirement:** The world shall hold neutral sites: installations of a neutral guardian faction that defends them but never expands, attacks beyond its sites, claims or wins. Each site guards something worth taking: rich or rare deposits, and buildings or blocks from the catalogue that player factions can't build (MP-009).
 
-**Acceptance criteria:** The neutral faction is a seat outside victory and elimination (MP-001) and outside the AI director; its turrets and guard units fire on any player's units and buildings in range and don't leave their site. Clearing a site (OQ-54) hands its remaining buildings to the player who cleared it, to use in place or move (FB-023). Sites come from world generation (WM-018) and scenarios (WM-017). Its state is hashed and snapshotted like any seat's.
+**Acceptance criteria:** Each site is held by its own neutral player of the guardian faction, with one or more cores. Neutral players are seats outside victory (MP-001) and the AI director; their turrets and guard units fire on any player's units and buildings in range and don't leave their site. A site is won by destroying all of its neutral player's cores (OQ-54): its buildings become unclaimed and players take them by claiming (WM-019), to use in place or move (FB-023). Sites come from world generation (WM-018) and scenarios (WM-017). Neutral state is hashed and snapshotted like any seat's.
 
 **As built:** Not built.
 
-**Notes:** Was: 'The world may contain neutral hazards or NPC-held tiles (e.g. derelict factories) that must be cleared before claim' / 'At least one neutral tile type exists with defenders that block claim until destroyed'. Owner, 2026-10-20: neutral factions hold sites within tiles, as treasure guardians. Matches the Keepers and claimable ruins of the content draft (specs/content/content-update.md §1.3, item 8). Open: OQ-54.
+**Notes:** Was: 'The world may contain neutral hazards or NPC-held tiles (e.g. derelict factories) that must be cleared before claim' / 'At least one neutral tile type exists with defenders that block claim until destroyed'. Owner, 2026-10-20: neutral factions hold sites within tiles, as treasure guardians; a site is won by destroying its neutral player's cores (OQ-54). Matches the Keepers and claimable ruins of the content draft (specs/content/content-update.md §1.3, item 8), except that a site is taken through its cores, not a beacon.
 
 ### WM-011 Terrain & buildability
 
@@ -197,11 +198,21 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Requirement:** World generation shall place neutral sites (WM-010), each guarding valuable deposits and tech, with guards matched to what the site holds, while keeping starts fair.
 
-**Acceptance criteria:** A generation phase after victory circles: the same seed gives the same sites; site density is a match setting, none included (MP-005); no site on a start tile; each site sits on a rich or rare deposit patch (RS-003, RS-004) and holds at least one catalogue entry no player faction can build, or a stock of valuable items; guard strength grows with the value guarded, worked out from content (item values, UnitStats, Combat.Dps), never ids (MP-007); fair starts (OQ-22) score each start's access to sites. Sites are built from content templates (prefab-like: buildings, guards, deposits, items; FB-021), validated with the rest. Saving the map as a scenario keeps its sites.
+**Acceptance criteria:** A generation phase after victory circles: the same seed gives the same sites; site density is a match setting, none included (MP-005), about one site per three tiles by default; none on or beside a start tile, and none inside a victory circle; each site has its own neutral player with at least one core, sits on a rich or rare deposit patch (RS-003, RS-004) and holds at least one catalogue entry no player faction can build, or a stock of valuable items; the value held and the guards' strength rise with distance from the starts, guard strength worked out from content (item values, UnitStats, Combat.Dps), never ids (MP-007); fair starts (OQ-22) score each start's access to sites. Sites are built from content templates (prefab-like: buildings, guards, deposits, items; FB-021), validated with the rest. Saving the map as a scenario keeps its sites.
 
 **As built:** Not built.
 
-**Notes:** Owner, 2026-10-20. Open: OQ-57.
+**Notes:** Owner, 2026-10-20 (OQ-57).
+
+### WM-019 Unclaimed buildings
+
+**Requirement:** When a seat's last core is destroyed, whether a neutral player's or an active player's, every building it still has becomes unclaimed. A player claims an unclaimed building by placing one of their own buildings, or landing one of their units, near it; it is then theirs, to use where it stands or move (FB-023).
+
+**Acceptance criteria:** The last core counts cores on units as well as on tiles (WM-016). Unclaimed buildings belong to no seat: they keep their HP and held items, can still be damaged, but don't run or fire and don't count towards presence (WM-015), victory circles (WM-006) or domination (MP-001). Placing a building or landing a unit within the claim radius (a Balance constant, tuned in playtesting) of unclaimed buildings claims every one in range; when two players claim the same building on one tick, the first command applied wins. A claim raises an event (UI-003) and counts as a capture for capture to build (MP-010). Unclaimed state and owners are sim state (hashed, snapshotted) and readable through GameQuery, so the AI can go after them. Placing and landing show the claim radius and what it would claim.
+
+**As built:** Not built.
+
+**Notes:** Owner, 2026-10-20 (OQ-53, OQ-54): one mechanic for neutral sites and eliminated players alike.
 
 ## Decisions & open questions
 
@@ -218,8 +229,8 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [OQ-37](#oq-37-what-does-the-unified-core-look-like) | What does the unified core look like? | WM-016, UD-010, UD-003, FB-005, WM-005 | Decided | Owner | 2026-10-17 |
 | [OQ-45](#oq-45-does-holding-more-tiles-cost-anything-and-what-does-owning-a-tile-give) | Does holding more tiles cost anything, and what does owning a tile give? | WM-004, WM-006, MP-001, IO-001 | Decided | Owner | 2026-10-17 |
 | [OQ-51](#oq-51-are-maps-hand-authored-or-generated) | Are maps hand-authored or generated? | WM-017, WM-009, MP-008 | Decided | Owner | 2026-10-18 |
-| [OQ-54](#oq-54-when-does-a-neutral-sites-equipment-become-a-players) | When does a neutral site's equipment become a player's? | WM-010, FB-023, MP-010, WM-006 | Open |  | 2026-10-20 |
-| [OQ-57](#oq-57-where-do-neutral-sites-spawn-and-how-strong-are-their-guards) | Where do neutral sites spawn, and how strong are their guards? | WM-018, WM-010, WM-005, MP-005 | Open |  | 2026-10-20 |
+| [OQ-54](#oq-54-when-does-a-neutral-sites-equipment-become-a-players) | When does a neutral site's equipment become a player's? | WM-010, FB-023, MP-010, WM-006 | Decided | Owner | 2026-10-20 |
+| [OQ-57](#oq-57-where-do-neutral-sites-spawn-and-how-strong-are-their-guards) | Where do neutral sites spawn, and how strong are their guards? | WM-018, WM-010, WM-005, MP-005 | Decided | Owner | 2026-10-20 |
 
 ### OQ-1 Square or hex tiles on the world map?
 
@@ -291,10 +302,10 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Options / notes:** Options: (a) when every guard (turrets and units) is destroyed, the rest goes to the player with the most presence there; (b) a site beacon held on a timer like a victory circle (WM-006), as in the content draft; (c) building by building, each taken when picked up (FB-023). Also: whether a site inside a tile's victory circle blocks claiming that tile until cleared (the old WM-010 criterion), and whether guards ever rebuild. Leaning: (b), a beacon with the circle's timer rules, so contested sites work like contested circles; a site in the circle blocks the claim; no rebuilding.
 
-**Decision:** Open.
+**Decision:** A neutral site is won by destroying all of its neutral player's cores. As with any seat losing its last core, its buildings become unclaimed, and players take them by claiming (WM-019).
 
 ### OQ-57 Where do neutral sites spawn, and how strong are their guards?
 
 **Options / notes:** Placement: a share of tiles, more of them far from the starts; never on a start tile, perhaps not on its neighbours; inside or outside the victory circle; on ocean tiles (FB-017). Strength: guard value from the value held, rising with distance from the starts, so the nearest sites are early-game targets and the far ones need an army. Treasure: richer patches of the tile's deposits, regional or rare items (RS-003), neutral-only buildings and blocks, stock. Leaning: one site per three tiles, none on or beside a start, outside the circle, value and guards rising with distance.
 
-**Decision:** Open.
+**Decision:** As proposed: about one site per three tiles, none on or beside a start, outside the victory circle, the value held and the guards rising with distance from the starts (WM-018).

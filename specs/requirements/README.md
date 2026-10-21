@@ -40,9 +40,10 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 
 ## Requirement additions (2026-10-20)
 
-- Building relocation: buildings move intact instead of being removed and rebuilt, including buildings and blocks taken from neutral sites that a faction can't build (FB-023; OQ-53).
-- Faction templates: each seat's faction is a subset of one shared catalogue, with variant replacements and special rules such as capture to build ('nomad'), a narrow exception to TT-001 (MP-009, MP-010; OQ-55, OQ-56).
-- Neutral guardian faction at sites placed by world generation, guarding valuable deposits and tech (WM-010 rewritten, WM-018; OQ-54, OQ-57).
+- Building relocation: cut a building you own and paste it, intact, on a tile you own; to leave a tile, graft it onto a landed unit and fly it out (FB-023; OQ-53).
+- Unclaimed buildings: when a seat (neutral or player) loses its last core, its buildings become unclaimed; building or landing near one claims it (WM-019).
+- Faction templates: each seat's faction highlights a subset of a hidden master tech tree, gated by resource, with variant replacements and rules: capture to build ('nomad', a narrow exception to TT-001) and buffs (MP-009, MP-010; OQ-55, OQ-56).
+- Neutral guardian factions hold sites placed by world generation, guarding valuable deposits and tech; a site falls when its neutral player's cores are destroyed (WM-010 rewritten, WM-018; OQ-54, OQ-57).
 
 ## Mechanics
 
@@ -66,7 +67,7 @@ See also the [glossary](glossary.md).
 
 | Mechanic | Must | Should | Could | Won't | Total | Done | In Progress | % Done | Conflict | Review |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [World Map](world-map.md) | 11 | 5 | 1 | 1 | 18 | 15 | 0 | 83% | 0 | 2 |
+| [World Map](world-map.md) | 11 | 6 | 1 | 1 | 19 | 15 | 0 | 79% | 0 | 2 |
 | [Factory & Logistics](factory-logistics.md) | 17 | 5 | 1 | 0 | 23 | 20 | 0 | 87% | 0 | 2 |
 | [Resources & Tech](resources-tech.md) | 7 | 2 | 1 | 0 | 10 | 5 | 0 | 50% | 0 | 2 |
 | [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
@@ -75,7 +76,7 @@ See also the [glossary](glossary.md).
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 7 | 0 | 54% | 0 | 0 |
 | [Multiplayer & Victory](multiplayer-victory.md) | 4 | 5 | 1 | 0 | 10 | 6 | 1 | 60% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 13 | 1 | 87% | 0 | 2 |
-| **Total** | 75 | 38 | 9 | 1 | 123 | 94 | 2 | 76% | 0 | 10 |
+| **Total** | 75 | 39 | 9 | 1 | 124 | 94 | 2 | 76% | 0 | 10 |
 
 ### Requirements by status
 
@@ -83,10 +84,10 @@ See also the [glossary](glossary.md).
 |---|---|---|
 | Done | 94 | 76% |
 | In Progress | 2 | 2% |
-| Approved | 5 | 4% |
+| Approved | 6 | 5% |
 | Proposed | 7 | 6% |
 | Deferred | 2 | 2% |
-| Rejected | 13 | 11% |
+| Rejected | 13 | 10% |
 
 ### Audit flags
 
@@ -95,7 +96,7 @@ See also the [glossary](glossary.md).
 | Conflict | 0 |
 | Review | 10 |
 | Updated | 26 |
-| New | 27 |
+| New | 28 |
 
 ### Design pillar coverage
 
@@ -108,7 +109,7 @@ See also the [glossary](glossary.md).
 | P5 | Squad command | 10 | 5 | 10 |
 | P6 | No Rush | 6 | 4 | 0 |
 | P7 | Resource-gated tech | 8 | 6 | 3 |
-| P8 | World domination | 20 | 10 | 14 |
+| P8 | World domination | 21 | 10 | 14 |
 
 <!-- END generated summary -->
 

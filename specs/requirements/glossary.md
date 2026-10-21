@@ -120,12 +120,16 @@ A map plus what stands on it at the start: the world (hand-authored, or generate
 
 ### Faction
 
-What a seat plays as: a template over the shared catalogue of buildings and blocks that sets which of them the seat can build, which variants replace shared entries, and which special rules apply (MP-009, MP-010).
+What a seat plays as: a template that highlights the parts of the hidden master tech tree (the shared catalogue of buildings and blocks) the seat can build, which variants replace shared entries, and which special rules apply (MP-009, MP-010).
 
 ### Neutral site
 
-An installation of the neutral guardian faction, placed at world generation or in a scenario, guarding rich deposits and tech players can't build. Cleared, its buildings become the clearing player's (WM-010, WM-018).
+An installation of the neutral guardian faction, placed at world generation or in a scenario, guarding rich deposits and tech players can't build. Each site has its own neutral player; destroying all its cores leaves its buildings unclaimed (WM-010, WM-018).
 
 ### Relocation
 
-Moving a building intact to another place, kept as it is and neither refunded nor paid for again; the way to take buildings and blocks from a neutral site (FB-023).
+Cutting a building you own and pasting it, intact, elsewhere on a tile you own, neither refunded nor paid for again; to leave its tile, it is grafted onto a landed unit and flown out (FB-023).
+
+### Unclaimed building
+
+A building whose seat lost its last core. It belongs to no one and does nothing until a player claims it by building or landing a unit near it (WM-019).
