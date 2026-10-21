@@ -16,7 +16,14 @@ static class TestContent
     /// </summary>
     public static ContentDb Unpowered(params string[] extraBuildings) => Build(power: false, extraBuildings);
 
-    static ContentDb Build(bool power, string[] extraBuildings, string? buildingsJson = null, string? layersJson = null)
+    /// <summary>
+    /// The real content plus the test bank with faction templates (MP-009): the shipped factions.json, or
+    /// <paramref name="factionsJson"/>. Other loads get the one default faction with everything.
+    /// </summary>
+    public static ContentDb WithFactions(string? factionsJson = null) =>
+        Build(power: true, [], factionsJson: factionsJson ?? Read("factions.json"));
+
+    static ContentDb Build(bool power, string[] extraBuildings, string? buildingsJson = null, string? layersJson = null, string? factionsJson = null)
     {
         var buildings = JsonNode.Parse(buildingsJson ?? Read("buildings.json"), documentOptions: new() { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })!.AsArray();
         if (!power)
@@ -29,7 +36,7 @@ static class TestContent
         foreach (var json in extraBuildings)
             buildings.Add(JsonNode.Parse(json));
         return ContentDb.FromJson(Read("items.json"), Read("recipes.json"), buildings.ToJsonString(), Read("goals.json"), Read("terrain.json"),
-            layersJson ?? Read("layers.json"), Prefabs(), Read("head_starts.json"));
+            layersJson ?? Read("layers.json"), Prefabs(), Read("head_starts.json"), factions: factionsJson);
     }
 
     /// <summary>The real content as shipped (no test bank) with <paramref name="extra"/> prefab JSON objects added.</summary>

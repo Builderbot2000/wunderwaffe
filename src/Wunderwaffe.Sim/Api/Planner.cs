@@ -56,7 +56,7 @@ public static class Planner
     public static Spot? Reach(Simulation sim, TileState tile, int player, int x, int y)
     {
         var radii = Territory.BuildRadii(sim, player, tile);
-        if (radii.Count == 0 || Territory.Covered(radii, x, y) || sim.Content.DefaultCore is not { } core
+        if (radii.Count == 0 || Territory.Covered(radii, x, y) || Roles.Core(sim.Content, Factions.Buildable(sim, player)) is not { } core
             || FindSpot(sim, tile, player, core.Id, nearX: x, nearY: y) is not { } spot)
             return null;
         long gap = Gap(spot.X, spot.Y, core.Width, core.Height, x, y);
@@ -121,7 +121,7 @@ public static class Planner
             return null;
         }
 
-        if (Roles.Extractor(sim.Content, depositItem) is not { Building: var drill })
+        if (Roles.Extractor(sim.Content, depositItem, Factions.Buildable(sim, player)) is not { Building: var drill })
             return null;
         int tries = 0;
         foreach (var (x, y) in layout.Candidates(drill, depositItem, null, sx, sy))
@@ -412,7 +412,7 @@ public static class Planner
                     plan.Add(new PlannedBuilding(def.Id, node.X, node.Y, 0, stage.RecipeId));
                     prev = node;
                 }
-                if (Route(prev, target) is not { } belt || Roles.Cheapest(sim.Content, BuildingKind.Conveyor) is not { } conveyor)
+                if (Route(prev, target) is not { } belt || Roles.Cheapest(sim.Content, BuildingKind.Conveyor, Factions.Buildable(sim, player)) is not { } conveyor)
                     return null;
                 // The belt's cells are taken too, for the wiring.
                 plan.AddRange(belt.Select(s => new PlannedBuilding(conveyor.Id, s.X, s.Y, s.Rotation, null)));
@@ -424,7 +424,7 @@ public static class Planner
                 var machines = _planned.Skip(_planned.Count - pushed).Prepend(start).Where(n => n.Real == null && n.Def.Power > 0).ToList();
                 if (Wire(player, machines) is not { } wires)
                     return null;
-                plan.AddRange(wires.Select(w => new PlannedBuilding(Roles.Cheapest(sim.Content, BuildingKind.Wire)!.Id, w.X, w.Y, 0, null)));
+                plan.AddRange(wires.Select(w => new PlannedBuilding(Roles.Cheapest(sim.Content, BuildingKind.Wire, Factions.Buildable(sim, player))!.Id, w.X, w.Y, 0, null)));
                 return plan;
             }
             finally
@@ -449,7 +449,7 @@ public static class Planner
             bool offFrame = sources.Count > 0;
             if (!offFrame)
                 sources = _g.Buildings.Where(Supplied).ToList();
-            if (Roles.Cheapest(sim.Content, BuildingKind.Wire) is not { } wire || sources.Count == 0)
+            if (Roles.Cheapest(sim.Content, BuildingKind.Wire, Factions.Buildable(sim, player)) is not { } wire || sources.Count == 0)
                 return wires;
             int added = 0;
             try

@@ -16,9 +16,12 @@ public sealed record AiDesign(string Name, Blueprint Blueprint, IReadOnlyDiction
 public static class AiDesigns
 {
     /// <summary>The unit design for a seat, or null if the content ships no unit prefab that moves.</summary>
+    /// <remarks>Only prefabs its faction can build, with its variants in (MP-009).</remarks>
     public static AiDesign? Pick(GameQuery q) =>
         q.Prefabs()
-            .Where(p => p.IsUnit && q.BlueprintLocomotion(p.Blueprint).Result == LocomotionResult.Ok)
+            .Select(p => (p.Id, p.IsUnit, Blueprint: q.ForFaction(p.Blueprint)))
+            .Where(p => p.IsUnit && q.CheckBlueprintFaction(p.Blueprint) == FactionResult.Ok
+                && q.BlueprintLocomotion(p.Blueprint).Result == LocomotionResult.Ok)
             .OrderBy(p => q.BlueprintStats(p.Blueprint).Cost.Values.Sum())
             .ThenBy(p => p.Id, StringComparer.Ordinal)
             .Select(p => new AiDesign(p.Id, p.Blueprint, q.BlueprintStats(p.Blueprint).Cost))

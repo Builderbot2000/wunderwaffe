@@ -8,6 +8,7 @@ public sealed class PlayerState(int id)
 {
     readonly SortedDictionary<string, long> _produced = new(StringComparer.Ordinal);
     readonly List<long> _goalTicks = [];
+    readonly SortedSet<string> _acquired = new(StringComparer.Ordinal);
 
     public int Id { get; } = id;
 
@@ -41,4 +42,12 @@ public sealed class PlayerState(int id)
 
     /// <summary>Tile this player is looking at (SetViewedTileCommand), or -1 for the world map. Tiles nobody views run in rate mode.</summary>
     public int ViewedTile { get; internal set; } = -1;
+
+    /// <summary>
+    /// Building ids this player has owned without building them (MP-010 capture to build, OQ-56): never shrinks.
+    /// Hashed and snapshotted.
+    /// </summary>
+    public IReadOnlySet<string> Acquired => _acquired;
+
+    internal void Acquire(string defId) => _acquired.Add(defId);
 }

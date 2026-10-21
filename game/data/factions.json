@@ -1,0 +1,18 @@
+// Faction templates (MP-009, MP-010, OQ-55). Each highlights part of the shared catalogue (buildings.json): give
+// "buildings" (allow list) or "except" (deny list), or neither for everything. A building another faction names as a
+// variant belongs to that faction only. "variants" maps a base to the faction's own building (same kind, footprint and
+// layer): blueprints and the AI's roles use it in the base's place. "rules" come from a fixed list:
+//   capture_to_build: the covered buildings ("buildings" and/or "kind") are built only once the seat has owned one it
+//                     didn't build (claiming an unclaimed one, WM-019); that exact building stays unlocked for good.
+//   buff:             "stat" (speed, power or build_speed) changes by "percent" for the covered buildings it owns.
+// "startPrefabs" (optional) replaces the default start. "hidden" keeps it out of the lobby and Random.
+// The first faction is the default. Values are placeholders until the content and balance update.
+[
+  { "id": "charter", "name": "Charter Company", "description": "The whole shared catalogue, no special rules." },
+  { "id": "nomads", "name": "Nomad Clans", "description": "No lasers or shields. Factories, large cores and precision jigs only once captured.",
+    "except": ["laser_turret", "shield_generator"],
+    "rules": [ { "type": "capture_to_build", "buildings": ["unit_factory", "core_large", "precision_jig"] } ] },
+  { "id": "foundry", "name": "Foundry Guild", "description": "Machines run 20% faster. Builds the heavier Bulwark in place of the wall.",
+    "variants": { "wall": "bulwark" },
+    "rules": [ { "type": "buff", "stat": "speed", "percent": 20, "kind": "machine" } ] }
+]

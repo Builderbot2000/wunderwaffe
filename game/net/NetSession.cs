@@ -39,7 +39,7 @@ public sealed record LobbyInfo(GameSetup Setup, List<string> Names)
             var s = Setup.Scenario != null
                 ? Setup with { AiPlayers = Math.Max(0, Setup.Players - Names.Count) }
                 : Setup with { Players = Math.Min(GameSetup.MaxPlayers, Names.Count + Setup.AiPlayers) };
-            return s with { AiHeadStarts = s.AiHeadStarts?.Take(Math.Max(0, s.AiPlayers)).ToArray() };
+            return s with { AiHeadStarts = s.AiHeadStarts?.Take(Math.Max(0, s.AiPlayers)).ToArray(), Factions = s.Factions?.Take(s.Players).ToArray() };
         }
     }
 }

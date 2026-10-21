@@ -270,10 +270,11 @@ public sealed record BuildingSnap(int Id, string DefId, int Owner, int Hp, int X
     }
 }
 
-public sealed record PlayerSnap(int Id, Dictionary<string, long> Produced, long Shipped, long Launched, List<long> GoalTicks, int ViewedTile)
+public sealed record PlayerSnap(int Id, Dictionary<string, long> Produced, long Shipped, long Launched, List<long> GoalTicks, int ViewedTile,
+    List<string>? Acquired = null)
 {
     internal static PlayerSnap Of(PlayerState p) =>
-        new(p.Id, p.Produced.ToDictionary(kv => kv.Key, kv => kv.Value), p.Shipped, p.Launched, [.. p.GoalTicks], p.ViewedTile);
+        new(p.Id, p.Produced.ToDictionary(kv => kv.Key, kv => kv.Value), p.Shipped, p.Launched, [.. p.GoalTicks], p.ViewedTile, [.. p.Acquired]);
 
     internal void Restore(PlayerState p)
     {
@@ -287,6 +288,8 @@ public sealed record PlayerSnap(int Id, Dictionary<string, long> Produced, long 
         foreach (long t in GoalTicks.Skip(p.GoalsDone))
             p.CompleteGoal(t);
         p.ViewedTile = ViewedTile;
+        foreach (var id in Acquired ?? [])
+            p.Acquire(id);
     }
 }
 

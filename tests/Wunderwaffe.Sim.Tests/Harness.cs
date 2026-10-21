@@ -17,6 +17,20 @@ static class Harness
     public static Simulation PoweredSim() => new(TestContent.Load());
 
     /// <summary>
+    /// An empty sim on the real content with the shipped factions (MP-009), or <paramref name="factionsJson"/>, where
+    /// <see cref="Me"/> plays <paramref name="faction"/> and everyone else the default.
+    /// </summary>
+    public static Simulation FactionSim(string faction, string? factionsJson = null)
+    {
+        var sim = new Simulation(TestContent.WithFactions(factionsJson));
+        sim.SetFaction(Me, faction);
+        return sim;
+    }
+
+    /// <summary>Records that <paramref name="player"/> came to own a building they didn't build (MP-010 capture to build).</summary>
+    public static void Capture(Simulation sim, string defId, int player = Me) => Factions.Acquired(sim, player, defId);
+
+    /// <summary>
     /// An owned tile with plenty of items to pay for buildings: a stocked bank core of the owner's in the bottom-right
     /// corner cell (FB-019, see <see cref="Bank"/>). Tests measure deltas, not totals.
     /// </summary>

@@ -143,7 +143,7 @@ public static class Blueprints
         bool ignoreRadius = false)
     {
         var defs = sim.Content.Buildings;
-        var bp = Transform(defs, blueprint, rotation, flip);
+        var bp = Factions.Substitute(sim, player, Transform(defs, blueprint, rotation, flip));
         var blocks = new List<PlacementPlan>();
         var newFrames = new List<(int X, int Y)>();
         var cost = new SortedDictionary<string, int>(StringComparer.Ordinal);

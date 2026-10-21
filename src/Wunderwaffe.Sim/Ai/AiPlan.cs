@@ -61,13 +61,14 @@ public sealed class AiPlan
     /// The plan for wanting <paramref name="wanted"/> (item amounts) and <paramref name="goals"/> (items, no weight), with
     /// <paramref name="available"/> telling which deposits the seat can mine.
     /// </summary>
-    public static AiPlan Build(ContentDb content, IReadOnlyDictionary<string, int> wanted, IEnumerable<string> goals, Func<string, bool> available)
+    public static AiPlan Build(ContentDb content, IReadOnlyDictionary<string, int> wanted, IEnumerable<string> goals, Func<string, bool> available,
+        Func<BuildingDef, bool>? can = null)
     {
         var memo = new Dictionary<string, (Chain? Chain, int Missing, int Depth)>();
         BuildingDef?[] always =
         [
-            content.DefaultCore, Roles.Cheapest(content, BuildingKind.Conveyor), Roles.Cheapest(content, BuildingKind.Wire),
-            Roles.Cheapest(content, BuildingKind.ExportPort), Roles.Cheapest(content, BuildingKind.ImportPort),
+            Roles.Core(content, can), Roles.Cheapest(content, BuildingKind.Conveyor, can), Roles.Cheapest(content, BuildingKind.Wire, can),
+            Roles.Cheapest(content, BuildingKind.ExportPort, can), Roles.Cheapest(content, BuildingKind.ImportPort, can),
         ];
         var items = new SortedSet<string>(wanted.Keys.Concat(goals), StringComparer.Ordinal);
         var chains = new SortedDictionary<string, Chain>(StringComparer.Ordinal);
@@ -76,7 +77,7 @@ public sealed class AiPlan
         {
             foreach (string item in items)
             {
-                if (!chains.ContainsKey(item) && Best(content, item, available, memo, []).Chain is { } chain)
+                if (!chains.ContainsKey(item) && Best(content, item, available, can, memo, []).Chain is { } chain)
                     chains[item] = chain;
             }
             foreach (var b in always.OfType<BuildingDef>().Concat(chains.Values.SelectMany(c => c.Steps).Select(s => s.Building)))
@@ -98,7 +99,7 @@ public sealed class AiPlan
     }
 
     /// <summary>The best chain for <paramref name="item"/>, with its count of missing deposits and its depth.</summary>
-    static (Chain? Chain, int Missing, int Depth) Best(ContentDb content, string item, Func<string, bool> available,
+    static (Chain? Chain, int Missing, int Depth) Best(ContentDb content, string item, Func<string, bool> available, Func<BuildingDef, bool>? can,
         Dictionary<string, (Chain?, int, int)> memo, HashSet<string> visiting)
     {
         if (memo.TryGetValue(item, out var known))
@@ -106,16 +107,16 @@ public sealed class AiPlan
         if (!visiting.Add(item))
             return (null, 0, 0);
         (Chain? Chain, int Missing, int Depth) best = (null, int.MaxValue, int.MaxValue);
-        if (Roles.Extractor(content, item) is { } ex)
+        if (Roles.Extractor(content, item, can) is { } ex)
             best = (new Chain(item, ex.Recipe, ex.Building, []), available(item) ? 0 : 1, 0);
-        foreach (var r in Roles.Crafting(content, item))
+        foreach (var r in Roles.Crafting(content, item, can))
         {
             var inputs = new List<Chain>();
             var leaves = new SortedSet<string>(StringComparer.Ordinal);
             int depth = 0;
             foreach (string input in r.Inputs.Keys.Order(StringComparer.Ordinal))
             {
-                if (Best(content, input, available, memo, visiting) is not { Chain: { } sub, Depth: var d })
+                if (Best(content, input, available, can, memo, visiting) is not { Chain: { } sub, Depth: var d })
                 {
                     inputs.Clear();
                     break;

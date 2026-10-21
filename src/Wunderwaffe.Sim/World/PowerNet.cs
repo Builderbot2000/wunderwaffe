@@ -154,14 +154,14 @@ public sealed class TilePower(TileGrid grid)
     internal bool TryPart(PlacedBuilding b, out int part) => _part.TryGetValue(b.Id, out part);
 
     /// <summary>Recomputes machine boosts and this tile's parts. The world joins them into networks afterwards.</summary>
-    internal void RebuildParts()
+    internal void RebuildParts(Simulation? sim = null)
     {
         Dirty = false;
         _networks.Clear();
         _byBuilding.Clear();
         // Boosts first: a machine's draw depends on its power boosters.
         foreach (var m in grid.Machines)
-            m.Machine!.Boost = Boosters.Stats(grid, m, 0);
+            m.Machine!.Boost = sim == null ? Boosters.Stats(grid, m, 0) : Factions.WithBuffs(sim, m, Boosters.Stats(grid, m, 0));
 
         var parent = new List<int>();
         int Find(int i)
@@ -365,7 +365,7 @@ public sealed class PowerWorld
                 var power = PowerOf(i);
                 if (power.Grid.Revision == _seen[i] && !power.Dirty)
                     continue;
-                power.RebuildParts();
+                power.RebuildParts(_sim);
                 _seen[i] = power.Grid.Revision;
                 changed = true;
             }

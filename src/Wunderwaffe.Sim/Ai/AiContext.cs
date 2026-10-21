@@ -42,9 +42,9 @@ public sealed class AiContext
         int start = q.StartTile();
         Home = Owned.Contains(start) ? start : Owned.FirstOrDefault(t => Cores(t).Any(), -1);
         Units = q.Units(Player);
-        CoreDef = q.Content.DefaultCore!;
-        ExportPort = Roles.Cheapest(q.Content, BuildingKind.ExportPort);
-        ImportPort = Roles.Cheapest(q.Content, BuildingKind.ImportPort);
+        CoreDef = Roles.Core(q.Content, q.Can)!;
+        ExportPort = Roles.Cheapest(q.Content, BuildingKind.ExportPort, q.Can);
+        ImportPort = Roles.Cheapest(q.Content, BuildingKind.ImportPort, q.Can);
     }
 
     /// <summary>A context for <paramref name="player"/> with the strategic layer run: what a think sees, for tests and tools.</summary>
@@ -124,7 +124,7 @@ public sealed class AiContext
     /// through the recipes, with deposits on home and on owned neighbours of home counted as minable.
     /// </summary>
     public AiPlan Plan => _plan ??= AiPlan.Build(Q.Content, Design?.Cost ?? new Dictionary<string, int>(),
-        Q.Goal() is { Type: "produce", Item: { } item } ? [item] : [], Available);
+        Q.Goal() is { Type: "produce", Item: { } item } ? [item] : [], Available, Q.Can);
 
     /// <summary>True if home or an owned neighbour of home holds a deposit of <paramref name="item"/>.</summary>
     public bool Available(string item)

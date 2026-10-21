@@ -146,6 +146,10 @@ public partial class Hud
         if (unit && stats.IsWunderwaffe)
             top.AddChild(Ui.Label("WUNDERWAFFE", Ui.SmallFont, Ui.Accent));
         col.AddChild(top);
+        // Blueprints are shared across factions (OQ-55): mark those this seat's faction can't build (MP-009).
+        if (Query.CheckBlueprintFaction(bp) is not FactionResult.Ok and var misfit)
+            col.AddChild(Ui.Label(misfit == FactionResult.NotCaptured ? "Needs a building your faction must capture first"
+                : "Doesn't work for your faction", Ui.SmallFont, Ui.Bad));
 
         string kind = unit ? $"Unit · {GameText.Plural(stats.Cells, "cell", "cells")} · {GameText.Plural(stats.Blocks, "block", "blocks")}"
             : $"{GameText.Plural(bp.Blocks.Length, "building", "buildings")}" + (bp.Frames.Length > 0 ? $" · {bp.Frames.Length} frame" : "");

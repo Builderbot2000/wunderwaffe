@@ -311,7 +311,7 @@ public sealed partial class Simulation
         (core?.Stock ?? _units.FirstOrDefault(u => u.Owner == owner)?.Cargo)?.Add(items);
     }
 
-    IReadOnlyList<string> StartPrefabsOf(int player) => (Setup ?? GameSetup.Default).PrefabsFor(player);
+    IReadOnlyList<string> StartPrefabsOf(int player) => (Setup ?? GameSetup.Default).PrefabsFor(player, Content);
 
     /// <summary>The box every seat's first prefab fits in: what a start tile needs room for.</summary>
     (int W, int H) StartSize()

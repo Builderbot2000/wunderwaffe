@@ -90,14 +90,16 @@ public partial class BuildTool : Node2D
 
     /// <summary>
     /// One entry per building, in buildings.json order within its tab, or per recipe for crafters that need one chosen.
-    /// The frame leads the units tab. Platforms (FB-017) come last in theirs, since they are rarely built.
+    /// The frame leads the units tab. Platforms (FB-017) come last in theirs, since they are rarely built. Only the
+    /// local seat's faction's buildings (MP-009); capture-locked ones stay, shown locked by the build bar.
     /// </summary>
     void BuildPalette(Simulation sim)
     {
         var content = sim.Content;
         static int Order(BuildingDef d) => d.Kind switch { BuildingKind.Frame => 0, BuildingKind.Platform => 2, _ => 1 };
         var tools = new List<Tool>();
-        foreach (var def in content.BuildingList.OrderBy(Order))
+        var faction = sim.FactionOf(_host.LocalPlayer);
+        foreach (var def in content.BuildingList.Where(d => faction.Has(d.Id)).OrderBy(Order))
         {
             int menu = System.Array.IndexOf(BuildingDef.Menus, def.Menu);
             var crafting = content.RecipesByBuilding.GetValueOrDefault(def.Id)?

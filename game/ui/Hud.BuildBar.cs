@@ -88,7 +88,8 @@ public partial class Hud
             var b = _toolButtons[i];
             b.SetPressedNoSignal(i == BuildTool.SelectedIndex);
             bool afford = Funds.CanPay(tile, Me, ToolCost(tool));
-            b.Modulate = afford ? Colors.White : new Color(1f, 0.55f, 0.55f, 0.6f);
+            bool locked = Factions.Check(Sim, Me, tool.BuildingId) != FactionResult.Ok;
+            b.Modulate = locked ? new Color(0.5f, 0.5f, 0.5f, 0.5f) : afford ? Colors.White : new Color(1f, 0.55f, 0.55f, 0.6f);
             b.TooltipText = ToolTooltip(tool);
         }
 
@@ -114,6 +115,8 @@ public partial class Hud
     string ToolTooltip(BuildTool.Tool tool)
     {
         var sb = new StringBuilder(tool.Label).Append('\n');
+        if (Factions.Check(Sim, Me, tool.BuildingId) == FactionResult.NotCaptured)
+            sb.Append("Locked: capture one to build it (").Append(Sim.FactionOf(Me).Name).Append(")\n");
         sb.Append("Cost: ").Append(GameText.Cost(Content, ToolCost(tool)));
         if (tool.RecipeId is { } rid)
             sb.Append('\n').Append(GameText.Recipe(Content, Content.Recipes[rid]));
@@ -152,6 +155,10 @@ public partial class Hud
                 return "out of range: build within the radius of your cores, factories, turrets or units here";
             case PlaceResult.EnemyCircle:
                 return "an enemy building holds this victory circle";
+            case PlaceResult.NotCaptured:
+                return "locked: your faction builds this only once it has captured one";
+            case PlaceResult.NotInFaction:
+                return "your faction can't build this";
             default:
                 return result.ToString();
         }

@@ -17,13 +17,18 @@ public sealed class MatchSettings
     static readonly (string Name, int Size)[] MapSizes = [("Small · 3 × 3", 3), ("Medium · 5 × 5", 5), ("Large · 7 × 7", 7)];
 
     /// <summary>Control names the UI tour finds them by.</summary>
-    public const string MapPickName = "MapPick", AiName = "AiCount", HeadStartName = "HeadStart";
+    public const string MapPickName = "MapPick", AiName = "AiCount", HeadStartName = "HeadStart", FactionName = "Faction";
 
     readonly LineEdit _seed;
     readonly OptionButton _size, _map;
     readonly SpinBox _ai, _capture, _victory, _richness;
     readonly VBoxContainer _heads;
     readonly List<OptionButton> _headPicks = [];
+    readonly VBoxContainer _factionBox;
+    readonly List<OptionButton> _factionPicks = [];
+    /// <summary>The lobby's faction choices: Random, then every faction not hidden (MP-009).</summary>
+    readonly List<FactionDef> _factions;
+    string?[] _factionIds;
     readonly List<ScenarioDef> _scenarios;
     readonly IReadOnlyList<HeadStartDef> _presets;
     readonly int _humans;
@@ -48,6 +53,8 @@ public sealed class MatchSettings
         _scenarios = [.. content.Scenarios.Values.OrderBy(s => s.Name, StringComparer.Ordinal)];
         _presets = content.HeadStartList;
         _headIds = initial.AiHeadStarts ?? [];
+        _factions = [.. content.FactionList.Where(f => !f.Hidden)];
+        _factionIds = initial.Factions ?? [];
 
         var grid = new GridContainer { Columns = 2, MouseFilter = Control.MouseFilterEnum.Ignore };
         grid.AddThemeConstantOverride("h_separation", 14);
@@ -59,7 +66,7 @@ public sealed class MatchSettings
         foreach (var s in _scenarios)
             _map.AddItem($"Scenario · {s.Name} ({s.Seats.Count} seats)");
         _map.Selected = initial.Scenario is { } id && _scenarios.FindIndex(s => s.Id == id) is >= 0 and var at ? at + 1 : 0;
-        _map.ItemSelected += _ => { Refresh(); onChange?.Invoke(); };
+        _map.ItemSelected += _ => { Refresh(); RebuildFactions(); onChange?.Invoke(); };
         Field(grid, "Map", _map);
 
         var seedRow = Ui.Row();
@@ -83,9 +90,11 @@ public sealed class MatchSettings
 
         _ai = Spin(grid, "AI opponents", 0, GameSetup.MaxPlayers - humans, 1, initial.AiPlayers, "", null);
         _ai.Name = AiName;
-        _ai.ValueChanged += _ => { RebuildHeads(); onChange?.Invoke(); };
+        _ai.ValueChanged += _ => { RebuildHeads(); RebuildFactions(); onChange?.Invoke(); };
         _heads = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         Field(grid, "AI head starts", _heads);
+        _factionBox = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        Field(grid, "Factions", _factionBox);
         _capture = Spin(grid, "Capture time", GameSetup.MinCaptureSeconds, GameSetup.MaxCaptureSeconds, 5, initial.CaptureSeconds, " s", onChange,
             "How long you must hold a tile's victory circle to take it");
         _victory = Spin(grid, "Victory share", GameSetup.MinVictoryPercent, GameSetup.MaxVictoryPercent, 5, initial.VictoryPercent, " %", onChange,
@@ -94,6 +103,7 @@ public sealed class MatchSettings
             "Deposit size compared with normal");
         Refresh();
         RebuildHeads();
+        RebuildFactions();
         Shown = this;
     }
 
@@ -146,6 +156,45 @@ public sealed class MatchSettings
             _heads.AddChild(Ui.Label("none", Ui.SmallFont, Ui.Muted));
     }
 
+    /// <summary>
+    /// One faction picker per seat, people first (MP-009): Random or a faction, keeping what was picked. A scenario seat
+    /// with a faction of its own shows it, fixed.
+    /// </summary>
+    void RebuildFactions()
+    {
+        _factionIds = FactionIds();
+        Ui.Clear(_factionBox);
+        _factionPicks.Clear();
+        int seats = _humans + (int)_ai.Value;
+        for (int i = 0; i < seats; i++)
+        {
+            string who = i < _humans ? $"Player {i + 1}" : $"AI {i - _humans + 1}";
+            var option = new OptionButton { Name = $"{FactionName}{i}", FocusMode = Control.FocusModeEnum.None };
+            option.AddItem($"{who}: Random");
+            foreach (var f in _factions)
+                option.AddItem($"{who}: {f.Name}");
+            for (int k = 0; k < _factions.Count; k++)
+                option.SetItemTooltip(k + 1, _factions[k].Description ?? "");
+            string? id = i < _factionIds.Length ? _factionIds[i] : null;
+            int at = _factions.FindIndex(f => f.Id == (id is { Length: > 0 } ? id : _factions.FirstOrDefault()?.Id));
+            option.Selected = id == GameSetup.RandomFaction ? 0 : at + 1;
+            if (Scenario is { } s && i < s.Seats.Count && s.Seats[i].Faction is { } fixedId
+                && _factions.FindIndex(f => f.Id == fixedId) is >= 0 and var fixedAt)
+            {
+                option.Selected = fixedAt + 1;
+                option.Disabled = true;
+                option.TooltipText = "The scenario fixes this seat's faction";
+            }
+            option.ItemSelected += _ => { _factionIds = FactionIds(); _onChange?.Invoke(); };
+            _factionBox.AddChild(option);
+            _factionPicks.Add(option);
+        }
+    }
+
+    string?[] FactionIds() =>
+        _factionPicks.Count == 0 ? _factionIds
+        : [.. _factionPicks.Select(o => o.Selected <= 0 ? GameSetup.RandomFaction : _factions[o.Selected - 1].Id)];
+
     string?[] HeadIds() =>
         _headPicks.Count == 0 ? _headIds : [.. _headPicks.Select(o => o.Selected > 0 ? _presets[o.Selected - 1].Id : null)];
 
@@ -159,13 +208,14 @@ public sealed class MatchSettings
         int ai = (int)_ai.Value;
         var heads = HeadIds().Take(ai).ToArray();
         string?[]? headStarts = heads.Any(h => h != null) ? heads : null;
+        var factions = FactionIds().Take(_humans + ai).ToArray();
         if (Scenario is { } s)
             return GameSetup.ForScenario(s, ai) with
             {
-                CaptureSeconds = (int)_capture.Value, VictoryPercent = (int)_victory.Value, AiHeadStarts = headStarts,
+                CaptureSeconds = (int)_capture.Value, VictoryPercent = (int)_victory.Value, AiHeadStarts = headStarts, Factions = factions,
             };
         return new GameSetup(n, n, GameSetup.ParseSeed(_seed.Text.Length == 0 ? "3037" : _seed.Text), _humans + ai, ai,
-            (int)_capture.Value, (int)_victory.Value, (int)_richness.Value, AiHeadStarts: headStarts);
+            (int)_capture.Value, (int)_victory.Value, (int)_richness.Value, AiHeadStarts: headStarts, Factions: factions);
     }
 
     /// <summary>A read-only summary for players waiting in someone else's lobby.</summary>
@@ -177,8 +227,10 @@ public sealed class MatchSettings
             : $"Map {s.Width} × {s.Height} · seed {s.Seed} · richness {s.RichnessPercent}%";
         var heads = Enumerable.Range(s.Players - s.AiPlayers, s.AiPlayers).Select(s.HeadStartFor).Where(h => h != null)
             .Select(h => content.HeadStarts.TryGetValue(h!, out var p) ? p.Name : h).ToList();
+        var factions = Enumerable.Range(0, s.Players).Select(p => s.Factions is { } f && p < f.Length && f[p] == GameSetup.RandomFaction
+            ? "Random" : s.FactionFor(p, content).Name);
         return $"{map}\n{s.AiPlayers} AI{(heads.Count > 0 ? $" (head starts: {string.Join(", ", heads)})" : "")} · " +
-               $"capture {s.CaptureSeconds} s · win at {s.VictoryPercent}% of tiles";
+               $"capture {s.CaptureSeconds} s · win at {s.VictoryPercent}% of tiles\nFactions: {string.Join(", ", factions)}";
     }
 
     static void Field(GridContainer grid, string name, Control control)

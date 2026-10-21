@@ -242,6 +242,9 @@ internal sealed class StateHash
             Mix(t);
         Mix(p.EliminatedTick);
         Mix(p.ViewedTile);
+        Mix(p.Acquired.Count);
+        foreach (var id in p.Acquired)
+            Mix(id);
     }
 
     void MixUnit(Unit u)

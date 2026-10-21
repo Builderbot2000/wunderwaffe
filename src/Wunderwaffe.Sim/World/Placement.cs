@@ -29,6 +29,12 @@ public enum PlaceResult
 
     /// <summary>Some cell lies outside every build radius of the player's on the tile (WM-015, <see cref="Territory.InBuildRadius"/>).</summary>
     OutOfRange,
+
+    /// <summary>The player's faction doesn't have the building (MP-009, <see cref="Factions.Check"/>).</summary>
+    NotInFaction,
+
+    /// <summary>Capture to build: the player has never owned one they didn't build (MP-010).</summary>
+    NotCaptured,
 }
 
 /// <summary>A placement that passed every check, ready to apply. The player's cores on the tile pay (<see cref="Funds"/>).</summary>
@@ -42,7 +48,7 @@ public static class Placement
 {
     public static PlaceResult Check(
         Simulation sim, TileState tile, int player, string buildingId, int x, int y, int rotation,
-        string? recipeId, out PlacementPlan plan, bool ignoreCost = false, bool ignoreRadius = false)
+        string? recipeId, out PlacementPlan plan, bool ignoreCost = false, bool ignoreRadius = false, bool ignoreFaction = false)
     {
         plan = default;
         var content = sim.Content;
@@ -50,6 +56,9 @@ public static class Placement
             return PlaceResult.NoPresence;
         if (!content.Buildings.TryGetValue(buildingId, out var def))
             return PlaceResult.NoSuchBuilding;
+        // The seat's faction (MP-009, MP-010), unless the caller puts it there by fiat (scenarios).
+        if (!ignoreFaction && Factions.Check(sim, player, buildingId) is var faction and not FactionResult.Ok)
+            return faction == FactionResult.NotCaptured ? PlaceResult.NotCaptured : PlaceResult.NotInFaction;
         rotation &= 3;
         var (w, h) = def.Footprint(rotation);
 

@@ -51,5 +51,6 @@
     "booster": { "hosts": ["factory"], "effects": { "precision": 1 }, "maxPerHost": 1 } },
   { "id": "core_large", "name": "Large Core", "menu": "logistics", "kind": "core", "width": 3, "height": 3, "power": 0, "powerSupply": 20, "capacity": 5000, "supplyRadius": 16, "buildRadius": 32, "hp": 1000, "cost": { "iron_plate": 60, "copper_plate": 40 } },
   { "id": "power_node", "name": "Power Node", "menu": "power", "kind": "power_node", "powerRadius": 8, "width": 1, "height": 1, "power": 0, "hp": 60, "cost": { "copper_plate": 3, "iron_plate": 2 } },
-  { "id": "frame", "name": "Unit Frame", "menu": "units", "kind": "frame", "layer": "frame", "width": 1, "height": 1, "power": 0, "hp": 50, "cost": { "iron_ore": 2 } }
+  { "id": "frame", "name": "Unit Frame", "menu": "units", "kind": "frame", "layer": "frame", "width": 1, "height": 1, "power": 0, "hp": 50, "cost": { "iron_ore": 2 } },
+  { "id": "bulwark", "name": "Bulwark", "menu": "combat", "kind": "wall", "width": 1, "height": 1, "power": 0, "hp": 900, "cost": { "iron_plate": 5 }, "resist": { "kinetic": 60, "energy": 30 } }
 ]

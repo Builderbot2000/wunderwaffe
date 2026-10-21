@@ -130,16 +130,16 @@ public sealed class ProductionModule : IAiModule
     public static Dictionary<string, int> Carry(AiContext c)
     {
         var carry = MinCarry(c);
-        if (ExpansionModule.Target(c) is not (>= 0 and var target, { } item) || Roles.Extractor(c.Q.Content, item) is not { } ex)
+        if (ExpansionModule.Target(c) is not (>= 0 and var target, { } item) || Roles.Extractor(c.Q.Content, item, c.Q.Can) is not { } ex)
             return carry;
         var (belt, wire, _, _) = ExportRun(c, target, c.Home, item);
         const int slack = Simulation.DefaultTileSize / 16;
         var parts = new List<IReadOnlyDictionary<string, int>> { ex.Building.Cost };
         if (c.ExportPort is { } export)
             parts.Add(export.Cost);
-        if (Roles.Cheapest(c.Q.Content, Content.BuildingKind.Conveyor) is { } conveyor)
+        if (Roles.Cheapest(c.Q.Content, Content.BuildingKind.Conveyor, c.Q.Can) is { } conveyor)
             parts.Add(AiContext.Scale(conveyor.Cost, 2 * belt + slack));
-        if (Roles.Cheapest(c.Q.Content, Content.BuildingKind.Wire) is { } w)
+        if (Roles.Cheapest(c.Q.Content, Content.BuildingKind.Wire, c.Q.Can) is { } w)
             parts.Add(AiContext.Scale(w.Cost, wire * 5 / 4 + slack));
         foreach (var (id, n) in AiContext.Sum(parts))
             carry[id] = Math.Max(carry.GetValueOrDefault(id), n);

@@ -25,17 +25,47 @@ namespace Wunderwaffe.Sim;
 /// <param name="AiHeadStarts">
 /// Head-start preset id per AI seat, in seat order (MP-008: the first AI seat first); null or "" for none.
 /// </param>
+/// <param name="Factions">
+/// Faction id per seat (MP-009), <see cref="RandomFaction"/> for one picked from the seed, null or "" for the default.
+/// A scenario seat with a faction of its own ignores it.
+/// </param>
 public sealed record GameSetup(
     int Width, int Height, ulong Seed, int Players = 1,
     int AiPlayers = 0, int CaptureSeconds = Balance.CaptureSeconds, int VictoryPercent = 60, int RichnessPercent = 100,
-    string[][]? StartPrefabs = null, string? Scenario = null, ulong ScenarioHash = 0, string?[]? AiHeadStarts = null)
+    string[][]? StartPrefabs = null, string? Scenario = null, ulong ScenarioHash = 0, string?[]? AiHeadStarts = null,
+    string?[]? Factions = null)
 {
+    /// <summary>The lobby's Random faction choice: resolved from the seed and seat, so every machine picks the same.</summary>
+    public const string RandomFaction = "random";
+
+    /// <summary>
+    /// The faction <paramref name="player"/> plays (MP-009): the scenario seat's own, else the setup's pick (Random
+    /// resolved from <see cref="Seed"/>, <see cref="ScenarioHash"/> and the seat among the factions not hidden), else
+    /// the default.
+    /// </summary>
+    public FactionDef FactionFor(int player, ContentDb content)
+    {
+        if (Scenario is { } sc && content.Scenarios.TryGetValue(sc, out var def) && player < def.Seats.Count
+            && def.Seats[player].Faction is { Length: > 0 } fixedId && content.Factions.TryGetValue(fixedId, out var fixedFaction))
+            return fixedFaction;
+        string? id = Factions is { } a && player < a.Length ? a[player] : null;
+        if (id == RandomFaction)
+        {
+            var pick = content.FactionList.Where(f => !f.Hidden).ToList();
+            var rng = new Core.Rng(Seed ^ ScenarioHash ^ (0x9E3779B97F4A7C15UL * (ulong)(player + 1)));
+            return pick.Count == 0 ? content.DefaultFaction : pick[rng.Range(0, pick.Count)];
+        }
+        return id is { Length: > 0 } && content.Factions.TryGetValue(id, out var f) ? f : content.DefaultFaction;
+    }
+
+    /// <summary>The prefabs <paramref name="player"/> starts with, the first in the victory circle: the setup's, else their faction's, else <see cref="DefaultStart"/>.</summary>
+    public IReadOnlyList<string> PrefabsFor(int player, ContentDb content) =>
+        StartPrefabs is { } s && player < s.Length && s[player] is { Length: > 0 } p ? p
+        : FactionFor(player, content).StartPrefabs is { Length: > 0 } fp ? fp
+        : [DefaultStart];
+
     /// <summary>The prefab every seat starts with unless the setup names others: the landed scout (WM-005).</summary>
     public const string DefaultStart = "scout";
-
-    /// <summary>The prefabs <paramref name="player"/> starts with, the first one in the victory circle.</summary>
-    public IReadOnlyList<string> PrefabsFor(int player) =>
-        StartPrefabs is { } s && player < s.Length && s[player] is { Length: > 0 } p ? p : [DefaultStart];
 
     public const int MinSize = 3;
     public const int MaxSize = 7;
@@ -65,18 +95,37 @@ public sealed record GameSetup(
         : RichnessPercent is < MinRichness or > MaxRichness ? $"richness {RichnessPercent}%; {MinRichness} to {MaxRichness} allowed"
         : StartPrefabs is { } s && s.Length > Players ? $"start prefabs for {s.Length} seats of {Players}"
         : AiHeadStarts is { } h && h.Length > AiPlayers ? $"head starts for {h.Length} AI seats of {AiPlayers}"
+        : Factions is { } f && f.Length > Players ? $"factions for {f.Length} seats of {Players}"
         : null;
 
     /// <summary>
-    /// Why the setup can't start a match with this content, or null: <see cref="Problem()"/>, an unknown prefab or head
-    /// start, or a scenario that is missing, changed since the setup was made, or has another seat count.
+    /// Why the setup can't start a match with this content, or null: <see cref="Problem()"/>, an unknown prefab, head
+    /// start or faction, a start prefab or head start using what the seat's faction can't build, or a scenario that is
+    /// missing, changed since the setup was made, or has another seat count.
     /// </summary>
     public string? Problem(ContentDb content) =>
-        Problem() ?? Enumerable.Range(0, Players).SelectMany(PrefabsFor).Where(id => !content.Prefabs.ContainsKey(id))
-            .Select(id => $"unknown start prefab '{id}'")
+        Problem()
+        ?? (Factions ?? []).Where(id => id is { Length: > 0 } && id != RandomFaction && !content.Factions.ContainsKey(id)).Select(id => $"unknown faction '{id}'")
+            .Concat(Enumerable.Range(0, Players).SelectMany(p => PrefabsFor(p, content)).Where(id => !content.Prefabs.ContainsKey(id))
+            .Select(id => $"unknown start prefab '{id}'"))
             .Concat((AiHeadStarts ?? []).Where(id => id is { Length: > 0 } && !content.HeadStarts.ContainsKey(id)).Select(id => $"unknown head start '{id}'"))
             .FirstOrDefault()
-        ?? ScenarioProblem(content);
+        ?? ScenarioProblem(content)
+        ?? Enumerable.Range(0, Players).Select(p => FactionProblem(p, content)).FirstOrDefault(x => x != null);
+
+    /// <summary>A start prefab or head-start prefab of the seat's that its faction can't build (MP-009), or null.</summary>
+    string? FactionProblem(int player, ContentDb content)
+    {
+        var f = FactionFor(player, content);
+        var prefabs = PrefabsFor(player, content)
+            .Concat(HeadStartFor(player) is { } h ? content.HeadStarts[h].Prefabs ?? [] : []);
+        foreach (var id in prefabs)
+        {
+            if (FactionDef.Misfit(content, f, content.Prefabs[id]) is { } bad)
+                return $"seat {player}'s faction '{f.Id}' can't build '{bad}' of prefab '{id}'";
+        }
+        return null;
+    }
 
     string? ScenarioProblem(ContentDb content) =>
         Scenario == null ? null

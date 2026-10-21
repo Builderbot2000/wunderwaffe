@@ -46,8 +46,10 @@ public sealed record ScenarioTile(string Name, int CircleX, int CircleY, CellGri
 /// <summary>
 /// A seat's starting state: <paramref name="Tiles"/> it owns (the first is its start tile), its buildings and its units.
 /// A seat with no buildings or units gets the setup's start prefabs on its start tile, as a generated map does (FB-021).
+/// <paramref name="Faction"/> fixes the seat's faction (MP-009, e.g. a campaign mission); null lets the lobby pick.
 /// </summary>
-public sealed record ScenarioSeat(List<int> Tiles, List<ScenarioBuilding>? Buildings = null, List<ScenarioUnit>? Units = null);
+public sealed record ScenarioSeat(List<int> Tiles, List<ScenarioBuilding>? Buildings = null, List<ScenarioUnit>? Units = null,
+    string? Faction = null);
 
 /// <summary>
 /// A building at tile-local (X, Y), its footprint's top-left. <paramref name="Hp"/> null is full; <paramref name="Stock"/> is
@@ -224,6 +226,8 @@ public static class Scenarios
             errors.Add($"{at}: needs terrain, tileMap, tiles and seats");
         else if (s.Seats.Count is < 1 or > GameSetup.MaxPlayers)
             errors.Add($"{at}: {s.Seats.Count} seats; 1 to {GameSetup.MaxPlayers} allowed");
+        foreach (var f in s.Seats?.Select(x => x?.Faction).Where(f => f is { Length: > 0 } && !content.Factions.ContainsKey(f)) ?? [])
+            errors.Add($"{at}: unknown faction '{f}'");
         if (errors.Count > before)
             return;
         try

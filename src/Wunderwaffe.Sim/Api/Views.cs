@@ -131,3 +131,11 @@ public sealed record LocomotionView(LocomotionResult Result, LocomotionClass Cla
 
 /// <summary>Per-10 s made and used counts over the last 10 minutes, oldest first (FB-011).</summary>
 public sealed record HistoryView(long[] Made, long[] Used);
+
+/// <summary>
+/// A seat's faction (MP-009, MP-010): what it can build (<paramref name="Subset"/>, menu order; capture-gated ones in
+/// <paramref name="Locked"/> until <paramref name="Acquired"/> holds them), its variants (base → its own) and rules.
+/// </summary>
+public sealed record FactionView(
+    string Id, string Name, string? Description, IReadOnlyList<string> Subset, IReadOnlyList<string> Locked,
+    IReadOnlyDictionary<string, string> Variants, IReadOnlyList<Content.FactionRule> Rules, IReadOnlyList<string> Acquired);

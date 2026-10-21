@@ -196,7 +196,7 @@ public sealed partial class Simulation
             // The placement rules, but for free and with the seat counted as present: the scenario puts it there.
             int owner = tile.Owner;
             tile.Owner = p;
-            var result = Placement.Check(this, tile, p, def.Id, b.X, b.Y, b.Rotation, b.RecipeId, out var plan, ignoreCost: true, ignoreRadius: true);
+            var result = Placement.Check(this, tile, p, def.Id, b.X, b.Y, b.Rotation, b.RecipeId, out var plan, ignoreCost: true, ignoreRadius: true, ignoreFaction: true);
             tile.Owner = owner;
             if (result != PlaceResult.Ok)
             {
@@ -301,7 +301,8 @@ public sealed partial class Simulation
             var buildings = _tiles.SelectMany(t => t.Grid.Buildings.Where(b => b.Owner == p).Select(b => new ScenarioBuilding(
                 t.Id, b.DefId, b.X, b.Y, b.Rotation, b.RecipeId, b.Hp < b.Def.Hp ? b.Hp : null, Items(b.Stock)))).ToList();
             var units = _units.Where(u => u.Owner == p).Select(UnitOf).ToList();
-            list.Add(new ScenarioSeat(owned, buildings.Count > 0 ? buildings : null, units.Count > 0 ? units : null));
+            var faction = FactionOf(p) is var f && f != Content.DefaultFaction ? f.Id : null;
+            list.Add(new ScenarioSeat(owned, buildings.Count > 0 ? buildings : null, units.Count > 0 ? units : null, faction));
         }
 
         return new ScenarioDef(id, name, w, h,

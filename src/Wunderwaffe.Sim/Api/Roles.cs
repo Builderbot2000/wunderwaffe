@@ -6,7 +6,8 @@ namespace Wunderwaffe.Sim.Api;
 /// Buildings and recipes by what they do, never by id (MP-007, NF-003): the planner and the AI find the conveyor, the
 /// wire, the ports, the extractor for an item or the recipes that make it through these, so renaming or rebalancing
 /// content needs no code change. Every choice is deterministic: cheapest total cost first, ties in
-/// <see cref="ContentDb.BuildingList"/> order, recipes by id.
+/// <see cref="ContentDb.BuildingList"/> order, recipes by id. <c>can</c>, when given, limits the search to what a seat
+/// can build (MP-009: its faction's subset, <see cref="World.Factions.Buildable"/>), so variants stand in for bases.
 /// </summary>
 public static class Roles
 {
@@ -14,16 +15,20 @@ public static class Roles
     public static int CostOf(BuildingDef def) => def.Cost.Values.Sum();
 
     /// <summary>The cheapest building of <paramref name="kind"/>, or null if the content has none.</summary>
-    public static BuildingDef? Cheapest(ContentDb content, BuildingKind kind) =>
-        content.BuildingList.Where(b => b.Kind == kind).OrderBy(CostOf).FirstOrDefault();
+    public static BuildingDef? Cheapest(ContentDb content, BuildingKind kind, Func<BuildingDef, bool>? can = null) =>
+        content.BuildingList.Where(b => b.Kind == kind && (can?.Invoke(b) ?? true)).OrderBy(CostOf).FirstOrDefault();
+
+    /// <summary>The first core in menu order the seat can build (<see cref="ContentDb.DefaultCore"/> for everyone).</summary>
+    public static BuildingDef? Core(ContentDb content, Func<BuildingDef, bool>? can = null) =>
+        can == null ? content.DefaultCore : content.BuildingList.FirstOrDefault(b => b.Kind == BuildingKind.Core && can(b));
 
     /// <summary>
     /// The cheapest machine with an extraction recipe (no inputs) giving <paramref name="item"/>, and that recipe; the
     /// one placing it on a deposit of the item picks (<see cref="World.Placement"/>). Null if nothing extracts it.
     /// </summary>
-    public static (BuildingDef Building, RecipeDef Recipe)? Extractor(ContentDb content, string item)
+    public static (BuildingDef Building, RecipeDef Recipe)? Extractor(ContentDb content, string item, Func<BuildingDef, bool>? can = null)
     {
-        foreach (var b in content.BuildingList.Where(b => b.Kind == BuildingKind.Machine).OrderBy(CostOf))
+        foreach (var b in content.BuildingList.Where(b => b.Kind == BuildingKind.Machine && (can?.Invoke(b) ?? true)).OrderBy(CostOf))
         {
             if (content.RecipesByBuilding.GetValueOrDefault(b.Id)?.Where(r => r.Inputs.Count == 0 && r.Outputs.ContainsKey(item))
                     .OrderBy(r => r.Id, StringComparer.Ordinal).FirstOrDefault() is { } r)
@@ -33,9 +38,9 @@ public static class Roles
     }
 
     /// <summary>Recipes with inputs that make <paramref name="item"/> on a machine, by id.</summary>
-    public static IEnumerable<RecipeDef> Crafting(ContentDb content, string item) =>
+    public static IEnumerable<RecipeDef> Crafting(ContentDb content, string item, Func<BuildingDef, bool>? can = null) =>
         content.Recipes.Values
             .Where(r => r.Inputs.Count > 0 && r.Outputs.ContainsKey(item)
-                && content.Buildings.TryGetValue(r.Building, out var b) && b.Kind == BuildingKind.Machine)
+                && content.Buildings.TryGetValue(r.Building, out var b) && b.Kind == BuildingKind.Machine && (can?.Invoke(b) ?? true))
             .OrderBy(r => r.Id, StringComparer.Ordinal);
 }

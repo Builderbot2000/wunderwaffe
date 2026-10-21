@@ -99,9 +99,10 @@ public sealed class ContentDb
     /// <param name="prefabs">Prefab blueprints (FB-021), one JSON object per text (one file each); null for none.</param>
     /// <param name="headStarts">Head-start presets (MP-008), a JSON list; null for none.</param>
     /// <param name="scenarios">Scenarios (WM-017), one JSON object per text (one file each); null for none.</param>
+    /// <param name="factions">Faction templates (MP-009), a JSON list, the first the default; null for one with everything.</param>
     public static ContentDb FromJson(
         string items, string recipes, string buildings, string? goals = null, string? terrain = null, string? layers = null,
-        IEnumerable<string>? prefabs = null, string? headStarts = null, IEnumerable<string>? scenarios = null)
+        IEnumerable<string>? prefabs = null, string? headStarts = null, IEnumerable<string>? scenarios = null, string? factions = null)
     {
         var errors = new List<string>();
         var itemList = Parse<ItemDef>(items, "items");
@@ -121,6 +122,7 @@ public sealed class ContentDb
         db.LoadLayers(layers == null ? [FallbackLayer] : Parse<LayerDef>(layers, "layers"), itemList, buildingList, errors);
         db.LoadPrefabs(prefabs ?? [], errors);
         db.LoadHeadStarts(headStarts == null ? [] : Parse<HeadStartDef>(headStarts, "head_starts"), errors);
+        db.LoadFactions(factions == null ? null : Parse<FactionDef>(factions, "factions"), errors);
         // Scenarios last: a trial build checks them against everything else.
         if (errors.Count == 0)
         {
@@ -172,6 +174,43 @@ public sealed class ContentDb
         def.Hash = Content.Scenarios.Hash(def);
         _scenarios[def.Id] = def;
         return def;
+    }
+
+    /// <summary>Faction templates by id (MP-009).</summary>
+    public IReadOnlyDictionary<string, FactionDef> Factions { get; private set; } = new SortedDictionary<string, FactionDef>(StringComparer.Ordinal);
+
+    /// <summary>Faction templates in file order, the order the lobby offers them in; the first is <see cref="DefaultFaction"/>.</summary>
+    public IReadOnlyList<FactionDef> FactionList { get; private set; } = [];
+
+    /// <summary>What a seat plays when nothing picks a faction for it: the first of factions.json, or everything.</summary>
+    public FactionDef DefaultFaction => FactionList[0];
+
+    void LoadFactions(List<FactionDef>? list, List<string> errors)
+    {
+        if (list == null)
+        {
+            list = [FactionDef.Everything(this)];
+        }
+        else
+        {
+            if (list.Count == 0)
+                errors.Add("factions: none; the first is the default");
+            var map = Index(list, x => x.Id ?? "", "faction", errors);
+            if (map.ContainsKey(GameSetup.RandomFaction))
+                errors.Add($"faction id '{GameSetup.RandomFaction}' is the lobby's Random choice");
+            // A variant belongs to the factions that name it; others get its base (FactionDef.Map).
+            var baseOf = new Dictionary<string, string>();
+            foreach (var f in list)
+            {
+                foreach (var (b, v) in f.Variants ?? [])
+                    baseOf.TryAdd(v, b);
+            }
+            foreach (var f in list)
+                f.Resolve(this, baseOf);
+            FactionDef.Validate(this, list, errors);
+        }
+        Factions = new SortedDictionary<string, FactionDef>(list.DistinctBy(f => f.Id ?? "").ToDictionary(f => f.Id ?? ""), StringComparer.Ordinal);
+        FactionList = list;
     }
 
     void LoadHeadStarts(List<HeadStartDef> list, List<string> errors)

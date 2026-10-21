@@ -12,7 +12,8 @@ try
     content = ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"), Read("layers.json"),
         Directory.GetFiles(Path.Combine(dir, "prefabs"), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText),
         Read("head_starts.json"),
-        Directory.GetFiles(Path.Combine(dir, "scenarios"), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText));
+        Directory.GetFiles(Path.Combine(dir, "scenarios"), "*.json").Order(StringComparer.Ordinal).Select(File.ReadAllText),
+        Read("factions.json"));
 }
 catch (Exception e) when (e is IOException or ContentException)
 {

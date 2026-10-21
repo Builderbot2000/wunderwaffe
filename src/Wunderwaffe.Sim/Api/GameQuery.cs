@@ -25,8 +25,8 @@ public sealed partial class GameQuery(Simulation sim, int player)
 
     // ---- Content: what can be built and made (the build bar) ----
 
-    /// <summary>Every building, in build-menu order: size, cost, kind.</summary>
-    public IReadOnlyList<BuildingDef> BuildingTypes() => sim.Content.BuildingList;
+    /// <summary>Every building of this seat's faction (MP-009; capture-gated ones too), in build-menu order: size, cost, kind.</summary>
+    public IReadOnlyList<BuildingDef> BuildingTypes() => [.. sim.Content.BuildingList.Where(b => sim.FactionOf(Player).Has(b.Id))];
 
     /// <summary>The recipes of one building, or every recipe.</summary>
     public IReadOnlyList<RecipeDef> Recipes(string? buildingId = null) =>

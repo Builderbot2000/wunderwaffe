@@ -63,7 +63,8 @@ public readonly record struct BoostStats(
 public static class Boosters
 {
     /// <summary>The host's boosted stats right now.</summary>
-    public static BoostStats StatsOf(Simulation sim, TileState tile, PlacedBuilding host) => Stats(tile.Grid, host, 0);
+    /// <remarks>The owner's faction buffs (MP-010) count as boosts.</remarks>
+    public static BoostStats StatsOf(Simulation sim, TileState tile, PlacedBuilding host) => Factions.WithBuffs(sim, host, Stats(tile.Grid, host, 0));
 
     /// <summary>
     /// One stat's additive bonus (see <see cref="BoostStats.Get"/>): <c>Bonus(sim, tile, factory, "radius")</c> is the
