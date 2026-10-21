@@ -279,6 +279,11 @@ public sealed partial class GameQuery(Simulation sim, int player)
         return r is PlaceResult.Ok or PlaceResult.CannotAfford ? plan.RecipeId : null;
     }
 
+    /// <summary>Whether cutting the building at (fromX, fromY) and pasting it at (x, y) on <paramref name="toTileId"/> would go through (FB-023).</summary>
+    public PlaceResult CheckMove(int tileId, int fromX, int fromY, int toTileId, int x, int y, int rotation = 0) =>
+        sim.TryGetTile(tileId) is { } t && sim.TryGetTile(toTileId) is { } to
+            ? Relocation.Check(sim, t, Player, fromX, fromY, to, x, y, rotation, out _) : PlaceResult.OutOfBounds;
+
 
     public PlaceResult CheckFrame(int tileId, int x, int y) =>
         sim.TryGetTile(tileId) is { } t ? UnitAssembly.CheckFrame(Sim, t, Player, x, y) : PlaceResult.OutOfBounds;

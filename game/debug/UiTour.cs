@@ -88,6 +88,11 @@ public partial class UiTour : Node
         Step(1, "built", () => Shot("05_building"));
         Step(1, "hover machine", HoverSmelter);
         Step(10, "hover shot", () => Shot("05b_hover"));
+        Step(1, "move mode", CutSmelter);
+        Step(3, "cut", AimPaste);
+        Step(5, "move ghost shot", () => { Shot("05b2_move_ghost"); Mouse(true); });
+        Step(3, "paste", () => Mouse(false));
+        Step(10, "pasted", CheckPasted);
         Step(1, "port zones", ShowPortZones);
         Step(10, "port zones shot", () => { Shot("05c_port_zones"); Key(Godot.Key.Escape); });
         Step(1, "combat", ShowCombat);
@@ -344,6 +349,59 @@ public partial class UiTour : Node
         GetViewport().WarpMouse(at);
         var tool = GetTree().Root.FindChild("BlueprintTool", true, false) as BlueprintTool ?? throw new InvalidOperationException("no BlueprintTool");
         Log(tool.Mode == BlueprintMode.Place ? $"blueprint picked: {tool.Status.Text}" : "FAIL: Place didn't pick the blueprint");
+    }
+
+    (int X, int Y) _pasteAt;
+
+    BuildTool Tool() => GetTree().Root.FindChild("BuildTool", true, false) as BuildTool ?? throw new InvalidOperationException("no BuildTool");
+
+    /// <summary>A left button press or release through Input, which BuildTool polls.</summary>
+    void Mouse(bool pressed)
+    {
+        var at = GetViewport().GetMousePosition();
+        Godot.Input.ParseInputEvent(new InputEventMouseButton
+        {
+            ButtonIndex = MouseButton.Left, Pressed = pressed, Position = at, GlobalPosition = at,
+            ButtonMask = pressed ? MouseButtonMask.Left : 0,
+        });
+    }
+
+    Vector2 CellCentre(int x, int y) => GetViewport().GetCanvasTransform() * (new Vector2(x + 0.5f, y + 0.5f) * Palette.CellPx);
+
+    /// <summary>FB-023: M, then a click on the smelter cuts it.</summary>
+    void CutSmelter()
+    {
+        Key(Godot.Key.M);
+        GetViewport().WarpMouse(CellCentre(_smelter.X, _smelter.Y));
+        Mouse(true);
+    }
+
+    /// <summary>Releases the click and hovers the nearest spot at least three cells off where the paste check passes.</summary>
+    void AimPaste()
+    {
+        Mouse(false);
+        var tool = Tool();
+        Log(tool is { Moving: true, Cut.DefId: "smelter" } ? "M and a click cut the smelter" : "FAIL: the smelter wasn't cut");
+        var sim = _host.Sim;
+        var tile = _host.ViewedTile;
+        var spot = Enumerable.Range(-8, 17).SelectMany(dy => Enumerable.Range(-8, 17).Select(dx => (X: _smelter.X + dx, Y: _smelter.Y + dy)))
+            .Where(p => Math.Max(Math.Abs(p.X - _smelter.X), Math.Abs(p.Y - _smelter.Y)) >= 3)
+            .OrderBy(p => Math.Abs(p.X - _smelter.X) + Math.Abs(p.Y - _smelter.Y))
+            .FirstOrDefault(p => Relocation.Check(sim, tile, _host.LocalPlayer, _smelter.X, _smelter.Y, tile, p.X, p.Y, 0, out _) == PlaceResult.Ok);
+        _pasteAt = spot;
+        GetViewport().WarpMouse(CellCentre(spot.X, spot.Y));
+    }
+
+    /// <summary>The smelter stands at the paste spot, the same building; then it goes back by command for the later steps.</summary>
+    void CheckPasted()
+    {
+        var tile = _host.ViewedTile;
+        var b = tile.Grid.BuildingAt(_pasteAt.X, _pasteAt.Y);
+        Log(b is { DefId: "smelter" } && tile.Grid.BuildingAt(_smelter.X, _smelter.Y) == null
+            ? $"smelter pasted at {_pasteAt}" : $"FAIL: the paste at {_pasteAt} didn't move the smelter");
+        Key(Godot.Key.M);
+        if (b is { DefId: "smelter" })
+            _host.Send(new MoveBuildingCommand(_host.LocalPlayer, tile.Id, b.X, b.Y, tile.Id, _smelter.X, _smelter.Y));
     }
 
     void HoverSmelter()

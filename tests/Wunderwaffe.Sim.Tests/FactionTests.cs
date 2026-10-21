@@ -91,6 +91,16 @@ public class FactionTests
     }
 
     [Fact]
+    public void MovingABuildingTheFactionCantBuildIsAllowed()
+    {
+        var sim = FactionSim("nomads");
+        var tile = Tile(sim);
+        // Got some other way than building it (a scenario, a claim): FB-023 may still move it.
+        tile.Grid.Add(sim.Content.Buildings["laser_turret"], Me, 2, 2, 1, 1, 0, null);
+        Assert.Equal(PlaceResult.Ok, Relocation.Check(sim, tile, Me, 2, 2, tile, 5, 5, 0, out _));
+    }
+
+    [Fact]
     public void AVariantAndItsBaseAreCapturedSeparately()
     {
         var sim = FactionSim("raiders", Raiders);

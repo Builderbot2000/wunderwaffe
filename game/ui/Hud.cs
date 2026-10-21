@@ -269,6 +269,7 @@ public partial class Hud : Control
         "Tile",
         "    Shift+1-6 or the tabs open a build menu tab · 1-9, 0 or its buttons pick a building · R rotates · Esc drops it",
         "    Left-click / drag places · right-click / drag removes (full refund)",
+        "    M: cut a building of yours and paste it elsewhere on the tile, intact and free; onto a unit's frame it flies along",
         "    Drills sit on ore. Belts carry items the way they face; machines push output into anything next to them.",
         "    Ports go in the I/O zones along the tile's borders: one zone per neighbour, on the side facing it.",
         "    An export port sends to the import ports in the neighbour's zone facing back; items flow both ways.",
@@ -346,7 +347,8 @@ public partial class Hud : Control
         {
             RefreshHover();
             RefreshStats();
-            _hints.Text = BuildTool.HasTool
+            _hints.Text = BuildTool.Moving ? "Click a building to cut it, click again to paste · R rotate · right-click or Esc drops it · M ends"
+                : BuildTool.HasTool
                 ? "R rotate · drag to place a line · right-click removes · Esc drops the building"
                 : "Tab world map · Shift+1-6 build tab · 1-9 pick a building · O production · drag to select units";
         }

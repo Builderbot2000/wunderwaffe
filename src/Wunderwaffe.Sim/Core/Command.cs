@@ -41,6 +41,7 @@ namespace Wunderwaffe.Sim.Core;
 [JsonDerivedType(typeof(ResumeFactoryCommand), "resume_factory")]
 [JsonDerivedType(typeof(SetTargetingCommand), "set_targeting")]
 [JsonDerivedType(typeof(SetSquadTargetingCommand), "set_squad_targeting")]
+[JsonDerivedType(typeof(MoveBuildingCommand), "move_building")]
 public abstract record Command(int Player)
 {
     internal abstract void Apply(Simulation sim);
@@ -351,4 +352,18 @@ public sealed record SetTargetingCommand(int Player, int[] UnitIds, TargetMode M
 public sealed record SetSquadTargetingCommand(int Player, int SquadId, TargetMode Mode) : Command(Player)
 {
     internal override void Apply(Simulation sim) => UnitSim.SetSquadTargeting(sim, Player, SquadId, Mode);
+}
+
+/// <summary>
+/// Cuts the player's building covering (FromX, FromY) on TileId and pastes it at (X, Y) on ToTileId, turned to
+/// <paramref name="Rotation"/>, intact and for free (FB-023). Another tile is refused; onto a landed unit's frame it is a graft.
+/// </summary>
+public sealed record MoveBuildingCommand(int Player, int TileId, int FromX, int FromY, int ToTileId, int X, int Y, int Rotation = 0)
+    : Command(Player)
+{
+    internal override void Apply(Simulation sim)
+    {
+        if (sim.TryGetTile(TileId) is { } tile && sim.TryGetTile(ToTileId) is { } to)
+            Relocation.Move(sim, tile, Player, FromX, FromY, to, X, Y, Rotation);
+    }
 }
