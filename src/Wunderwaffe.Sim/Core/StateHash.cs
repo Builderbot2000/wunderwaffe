@@ -433,6 +433,8 @@ internal sealed class StateHash
             Mix(site.Template);
             Mix(site.Name);
             Mix(site.Patch);
+            Mix(site.Regional);
+            Mix(site.Start);
         }
     }
 }

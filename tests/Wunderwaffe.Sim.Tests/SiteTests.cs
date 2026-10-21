@@ -16,9 +16,6 @@ public class SiteTests
     static readonly Lazy<Simulation> Match = new(() => Simulation.NewGame(Content, Duel));
     static readonly Lazy<Simulation> Bare = new(() => Simulation.NewGame(Content, Duel with { SitesPercent = 0 }));
 
-    static long Dist(Simulation sim, TileState t) =>
-        sim.StartTileIds.Min(s => Sq(t.CenterX - sim.Tiles[s].CenterX) + Sq(t.CenterY - sim.Tiles[s].CenterY));
-
     static long Sq(long v) => v * v;
 
     [Fact]
@@ -54,11 +51,87 @@ public class SiteTests
             Assert.True(view.Dps > 0);
         }
 
-        // Nearest the starts the weakest template, farthest the strongest.
-        var ranks = sim.Sites.OrderBy(s => Dist(sim, sim.Tiles[s.TileId])).Select(s => Content.SiteList.ToList().FindIndex(d => d.Id == s.Template)).ToList();
-        Assert.Equal(ranks.Order(), ranks);
-        Assert.True(ranks[^1] > ranks[0]);
+        // Around each start, nearest the weakest template, farthest the strongest.
+        foreach (var mine in sim.Sites.GroupBy(s => s.Start))
+        {
+            var ranks = mine.OrderBy(s => sim.StartDist(sim.Tiles[s.TileId], s.Start)).Select(Rank).ToList();
+            Assert.Equal(ranks.Order(), ranks);
+            Assert.True(ranks[^1] > ranks[0]);
+        }
         Assert.Equal(Duel.Players, new GameQuery(sim, Me).Players().Count);
+    }
+
+    static int Rank(NeutralSite s) => Content.SiteList.ToList().FindIndex(d => d.Id == s.Template);
+
+    [Theory]
+    [InlineData(2, 1UL)]
+    [InlineData(2, 7UL)]
+    [InlineData(3, 42UL)]
+    [InlineData(4, 3037UL, 7)]
+    public void EveryStartGetsTheSameTiersOfSites(int players, ulong seed, int size = 5)
+    {
+        // OQ-22 with sites: every start drafts the same templates, so the same count and strength, weakest nearest.
+        var sim = Simulation.NewGame(Content, GameSetup.Default with { Players = players, Seed = seed, Width = size, Height = size });
+        Assert.NotEmpty(sim.Sites);
+        Assert.All(sim.Sites, s => Assert.InRange(s.Start, 0, players - 1));
+        var tiers = Enumerable.Range(0, players).Select(i => sim.Sites.Where(s => s.Start == i)
+            .OrderBy(s => sim.StartDist(sim.Tiles[s.TileId], i)).Select(Rank).ToList()).ToList();
+        Assert.All(tiers, t => Assert.Equal(tiers[0], t));
+        Assert.All(tiers, t => Assert.Equal(t.Order(), t));
+    }
+
+    [Fact]
+    public void SitesGuardARegionalDepositBesideThem()
+    {
+        var sim = Match.Value;
+        var withRegional = sim.Sites.Where(s => Content.Sites[s.Template].Regional > 0).ToList();
+        Assert.NotEmpty(withRegional);
+        Assert.Contains(sim.Sites, s => Content.Sites[s.Template].Regional == 0 && s.Regional == 0);
+        foreach (var s in withRegional)
+        {
+            var def = Content.Sites[s.Template];
+            var grid = sim.Tiles[s.TileId].Grid;
+            var patch = grid.Patches.ById(s.Regional)!;
+            var item = Content.Items[patch.Item];
+            Assert.True(item.Regional);
+            Assert.InRange(patch.Cells, 1, def.Regional);
+            Assert.Equal((long)item.Deposit!.PerCell * patch.Cells * def.Richness / 100, patch.Amount);
+            // Its cells lie in the rings around the layout, within its turrets' reach of the box, and are real deposits.
+            Assert.True(patch.X0 >= s.X - 6 && patch.X1 < s.X + s.Width + 6 && patch.Y0 >= s.Y - 6 && patch.Y1 < s.Y + s.Height + 6);
+            int found = 0;
+            for (int y = patch.Y0; y <= patch.Y1; y++)
+            {
+                for (int x = patch.X0; x <= patch.X1; x++)
+                {
+                    if (grid.Patches.IdAt(x, y) == patch.Id)
+                    {
+                        Assert.Equal(item.Id, grid.DepositAt(x, y));
+                        found++;
+                    }
+                }
+            }
+            Assert.Equal(patch.Cells, found);
+            var view = new GameQuery(sim, Me).SiteOf(s.Player)!;
+            Assert.Equal((item.Id, patch.Amount), (view.Regional, view.RegionalAmount));
+        }
+        // No regional deposit without sites: the same seed bare has fewer cells of it.
+        var bare = Bare.Value;
+        var id = sim.Tiles[withRegional[0].TileId].Grid.Patches.ById(withRegional[0].Regional)!.Item;
+        Assert.True(sim.Tiles.Sum(t => t.Grid.DepositCounts().GetValueOrDefault(id)) > bare.Tiles.Sum(t => t.Grid.DepositCounts().GetValueOrDefault(id)));
+    }
+
+    [Fact]
+    public void ARegionalCountOutOfRangeOrFallingIsRefused()
+    {
+        string Edited(Func<System.Text.Json.Nodes.JsonArray, System.Text.Json.Nodes.JsonArray> edit)
+        {
+            var list = System.Text.Json.Nodes.JsonNode.Parse(Read("sites.json"), documentOptions: new() { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })!.AsArray();
+            return edit(list).ToJsonString();
+        }
+        ContentException Load(string sites) => Assert.Throws<ContentException>(() => ContentDb.FromJson(Read("items.json"), Read("recipes.json"),
+            Read("buildings.json"), Read("goals.json"), Read("terrain.json"), Read("layers.json"), factions: Read("factions.json"), sites: sites));
+        Assert.Contains(Load(Edited(l => { l[0]!["regional"] = SiteDef.MaxRegional + 1; return l; })).Errors, e => e.Contains("regional"));
+        Assert.Contains(Load(Edited(l => { l[^1]!["regional"] = 0; return l; })).Errors, e => e.Contains("must rise"));
     }
 
     [Fact]

@@ -55,10 +55,12 @@ public sealed record ScenarioSeat(List<int> Tiles, List<ScenarioBuilding>? Build
 /// <summary>
 /// A neutral site (WM-010) built from site template <paramref name="Template"/> (its guardian faction), its layout's box
 /// at tile-local (X, Y) on <paramref name="Tile"/>: the site's buildings (a core at least) and guard units, placed as a
-/// seat's are. Its guards defend where they stand. <paramref name="Patch"/>: the tile's deposit patch it guards (1-based), or 0.
+/// seat's are. Its guards defend where they stand. <paramref name="Patch"/>: the tile's deposit patch it guards (1-based), or 0;
+/// <paramref name="Regional"/>: its regional item's patch (WM-018), or 0; <paramref name="Start"/>: the start whose share
+/// of sites it is, or -1.
 /// </summary>
 public sealed record ScenarioSite(string Template, int Tile, int X, int Y, string? Name = null, List<ScenarioBuilding>? Buildings = null,
-    List<ScenarioUnit>? Units = null, int Patch = 0);
+    List<ScenarioUnit>? Units = null, int Patch = 0, int Regional = 0, int Start = -1);
 
 /// <summary>
 /// A building at tile-local (X, Y), its footprint's top-left. <paramref name="Hp"/> null is full; <paramref name="Stock"/> is

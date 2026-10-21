@@ -85,7 +85,9 @@ public sealed partial class Simulation
             errors.Add($"{at}: a site needs a core");
             return;
         }
-        var ns = AddSite(tile, def, site.X, site.Y, site.Name, tile.Grid.Patches.ById(site.Patch) is { } p ? p.Id : 0);
+        var ns = AddSite(tile, def, site.X, site.Y, site.Name, tile.Grid.Patches.ById(site.Patch) is { } p ? p.Id : 0,
+            tile.Grid.Patches.ById(site.Regional) is { } r ? r.Id : 0);
+        ns.Start = site.Start >= 0 && site.Start < _startTileIds.Count ? site.Start : -1;
         LoadSeat(ns.Player, new ScenarioSeat([], site.Buildings, site.Units), at, errors, neutral: true);
         foreach (var u in _units.Where(u => u.Owner == ns.Player))
             u.Stance = Stance.Defensive;
@@ -330,7 +332,7 @@ public sealed partial class Simulation
         var sites = _sites.Where(s => !HasFallen(s)).Select(s => // a fallen site's buildings are unclaimed, as a scenario never has
         {
             var (b, u) = HeldBy(s.Player);
-            return new ScenarioSite(s.Template, s.TileId, s.X, s.Y, s.Name, b.Count > 0 ? b : null, u.Count > 0 ? u : null, s.Patch);
+            return new ScenarioSite(s.Template, s.TileId, s.X, s.Y, s.Name, b.Count > 0 ? b : null, u.Count > 0 ? u : null, s.Patch, s.Regional, s.Start);
         }).ToList();
 
         return new ScenarioDef(id, name, w, h,

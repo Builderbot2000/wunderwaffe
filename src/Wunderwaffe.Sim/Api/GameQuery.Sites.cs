@@ -35,9 +35,11 @@ public sealed partial class GameQuery
         var faction = Sim.FactionOf(Player);
         var tech = buildings.Select(b => b.DefId).Where(id => !faction.Has(id)).Distinct().Order(StringComparer.Ordinal).ToList();
         var patch = tile.Grid.Patches.ById(s.Patch);
+        var regional = tile.Grid.Patches.ById(s.Regional);
         var def = Content.Sites.GetValueOrDefault(s.Template);
         return new SiteView(s.Id, s.Name, s.Player, s.TileId, s.X, s.Y, s.Width, s.Height, s.Template, fallen,
             buildings.Count(b => b.Kind == BuildingKind.Core), buildings.Count(b => b.Kind == BuildingKind.Weapon), guards.Count,
-            dps, hp, stock, tech, patch?.Item, patch?.Amount ?? 0, def?.Strength(Content) ?? 0, def?.Value(Content) ?? 0);
+            dps, hp, stock, tech, patch?.Item, patch?.Amount ?? 0, def?.Strength(Content) ?? 0, def?.Value(Content) ?? 0,
+            regional?.Item, regional?.Amount ?? 0);
     }
 }

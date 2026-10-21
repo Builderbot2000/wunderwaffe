@@ -17,6 +17,15 @@ public sealed record NeutralSite(int Id, int Player, int TileId, int X, int Y, i
     /// <summary>Id of the deposit patch it guards (RS-004, made richer by its template), or 0.</summary>
     public int Patch { get; internal set; }
 
+    /// <summary>Id of the regional item's patch laid around it (WM-018, RS-003; <see cref="SiteDef.Regional"/>), or 0.</summary>
+    public int Regional { get; internal set; }
+
+    /// <summary>
+    /// Index into <see cref="Simulation.StartTileIds"/> of the start whose share of sites this is (WM-018 fair starts),
+    /// or -1 (a scenario's own site).
+    /// </summary>
+    public int Start { get; internal set; } = -1;
+
     public int CentreX => X + Width / 2;
     public int CentreY => Y + Height / 2;
 }
@@ -43,11 +52,11 @@ public sealed partial class Simulation
     public bool HasFallen(NeutralSite site) => CoreCount(site.Player) == 0;
 
     /// <summary>Registers a site under a new neutral player, after every seat and existing player. Builds nothing.</summary>
-    internal NeutralSite AddSite(TileState tile, SiteDef def, int x, int y, string? name = null, int patch = 0)
+    internal NeutralSite AddSite(TileState tile, SiteDef def, int x, int y, string? name = null, int patch = 0, int regional = 0)
     {
         int player = Math.Max(_players.Count, Setup?.Players ?? 0);
         var (w, h) = def.Layout.Blueprint.Size(Content.Buildings);
-        var site = new NeutralSite(_sites.Count, player, tile.Id, x, y, w, h, def.Id, name ?? $"{def.Name}, {tile.Name}") { Patch = patch };
+        var site = new NeutralSite(_sites.Count, player, tile.Id, x, y, w, h, def.Id, name ?? $"{def.Name}, {tile.Name}") { Patch = patch, Regional = regional };
         _sites.Add(site);
         _siteOf[player] = site;
         Player(player);
@@ -57,63 +66,145 @@ public sealed partial class Simulation
     }
 
     /// <summary>
-    /// Places neutral sites on a generated world (WM-018), after the starts are settled: <paramref name="percent"/> of
-    /// the tiles, picked by seed among those neither a start nor beside one (and reachable), each taking the template
-    /// whose rank matches its distance from the nearest start (nearest gets the weakest, farthest the strongest). A tile whose
-    /// patches leave no spot clear of the victory circle and the borders is skipped.
+    /// Places neutral sites on a generated world (WM-018), after the starts are settled, so that every start has the same
+    /// access to them (fair starts, OQ-22): a draft. Candidates are tiles neither a start nor beside one (and reachable).
+    /// Each start drafts the same tiers of sites, one per round, the order of starts rotating each round from a seeded
+    /// first; round k places the template ranked at the middle of tier k (the first rounds the weakest) on the unused
+    /// candidate with room whose distance from the start (tile centres) is nearest the start's own k-th tier distance
+    /// (the middle of its k-th slice of candidates, nearest first) and no nearer than its previous site. So each start
+    /// gets the same count and templates, outward at comparable distances. Tiers per start: <paramref name="percent"/>
+    /// of the tiles shared among the starts (at least one), fewer while the draft can't fill them. Planned read-only,
+    /// then built. Each site records the start it was drafted for (<see cref="NeutralSite.Start"/>).
     /// </summary>
     void PlaceSites(int percent, ulong seed)
     {
         var templates = Content.SiteList;
-        if (percent <= 0 || templates.Count == 0 || _startTileIds.Count == 0)
+        int n = _startTileIds.Count;
+        if (percent <= 0 || templates.Count == 0 || n == 0)
             return;
         var steps = TileSteps([.. _startTileIds]);
         var near = new HashSet<int>(_startTileIds);
         foreach (int s in _startTileIds)
             near.UnionWith(_tiles[s].Neighbors);
         var candidates = _tiles.Where(t => !near.Contains(t.Id) && steps[t.Id] != int.MaxValue).ToList();
-        if (candidates.Count == 0)
+        if (candidates.Count < n)
             return;
-        var rng = new Rng(seed ^ 0x517E517E517E517EUL);
-        for (int i = candidates.Count - 1; i > 0; i--)
+        var dist = new long[n][];
+        for (int i = 0; i < n; i++)
+            dist[i] = [.. _tiles.Select(t => StartDist(t, i))];
+        // Per start, its candidates' distances (cells), nearest first: tier k aims for the middle of its k-th slice.
+        var sorted = Enumerable.Range(0, n).Select(i => candidates.Select(t => IntMath.ISqrt(dist[i][t.Id])).Order().ToArray()).ToArray();
+        int first = new Rng(seed ^ 0x517E517E517E517EUL).Range(0, n);
+
+        var spots = new Dictionary<(int, string), SiteSpot?>();
+        SiteSpot? Spot(TileState t, SiteDef def) =>
+            spots.TryGetValue((t.Id, def.Id), out var s) ? s : spots[(t.Id, def.Id)] = FindSiteSpot(t, def);
+
+        int want = (_tiles.Count * percent + 50) / 100;
+        for (int q = Math.Min(Math.Max(1, want / n), candidates.Count / n); q > 0; q--)
         {
-            int j = rng.Range(0, i + 1);
-            (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
-        }
-        // Strength by distance from the nearest start (tile centres, in cells): rank among every candidate, so the
-        // nearest third gets the weakest template and the farthest the strongest, whatever the map's size.
-        long Dist(TileState t) => _startTileIds.Min(s => Sq(t.CenterX - _tiles[s].CenterX) + Sq(t.CenterY - _tiles[s].CenterY));
-        var byDistance = candidates.OrderBy(Dist).ThenBy(t => t.Id).Select(t => t.Id).ToList();
-        int want = (_tiles.Count * percent + 50) / 100, placed = 0;
-        foreach (var tile in candidates)
-        {
-            if (placed >= want)
-                break;
-            int rank = byDistance.IndexOf(tile.Id) * templates.Count / byDistance.Count;
-            if (TryBuildSite(tile, templates[rank]) != null)
-                placed++;
+            var plan = new List<(TileState Tile, SiteDef Def, SiteSpot Spot, int Start)>();
+            var last = new long[n];
+            for (int k = 0; k < q && plan.Count == k * n; k++)
+            {
+                var def = templates[(2 * k + 1) * templates.Count / (2 * q)];
+                for (int j = 0; j < n; j++)
+                {
+                    int i = (first + k + j) % n;
+                    long target = sorted[i][(2 * k + 1) * sorted[i].Length / (2 * q)];
+                    var free = candidates.Where(t => !plan.Any(p => p.Tile == t))
+                        .OrderBy(t => dist[i][t.Id] < last[i] ? 1 : 0)
+                        .ThenBy(t => Math.Abs(IntMath.ISqrt(dist[i][t.Id]) - target)).ThenBy(t => t.Id);
+                    var pick = free.Select(t => (Tile: t, Spot: Spot(t, def))).FirstOrDefault(c => c.Spot != null);
+                    if (pick.Spot is not { } spot)
+                        break;
+                    plan.Add((pick.Tile, def, spot, i));
+                    last[i] = dist[i][pick.Tile.Id];
+                }
+            }
+            if (plan.Count < q * n)
+                continue;
+            foreach (var (tile, def, spot, start) in plan.OrderBy(p => p.Tile.Id))
+                BuildSite(tile, def, spot).Start = start;
+            return;
         }
     }
 
+    /// <summary>Squared distance in cells from start <paramref name="start"/> (index into <see cref="StartTileIds"/>) to the tile, centre to centre.</summary>
+    internal long StartDist(TileState t, int start)
+    {
+        var s = _tiles[_startTileIds[start]];
+        return Sq(t.CenterX - s.CenterX) + Sq(t.CenterY - s.CenterY);
+    }
+
+    /// <summary>Where a site of a template goes on a tile: the layout's top-left and the patch it guards.</summary>
+    sealed record SiteSpot(int X, int Y, int Patch);
+
     /// <summary>
-    /// Builds a site from <paramref name="def"/> on the tile beside its richest deposit patch that leaves room: the layout
-    /// clear of the victory circle by <see cref="Balance.SiteCircleClearance"/> and off the port zones. Null if none does.
+    /// Where <paramref name="def"/> fits on the tile, read-only: beside its richest deposit patch that leaves room, the
+    /// layout clear of the victory circle by <see cref="Balance.SiteCircleClearance"/> and off the port zones. Null if none.
     /// </summary>
-    internal NeutralSite? TryBuildSite(TileState tile, SiteDef def)
+    SiteSpot? FindSiteSpot(TileState tile, SiteDef def)
     {
         var (w, h) = def.Layout.Blueprint.Size(Content.Buildings);
-        var grid = tile.Grid;
-        foreach (var patch in grid.Patches.All.Where(p => !p.Empty).OrderByDescending(p => p.Amount).ThenBy(p => p.Id))
+        foreach (var patch in tile.Grid.Patches.All.Where(p => !p.Empty).OrderByDescending(p => p.Amount).ThenBy(p => p.Id))
         {
             int px = (patch.X0 + patch.X1) / 2, py = (patch.Y0 + patch.Y1) / 2;
-            if (FreeSpot(tile, w, h, px - w / 2, py - h / 2) is not { } spot || !SiteSpotOk(tile, def, spot.X, spot.Y, w, h))
-                continue;
-            var site = BuildSite(tile, def, spot.X, spot.Y, patch: patch.Id);
-            grid.Patches.Enrich(patch, def.Richness);
-            return site;
+            if (FreeSpot(tile, w, h, px - w / 2, py - h / 2) is { } spot && SiteSpotOk(tile, def, spot.X, spot.Y, w, h))
+                return new SiteSpot(spot.X, spot.Y, patch.Id);
         }
         return null;
     }
+
+    /// <summary>Builds a site from <paramref name="def"/> where <see cref="FindSiteSpot"/> finds room (tests). Null if none.</summary>
+    internal NeutralSite? TryBuildSite(TileState tile, SiteDef def) => FindSiteSpot(tile, def) is { } spot ? BuildSite(tile, def, spot) : null;
+
+    /// <summary>A generated site: built at the spot, its patch made richer by the template, its regional deposit laid.</summary>
+    NeutralSite BuildSite(TileState tile, SiteDef def, SiteSpot spot)
+    {
+        var site = BuildSite(tile, def, spot.X, spot.Y, patch: spot.Patch);
+        tile.Grid.Patches.Enrich(tile.Grid.Patches.ById(spot.Patch)!, def.Richness);
+        LayRegional(tile, site, def);
+        return site;
+    }
+
+    /// <summary>
+    /// The rare treasure (WM-018, RS-003): <see cref="SiteDef.Regional"/> cells of a regional item's deposit (the first by
+    /// id the tile has no patch of, else one by site id) in rings around the layout, nearest first, on free buildable
+    /// cells off port zones and the victory circle: one patch at the template's and the world's richness.
+    /// </summary>
+    void LayRegional(TileState tile, NeutralSite site, SiteDef def)
+    {
+        var items = Content.Items.Values.Where(i => i.Regional && i.Deposit != null).OrderBy(i => i.Id, StringComparer.Ordinal).ToList();
+        if (def.Regional <= 0 || items.Count == 0)
+            return;
+        var grid = tile.Grid;
+        var item = items.FirstOrDefault(i => !grid.Patches.All.Any(p => p.Item == i.Id && !p.Empty)) ?? items[site.Id % items.Count];
+        var cells = new List<(int X, int Y)>();
+        for (int d = 1; d <= RegionalRings && cells.Count < def.Regional; d++)
+        {
+            int x0 = site.X - d, y0 = site.Y - d, x1 = site.X + site.Width - 1 + d, y1 = site.Y + site.Height - 1 + d;
+            for (int y = y0; y <= y1 && cells.Count < def.Regional; y++)
+            {
+                // Top and bottom rows whole, the rows between only their two ends.
+                for (int x = x0; x <= x1 && cells.Count < def.Regional; x += y == y0 || y == y1 ? 1 : x1 - x0)
+                {
+                    if (grid.Buildable(x, y) && grid.DepositAt(x, y) == null && grid.BuildingAt(x, y) == null
+                        && grid.ZoneAt(x, y) < 0 && !tile.InCircle(x, y, 1, 1))
+                        cells.Add((x, y));
+                }
+            }
+        }
+        if (cells.Count == 0)
+            return;
+        foreach (var (x, y) in cells)
+            grid.SetDeposit(x, y, item.Id);
+        long amount = Math.Max(1, (long)item.Deposit!.PerCell * cells.Count * (Setup?.RichnessPercent ?? 100) / 100 * def.Richness / 100);
+        site.Regional = grid.Patches.Add(Content, item.Id, cells, amount).Id;
+    }
+
+    /// <summary>How many rings around a site's layout its regional deposit may spread over.</summary>
+    const int RegionalRings = 6;
 
     bool SiteSpotOk(TileState tile, SiteDef def, int x, int y, int w, int h)
     {
