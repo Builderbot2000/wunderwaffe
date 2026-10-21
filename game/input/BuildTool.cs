@@ -322,26 +322,56 @@ public partial class BuildTool : Node2D
 
     /// <summary>
     /// The local player's build radii on the viewed tile (WM-015, <see cref="GameQuery.BuildRadii"/>), outlined in their
-    /// colour: each footprint grown by its radius with round corners, the exact edge of where they may build. Drawn while
-    /// the build or blueprint tool is active.
+    /// colour: each footprint grown by its radius with round corners, the exact edge of where they may build, clipped to
+    /// the tile (radii stop at its border). Drawn while the build or blueprint tool is active, and by the unit tool while
+    /// units are selected or one of your major buildings is hovered.
     /// </summary>
     public static void DrawBuildRadii(CanvasItem canvas, SimHost host)
     {
-        float px = Palette.CellPx;
-        var line = Palette.Owner(host.LocalPlayer) with { A = 0.7f };
+        var grid = host.ViewedTile.Grid;
+        var segments = new List<Vector2>();
         foreach (var b in new GameQuery(host.Sim, host.LocalPlayer).BuildRadii(host.ViewedTile.Id))
+            OutlineRadius(segments, grid, b.X, b.Y, b.Width, b.Height, b.Radius);
+        if (segments.Count > 0)
+            canvas.DrawMultiline([.. segments], Palette.Owner(host.LocalPlayer) with { A = 0.7f }, 2);
+    }
+
+    /// <summary>
+    /// Adds to <paramref name="segments"/> (pairs of points, cell pixels) the outline of a footprint grown by
+    /// <paramref name="r"/> cells with round corners, leaving out the parts whose cell just inside lies off the tile.
+    /// </summary>
+    public static void OutlineRadius(List<Vector2> segments, TileGrid grid, int x, int y, int w, int h, int r)
+    {
+        float px = Palette.CellPx;
+        // The covered cells' outer edge: r + 1/2 cell out from the footprint's edge cells' centres.
+        float rr = (r + 0.5f) * px;
+        var lo = new Vector2(x + 0.5f, y + 0.5f) * px;
+        var hi = new Vector2(x + w - 0.5f, y + h - 0.5f) * px;
+        int arc = Mathf.Max(6, r);
+        // Clockwise from the top-left corner: each corner a quarter circle, each side a point per cell (for clipping).
+        Vector2[] corners = [lo, new(hi.X, lo.Y), hi, new(lo.X, hi.Y)];
+        var path = new List<Vector2>();
+        for (int k = 0; k < 4; k++)
         {
-            // The covered cells' outer edge: r + 1/2 cell out from the footprint's edge cells' centres.
-            float r = (b.Radius + 0.5f) * px;
-            float x0 = (b.X + 0.5f) * px, y0 = (b.Y + 0.5f) * px, x1 = (b.X + b.Width - 0.5f) * px, y1 = (b.Y + b.Height - 0.5f) * px;
-            canvas.DrawLine(new Vector2(x0, y0 - r), new Vector2(x1, y0 - r), line, 2);
-            canvas.DrawLine(new Vector2(x0, y1 + r), new Vector2(x1, y1 + r), line, 2);
-            canvas.DrawLine(new Vector2(x0 - r, y0), new Vector2(x0 - r, y1), line, 2);
-            canvas.DrawLine(new Vector2(x1 + r, y0), new Vector2(x1 + r, y1), line, 2);
-            canvas.DrawArc(new Vector2(x0, y0), r, Mathf.Pi, Mathf.Pi * 1.5f, 24, line, 2);
-            canvas.DrawArc(new Vector2(x1, y0), r, Mathf.Pi * 1.5f, Mathf.Pi * 2, 24, line, 2);
-            canvas.DrawArc(new Vector2(x1, y1), r, 0, Mathf.Pi * 0.5f, 24, line, 2);
-            canvas.DrawArc(new Vector2(x0, y1), r, Mathf.Pi * 0.5f, Mathf.Pi, 24, line, 2);
+            float from = Mathf.Pi * (1f + k * 0.5f);
+            for (int i = 0; i <= arc; i++)
+                path.Add(corners[k] + Vector2.FromAngle(from + Mathf.Pi * 0.5f * i / arc) * rr);
+            var start = path[^1];
+            var next = corners[(k + 1) % 4] + Vector2.FromAngle(from + Mathf.Pi * 0.5f) * rr;
+            int steps = Mathf.CeilToInt(start.DistanceTo(next) / px);
+            for (int i = 1; i < steps; i++)
+                path.Add(start.Lerp(next, (float)i / steps));
+        }
+        path.Add(path[0]);
+        for (int i = 0; i + 1 < path.Count; i++)
+        {
+            var mid = (path[i] + path[i + 1]) / 2;
+            var probe = mid + (mid.Clamp(lo, hi) - mid).Normalized() * 0.3f * px;
+            if (grid.InBounds(Mathf.FloorToInt(probe.X / px), Mathf.FloorToInt(probe.Y / px)))
+            {
+                segments.Add(path[i]);
+                segments.Add(path[i + 1]);
+            }
         }
     }
 

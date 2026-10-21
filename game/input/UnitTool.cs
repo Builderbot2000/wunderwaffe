@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Wunderwaffe.Game.Render;
+using Wunderwaffe.Sim.Api;
 using Wunderwaffe.Sim.Content;
 using Wunderwaffe.Sim.Core;
 using Wunderwaffe.Sim.World;
@@ -211,11 +212,49 @@ public partial class UnitTool : Node2D
 
     public override void _Draw()
     {
+        if (_host.View == ViewMode.Tile && !BuildTool.HasTool)
+            DrawReach();
         if (_dragStart is not { } start || start.DistanceTo(_dragNow) < DragThresholdPx)
             return;
         var rect = new Rect2(start, Vector2.Zero).Expand(_dragNow);
         DrawRect(rect, BoxFill);
         DrawRect(rect, BoxLine, false, 1);
+    }
+
+    /// <summary>
+    /// Your build radii (WM-015) while you have units selected or hover one of your major buildings; for each selected
+    /// unit here that could land (G), the claim range around where it would land and the unclaimed buildings that landing
+    /// would claim (WM-019).
+    /// </summary>
+    void DrawReach()
+    {
+        var sim = _host.Sim;
+        var tile = _host.ViewedTile;
+        var cell = HoveredCell();
+        bool hoverMajor = tile.Grid.BuildingAt(cell.X, cell.Y) is { Def.BuildRadius: > 0 } b && b.Owner == _host.LocalPlayer;
+        if (_host.Selected.Count == 0 && !hoverMajor)
+            return;
+        BuildTool.DrawBuildRadii(this, _host);
+
+        float px = Palette.CellPx;
+        var range = new List<Vector2>();
+        var query = new GameQuery(sim, _host.LocalPlayer);
+        foreach (int id in _host.Selected)
+        {
+            if (sim.UnitById(id) is not { } unit || unit.TileId != tile.Id
+                || UnitAssembly.CheckDeploy(sim, _host.LocalPlayer, id, out var plan) != DeployResult.Ok)
+                continue;
+            int x0 = plan!.Blocks.Min(p => p.X), y0 = plan.Blocks.Min(p => p.Y);
+            int w = plan.Blocks.Max(p => p.X + p.W) - x0, h = plan.Blocks.Max(p => p.Y + p.H) - y0;
+            BuildTool.OutlineRadius(range, tile.Grid, x0, y0, w, h, query.ClaimRadius());
+            foreach (int claim in query.ClaimableNear(tile.Id, x0, y0, w, h))
+            {
+                var c = tile.Grid.BuildingById(claim)!;
+                DrawRect(new Rect2(c.X * px, c.Y * px, c.Width * px, c.Height * px), Palette.Unclaimed.Lightened(0.5f), false, 2);
+            }
+        }
+        if (range.Count > 0)
+            DrawMultiline([.. range], Palette.Unclaimed.Lightened(0.5f) with { A = 0.8f }, 2);
     }
 
     string SelectionStatus()

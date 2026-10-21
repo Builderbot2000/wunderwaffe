@@ -71,7 +71,7 @@ public partial class Hud
         if (contested)
             head.AddChild(Ui.Label("Contested", Ui.FontSize, Ui.Warn));
         head.AddChild(mine ? Ui.Label("Yours", Ui.FontSize, Ui.Good)
-            : tile.Owner == TileState.Unowned ? Ui.Label("Unclaimed", Ui.FontSize, Ui.Muted)
+            : tile.Owner == TileState.Unowned ? Ui.Label("Unowned", Ui.FontSize, Ui.Muted)
             : Ui.Label($"Player {tile.Owner}", Ui.FontSize, Ui.Bad));
         _sideInfo.AddChild(head);
         AddProfile(tile);

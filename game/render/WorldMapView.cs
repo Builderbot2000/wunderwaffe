@@ -226,6 +226,7 @@ public partial class WorldMapView : Node2D
 
         // Labels stop growing past twice their size as the camera zooms toward a tile (WM-007).
         float labelScale = Mathf.Min(1f, 2f / _overlay.GetGlobalTransformWithCanvas().Scale.X);
+        var labels = new Dictionary<int, Rect2>();
         foreach (var tile in sim.Tiles)
         {
             _overlay.DrawSetTransform(Center(tile), 0, Vector2.One * labelScale);
@@ -238,8 +239,10 @@ public partial class WorldMapView : Node2D
             _overlay.DrawString(font, new Vector2(box.Position.X + 6, FontSize - 6), what, HorizontalAlignment.Left, -1, FontSize - 4, Colors.White);
             DrawDeposits(tile, new Rect2(box.Position.X, box.End.Y - 8, box.Size.X, 6));
             DrawRegional(tile, new Vector2(box.End.X + 4, box.Position.Y));
+            labels[tile.Id] = new Rect2(Center(tile) + box.Position * labelScale, box.Size * labelScale);
         }
         _overlay.DrawSetTransform(Vector2.Zero, 0, Vector2.One);
+        DrawSiteNames(sim, labels, labelScale);
         if (ShowLogistics)
             DrawLinks();
         DrawDisrupted();
@@ -325,11 +328,10 @@ public partial class WorldMapView : Node2D
 
     /// <summary>
     /// Each neutral site (WM-010) as a diamond at its layout's centre: filled while it stands, hollow once fallen (its
-    /// buildings unclaimed), with its template's name below.
+    /// buildings unclaimed); <see cref="DrawSiteNames"/> names it.
     /// </summary>
     void DrawSites(Sim.Simulation sim)
     {
-        var font = ThemeDB.FallbackFont;
         foreach (var site in sim.Sites)
         {
             var tile = sim.Tiles[site.TileId];
@@ -341,10 +343,38 @@ public partial class WorldMapView : Node2D
                 _overlay.DrawPolyline([.. diamond, diamond[0]], Palette.Unclaimed.Lightened(0.3f), 2);
             else
                 _overlay.DrawColoredPolygon(diamond, Palette.Neutral);
-            string name = sim.Content.Sites.TryGetValue(site.Template, out var def) ? def.Name : site.Name; // the tile's label names the tile
-            _overlay.DrawString(font, c + new Vector2(-90, r + FontSize), name, HorizontalAlignment.Center, 180, FontSize - 2,
-                fallen ? Palette.Unclaimed.Lightened(0.3f) : Palette.Neutral.Lightened(0.3f));
         }
+    }
+
+    /// <summary>
+    /// Each site's template name (the tile's label names the tile) under its diamond, or above it, or else below the tile's
+    /// label, whichever first stays clear of the tile labels (<paramref name="labels"/>: their boxes) and the site names before it. Scaled like it.
+    /// </summary>
+    void DrawSiteNames(Sim.Simulation sim, Dictionary<int, Rect2> labels, float scale)
+    {
+        var font = ThemeDB.FallbackFont;
+        float size = FontSize - 2, height = (size + 6) * scale, gap = 16;
+        var taken = labels.Values.ToList();
+        foreach (var site in sim.Sites)
+        {
+            var tile = sim.Tiles[site.TileId];
+            var c = new Vector2(tile.OriginX + site.CentreX + 0.5f, tile.OriginY + site.CentreY + 0.5f) * CellPx;
+            string name = sim.Content.Sites.TryGetValue(site.Template, out var def) ? def.Name : site.Name;
+            float width = font.GetStringSize(name, HorizontalAlignment.Left, -1, (int)size).X * scale;
+            var label = labels[tile.Id];
+            Rect2 At(float top) => new(c.X - width / 2, top, width, height);
+            var box = At(c.Y + gap);
+            if (taken.Any(l => l.Intersects(box)))
+                box = At(c.Y - gap - height);
+            if (taken.Any(l => l.Intersects(box)))
+                box = new Rect2(label.GetCenter().X - width / 2, label.End.Y + 4, width, height);
+            taken.Add(box);
+            _overlay.DrawSetTransform(box.Position, 0, Vector2.One * scale);
+            _overlay.DrawRect(new Rect2(-4, 0, width / scale + 8, size + 6), new Color(0, 0, 0, 0.45f));
+            _overlay.DrawString(font, new Vector2(0, size), name, HorizontalAlignment.Left, -1, (int)size,
+                sim.HasFallen(site) ? Palette.Unclaimed.Lightened(0.3f) : Palette.Neutral.Lightened(0.3f));
+        }
+        _overlay.DrawSetTransform(Vector2.Zero, 0, Vector2.One);
     }
 
     /// <summary>Each unit as a dot where it is in the world, ringed if selected.</summary>
@@ -404,7 +434,7 @@ public partial class WorldMapView : Node2D
 
     string Describe(TileState tile) => tile.Owner switch
     {
-        TileState.Unowned => "unclaimed",
+        TileState.Unowned => "unowned",
         _ when tile.Owner == _host.LocalPlayer => $"you · {tile.Grid.BuildingCount} bldgs",
         _ => $"player {tile.Owner}",
     };
