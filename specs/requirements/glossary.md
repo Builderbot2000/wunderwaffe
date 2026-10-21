@@ -137,3 +137,15 @@ A building whose seat lost its last core. It belongs to no one and does nothing 
 ### Build radius
 
 The area around each of a player's major buildings (factories, cores, defences; set per building) and vehicles (from their block count), inside which they may build (WM-015).
+
+### Role
+
+The one physical job an item does (bear load, conduct, burn, explode, cool...). No two items of a tier share a role (CD-002).
+
+### Hub item
+
+An item with two or more consumers in different production chains. Every item is a hub or a consumable (CD-003).
+
+### Consumable
+
+An item that play uses up, such as ammo or fuel, rather than one that goes into other items or buildings (CD-003).

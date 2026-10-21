@@ -48,6 +48,12 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 - Follow cursor: a mode in which selected vehicles keep moving towards the mouse (UC-010).
 - Every player starts with a small vehicle beside the landed big one (WM-005).
 
+## Content design principles (2026-10-21)
+
+- Principles for all content, agreed with the owner, in a new file (Content Design, CD-001..008): each tier adds a verb; one role per item; every item a hub or a consumable; lower tiers stay relevant; a material's identity lives in its blocks' physical properties, not unit stats; solids and fluids differ only in state and transport infrastructure; where resources appear is map design; no fixed content budget.
+- Names say what things are (CD-009): real engineering or serious science fiction, no buzzwords or made-up terms. The draft's failing names were replaced (OQ-62: rare-earth ore, superconductor, reactor core, relic components, particle beam, composite...).
+- Open: per-item mass (OQ-59), the role table (OQ-60), how units carry fluids (OQ-61), whether a raw resource with one refined product passes CD-003 (OQ-63).
+
 ## Mechanics
 
 - [World Map](world-map.md)
@@ -58,6 +64,7 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 - [Unit Command](unit-command.md)
 - [Combat & Protection](combat-protection.md)
 - [Multiplayer & Victory](multiplayer-victory.md)
+- [Content Design](content-design.md)
 - [Misc](misc.md)
 
 See also the [glossary](glossary.md).
@@ -78,18 +85,19 @@ See also the [glossary](glossary.md).
 | [Unit Command](unit-command.md) | 5 | 5 | 0 | 0 | 10 | 9 | 0 | 90% | 0 | 0 |
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 7 | 0 | 54% | 0 | 0 |
 | [Multiplayer & Victory](multiplayer-victory.md) | 4 | 5 | 1 | 0 | 10 | 8 | 1 | 80% | 0 | 0 |
+| [Content Design](content-design.md) | 9 | 0 | 0 | 0 | 9 | 0 | 0 | 0% | 0 | 0 |
 | [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 13 | 1 | 87% | 0 | 2 |
-| **Total** | 75 | 40 | 9 | 1 | 125 | 99 | 3 | 79% | 0 | 9 |
+| **Total** | 84 | 40 | 9 | 1 | 134 | 99 | 3 | 74% | 0 | 9 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 99 | 79% |
+| Done | 99 | 74% |
 | In Progress | 3 | 2% |
-| Approved | 1 | 1% |
-| Proposed | 7 | 6% |
-| Deferred | 2 | 2% |
+| Approved | 10 | 7% |
+| Proposed | 7 | 5% |
+| Deferred | 2 | 1% |
 | Rejected | 13 | 10% |
 
 ### Audit flags
@@ -99,19 +107,19 @@ See also the [glossary](glossary.md).
 | Conflict | 0 |
 | Review | 9 |
 | Updated | 28 |
-| New | 28 |
+| New | 37 |
 
 ### Design pillar coverage
 
 | Pillar | Name | Reqs | Must | Done |
 |---|---|---|---|---|
-| P1 | World map of tiles | 20 | 13 | 18 |
-| P2 | Tile = RTS factory map | 23 | 17 | 21 |
+| P1 | World map of tiles | 21 | 14 | 18 |
+| P2 | Tile = RTS factory map | 24 | 18 | 21 |
 | P3 | Inter-tile I/O | 10 | 5 | 8 |
-| P4 | Block-by-block unit design | 15 | 10 | 13 |
+| P4 | Block-by-block unit design | 16 | 11 | 13 |
 | P5 | Squad command | 11 | 5 | 10 |
 | P6 | No Rush | 6 | 4 | 0 |
-| P7 | Resource-gated tech | 8 | 6 | 3 |
+| P7 | Resource-gated tech | 14 | 12 | 3 |
 | P8 | World domination | 21 | 10 | 17 |
 
 <!-- END generated summary -->

@@ -43,7 +43,7 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 
 **As built:** Per item, not per biome: items flagged 'regional' (coal) never spawn on a starting tile, appear on 35% of other tiles, and always on at least one neighbour of each start.
 
-**Notes:** Built scarcity is per tile, not per biome, and only coal (tier 1) is regional. Confirm the acceptance criterion or reword it.
+**Notes:** Built scarcity is per tile, not per biome, and only coal (tier 1) is regional. Confirm the acceptance criterion or reword it. Owner, 2026-10-21: where resources appear is a map decision, not an item property (CD-007); vanilla maps cluster higher-tier raw resources away from the spawns. Reword this row with the content update.
 
 ### RS-004 Deposit depletion
 
@@ -79,7 +79,7 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 
 **Requirement:** The player shall view the tech tree showing locked/unlocked nodes, unlock conditions and what each node grants.
 
-**Acceptance criteria:** Tree UI shows progress toward each condition (e.g. 34/100 Plasteel).
+**Acceptance criteria:** Tree UI shows progress toward each condition (e.g. 34/100 Composite).
 
 **As built:** Built once (T overlay), removed with the tech tree (TT-001).
 

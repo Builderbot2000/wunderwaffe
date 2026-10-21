@@ -1,12 +1,13 @@
 {
   "combat-protection.xlsx": "bb8a9a94b6ea01dd64048efcd70289f2f70f54c522ad91127313b0d9bc57b31a",
-  "factory-logistics.xlsx": "115f0b68c300c4951a4c9504a2f876b45b40649a64b952bd714b9fdf46ec5c97",
-  "glossary.xlsx": "123afdcba3c65301bcb1f72b68375e2b90c8d18a068b76f210deb45eb32b3122",
+  "content-design.xlsx": "d38d17ecb803a6947e27afadc56b2ec3f1ae5cab9fb481a563a5750e4f0ed8fa",
+  "factory-logistics.xlsx": "d773732a778bc58ee204ebb8e98252bb4100d00d1265eb2e71047a5241c6de2a",
+  "glossary.xlsx": "dd08cd32e471004dcaafd744b9121c9790edff0f0c060bbf33d4eba38f43a4e2",
   "inter-tile-links.xlsx": "a0eb16f9f8dba7633730630c114ec38481f1e732400b80dca30c2afdf37f7547",
   "misc.xlsx": "f4c79fcd7cbec6f40c51770121e8eb7faa76ce3e98f5bd8c7f41abafeb09aff2",
   "multiplayer-victory.xlsx": "40d6090d3cea50e38b406adee1f3866ecf6041c197ca914a31561ba7bc9c86e1",
-  "overview.xlsx": "78844eee1341a4ca8aef5cca861990f2395fb7ed73147d2dff9963ed3b599e5b",
-  "resources-tech.xlsx": "853b351b57a84ee7c839557b3c777007c8661b4c36fe4bd50b5cd9f180342a41",
+  "overview.xlsx": "306ce5af562234c158c02b46776143cc63efabeb1521775ffc29458cbd5de18b",
+  "resources-tech.xlsx": "fe2db813039af1fcb68bd18b8644e19800c86cc74957d60854d3e43c965a9362",
   "unit-command.xlsx": "f6c170685739d69b3c5e4374e26afb350620ed2a99161aaeb9db74baa97cdd0f",
   "units-wunderwaffe.xlsx": "ad01f51927eaf445715e6bc560aedefe13346a6edb88906cdacfc080295b1534",
   "world-map.xlsx": "87d228b3c016cf6a3142f7faf21998f32eff19138985546eb7293920279aa3dc"

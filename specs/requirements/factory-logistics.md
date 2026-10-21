@@ -176,7 +176,7 @@ Where it stands (2026-10-17): Drills, belts, junctions, routers, sorters, bridge
 
 **As built:** Not built.
 
-**Notes:** Split from FB-003/FB-005 on 2026-10-10 (OQ-21): wanted for content variety, not MVP.
+**Notes:** Split from FB-003/FB-005 on 2026-10-10 (OQ-21): wanted for content variety, not MVP. Owner, 2026-10-21: fluids differ from solids only in physical state and the infrastructure that moves them (CD-006).
 
 ### FB-016 Building boosters
 
