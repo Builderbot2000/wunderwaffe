@@ -1,0 +1,5 @@
+// Adds one block: a heavier wall in the combat tab. A sprite named sprites/bastion_wall.png would draw it.
+[
+  { "id": "bastion_wall", "name": "Bastion Wall", "menu": "combat", "kind": "wall", "width": 2, "height": 2, "power": 0, "hp": 3000,
+    "cost": { "iron_plate": 10, "steel": 4 }, "resist": { "kinetic": 60, "energy": 30 } }
+]

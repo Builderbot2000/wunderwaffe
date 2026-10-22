@@ -1,14 +1,14 @@
 {
   "combat-protection.xlsx": "bb8a9a94b6ea01dd64048efcd70289f2f70f54c522ad91127313b0d9bc57b31a",
-  "content-design.xlsx": "d38d17ecb803a6947e27afadc56b2ec3f1ae5cab9fb481a563a5750e4f0ed8fa",
+  "content-design.xlsx": "620b61b331317109b044d171eadfa407a7112c6fb13c1802c8e45f7f4cda520a",
   "factory-logistics.xlsx": "d773732a778bc58ee204ebb8e98252bb4100d00d1265eb2e71047a5241c6de2a",
   "glossary.xlsx": "dd08cd32e471004dcaafd744b9121c9790edff0f0c060bbf33d4eba38f43a4e2",
   "inter-tile-links.xlsx": "a0eb16f9f8dba7633730630c114ec38481f1e732400b80dca30c2afdf37f7547",
-  "misc.xlsx": "f4c79fcd7cbec6f40c51770121e8eb7faa76ce3e98f5bd8c7f41abafeb09aff2",
-  "multiplayer-victory.xlsx": "40d6090d3cea50e38b406adee1f3866ecf6041c197ca914a31561ba7bc9c86e1",
-  "overview.xlsx": "306ce5af562234c158c02b46776143cc63efabeb1521775ffc29458cbd5de18b",
-  "resources-tech.xlsx": "fe2db813039af1fcb68bd18b8644e19800c86cc74957d60854d3e43c965a9362",
-  "unit-command.xlsx": "f6c170685739d69b3c5e4374e26afb350620ed2a99161aaeb9db74baa97cdd0f",
-  "units-wunderwaffe.xlsx": "ad01f51927eaf445715e6bc560aedefe13346a6edb88906cdacfc080295b1534",
-  "world-map.xlsx": "87d228b3c016cf6a3142f7faf21998f32eff19138985546eb7293920279aa3dc"
+  "misc.xlsx": "24859c85f18811dbfcaeb110ba09638b5e1158d489490bb7dc05a340977841fa",
+  "multiplayer-victory.xlsx": "402c8c6f9bd4f19eeb5e4dfa9374fa4da5b7fdc79ad0dfff0b93fe98ca7ddbb4",
+  "overview.xlsx": "16cb9c7e6a78e7b4a1c3a37085de0a3b9a17687dc4cccb9d149a52443b5569c1",
+  "resources-tech.xlsx": "f93557411e5228af85c1db983be290f8b695c42af3041c549b2ad2a6842f66d3",
+  "unit-command.xlsx": "68f027283bd8d7d74a885b4c5224ad4dc5fcd7d08badf309a25dac97595f9b4c",
+  "units-wunderwaffe.xlsx": "d7e479592008a6927f75762add3d88e094337db85a88c99d0a663fe9230d0910",
+  "world-map.xlsx": "91d4562465744840b21bcd06a80b91e94d83575d7d57b53acfb1315d1e8913de"
 }

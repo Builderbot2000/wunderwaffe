@@ -17,11 +17,15 @@ namespace Wunderwaffe.Game.Input;
 /// Y over a unit core then right-click sets its rally point. Ctrl+1-9 stores the selection as a control group,
 /// Alt+1-9 recalls it. G over a unit core lifts the framed blocks around it off as a unit; G with units selected lands
 /// them. The selection is shared between both views, in <see cref="SimHost.Selected"/>. Combat (CB-001): right-click on
-/// an enemy unit or building attacks it, and Z arms an attack-move for the next right-click.
+/// an enemy unit or building attacks it, and Z arms an attack-move for the next right-click. U toggles follow cursor
+/// (UC-010): the selection keeps heading for the cell under the mouse, on either view, until U again, any other order
+/// or an empty selection ends it. Each new target is an ordinary move command, sent only when the cursor's cell has
+/// changed and at most every <see cref="FollowIntervalMs"/>, so lockstep, replays and the log stay as they are.
 /// </summary>
 public partial class UnitTool : Node2D
 {
     const float DragThresholdPx = 6;
+    const ulong FollowIntervalMs = 250;
 
     static readonly Color BoxFill = new(1f, 1f, 1f, 0.12f);
     static readonly Color BoxLine = new(1f, 1f, 1f, 0.8f);
@@ -45,6 +49,11 @@ public partial class UnitTool : Node2D
 
     /// <summary>Control groups 1-9: unit ids. Local to this player's UI, not sim state.</summary>
     readonly List<int>[] _groups = [.. Enumerable.Range(0, 9).Select(_ => new List<int>())];
+
+    /// <summary>Follow cursor (UC-010) is on for the selection.</summary>
+    bool _following;
+    (int Tile, int X, int Y) _followSent = (-1, 0, 0);
+    ulong _followAtMs;
 
     public string Status { get; private set; } = "";
 
@@ -82,6 +91,7 @@ public partial class UnitTool : Node2D
                 _armed = Armed.None;
             else
                 _host.Selected.Clear();
+            _following = false;
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -140,6 +150,13 @@ public partial class UnitTool : Node2D
         if (ids.Length == 0)
             return false;
 
+        if (e.IsActionPressed(InputActions.UnitFollow))
+        {
+            _following = !_following;
+            _followSent = (-1, 0, 0);
+            GetViewport().SetInputAsHandled();
+            return true;
+        }
         if (e.IsActionPressed(InputActions.UnitHold))
             _host.Send(new HoldUnitsCommand(me, ids));
         else if (e.IsActionPressed(InputActions.UnitPatrol))
@@ -175,8 +192,42 @@ public partial class UnitTool : Node2D
         }
         else
             return false;
+        _following = false;
         GetViewport().SetInputAsHandled();
         return true;
+    }
+
+    /// <summary>
+    /// Follow cursor (UC-010): sends the selection toward the cell under the mouse when it has moved to another cell,
+    /// at most every <see cref="FollowIntervalMs"/>. Ends when the selection empties.
+    /// </summary>
+    void Follow()
+    {
+        if (!_following)
+            return;
+        if (_host.Selected.Count == 0)
+        {
+            _following = false;
+            return;
+        }
+        ulong now = Time.GetTicksMsec();
+        if (now - _followAtMs < FollowIntervalMs || CursorTarget() is not { } target || target == _followSent)
+            return;
+        _followAtMs = now;
+        _followSent = target;
+        _host.Send(new MoveUnitsCommand(_host.LocalPlayer, [.. _host.Selected.Order()], target.Tile, target.X, target.Y));
+    }
+
+    /// <summary>The tile and local cell under the mouse on either view, if it is on a tile.</summary>
+    (int Tile, int X, int Y)? CursorTarget()
+    {
+        if (_host.View == ViewMode.World)
+        {
+            var cell = WorldMapView.CellAt(GetGlobalMousePosition());
+            return _host.Sim.TileAtCell(cell.X, cell.Y) is { } tile ? (tile.Id, cell.X - tile.OriginX, cell.Y - tile.OriginY) : null;
+        }
+        var hovered = HoveredCell();
+        return _host.Sim.ResolveCell(_host.ViewedTile, hovered.X, hovered.Y) is { } at ? (at.Tile.Id, at.X, at.Y) : null;
     }
 
     /// <summary>The squad every selected unit is in, if they are all in one.</summary>
@@ -206,6 +257,7 @@ public partial class UnitTool : Node2D
     {
         if (_dragStart != null)
             _dragNow = GetGlobalMousePosition();
+        Follow();
         Status = SelectionStatus();
         QueueRedraw();
     }
@@ -262,6 +314,8 @@ public partial class UnitTool : Node2D
         var sim = _host.Sim;
         int mine = sim.Units.Count(u => u.Owner == _host.LocalPlayer);
         string line = $"Units {mine}  selected {_host.Selected.Count}";
+        if (_following)
+            return line + "\nFollowing the cursor (U or any order stops)";
         if (_armed == Armed.Patrol)
             return line + "\nRight-click: patrol there (Esc cancels)";
         if (_armed == Armed.Rally)
@@ -289,7 +343,7 @@ public partial class UnitTool : Node2D
         {
             var landing = UnitAssembly.CheckDeploy(sim, _host.LocalPlayer, _host.Selected.Min(), out _);
             line += landing == DeployResult.Ok ? "\nG: land" : $"\nCan't land here: {landing}";
-            line += " · H hold · P patrol · Z attack-move · X retreat · Q squad · T formation · V stance · E targeting";
+            line += " · H hold · U follow · P patrol · Z attack-move · X retreat · Q squad · T formation · V stance · E targeting";
             int stuck = _host.Selected.Count(id => sim.UnitById(id) is { MaxSpeed: <= 0 });
             if (stuck > 0)
                 line += $"\n{stuck} selected can't move: no thruster";
@@ -379,6 +433,7 @@ public partial class UnitTool : Node2D
         if (enemy != null)
         {
             _host.Send(new AttackCommand(_host.LocalPlayer, ids, enemy.Id));
+            _following = false;
             return true;
         }
         var cell = HoveredCell();
@@ -386,6 +441,7 @@ public partial class UnitTool : Node2D
             && at.Tile.Grid.BuildingAt(at.X, at.Y) is { } b && b.Owner != _host.LocalPlayer)
         {
             _host.Send(new AttackBuildingCommand(_host.LocalPlayer, ids, at.Tile.Id, at.X, at.Y));
+            _following = false;
             return true;
         }
         return false;
@@ -397,6 +453,7 @@ public partial class UnitTool : Node2D
         int me = _host.LocalPlayer;
         var armed = _armed;
         _armed = Armed.None;
+        _following = false;
         if (armed == Armed.Rally)
         {
             var (ft, fx, fy) = _rallyFrom;
@@ -442,6 +499,7 @@ public partial class UnitTool : Node2D
     /// <summary>Lands the selected units where they are (UD-011); on any tile, so a scout can take a foothold (WM-015).</summary>
     void Land()
     {
+        _following = false;
         foreach (int id in _host.Selected.Order())
             _host.Send(new DeployUnitCommand(_host.LocalPlayer, id));
         _host.Selected.Clear();

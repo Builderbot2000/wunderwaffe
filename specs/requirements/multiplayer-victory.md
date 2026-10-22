@@ -2,7 +2,7 @@
 
 P8 · Players compete for domination of the world map.
 
-Where it stands (2026-10-17): Victory by domination or elimination, AI opponents, ENet lockstep with a lobby and desync detection, match settings. Only two-peer online play is tested. No diplomacy.
+Where it stands (2026-10-21): Victory by domination or elimination, AI opponents, ENet lockstep with a lobby and desync detection, match settings. Online play is tested with up to 8 instances on one machine. No diplomacy.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 |---|---|---|---|---|---|---|---|---|---|---|
 | [MP-001](#mp-001-domination-victory) | Domination victory | Must | Done | Yes | MVP | Functional | P8 | WM-004, WM-016 | Updated |  |
 | [MP-002](#mp-002-ai-opponents) | AI opponents | Must | Done | Yes | MVP | Functional | P8 | UC-001, UD-001 |  |  |
-| [MP-003](#mp-003-online-multiplayer) | Online multiplayer | Should | In Progress | Partial | Alpha | Functional | P8 | NF-004 |  |  |
+| [MP-003](#mp-003-online-multiplayer) | Online multiplayer | Should | Done | Yes | Alpha | Functional | P8 | NF-004 |  |  |
 | [MP-004](#mp-004-diplomacy) | Diplomacy | Could | Proposed | No | Beta | Functional | P8 | MP-003, IO-002 |  |  |
 | [MP-005](#mp-005-match-settings) | Match settings | Should | Done | Yes | Alpha | Functional | P8 | MP-001 | Updated |  |
 | [MP-006](#mp-006-ai-framework) | AI framework | Must | Done | Yes | MVP | Non-Functional | P8 | MP-002, NF-009, FB-021 | New |  |
@@ -45,7 +45,7 @@ Where it stands (2026-10-17): Victory by domination or elimination, AI opponents
 
 **Acceptance criteria:** 2-8 players can complete a match; desync detected and reported; a player who leaves is replaced by an AI seat that carries on their side (OQ-46).
 
-**As built:** Net/Lockstep.cs over ENet (net/NetSession.cs): lobby, host/join, AI seats on the host, periodic hash checks report desyncs to everyone, seat spoofing and cheats refused. A client who leaves is dropped (Lockstep.Drop raises SeatLeft) and the host's AiDirector takes over the seat from the current state (OQ-46); a left seat's input is refused. Tested with in-memory peers (5 seats with a leaver taken over by the AI, LockstepTests) and two headless instances (--net-smoke); no 3-8 player match over ENet tested.
+**As built:** Net/Lockstep.cs over ENet (net/NetSession.cs): lobby, host/join, AI seats on the host, periodic hash checks report desyncs to everyone, seat spoofing and cheats refused. A client who leaves is dropped (Lockstep.Drop raises SeatLeft) and the host's AiDirector takes over the seat from the current state (OQ-46); a left seat's input is refused. Tested with in-memory peers (5 seats with a leaver taken over by the AI, LockstepTests) and over ENet with `--net-smoke host <people>` + joins: 8 people and 2 people + 1 AI each played 1200 ticks with every client on the same hash and no desync (2026-10-21). Not tested across machines or to a match's end.
 
 **Notes:** Updated 2026-10-05: decision OQ-12. Owner, 2026-10-17: leavers are replaced by AI (OQ-46). No pause in multiplayer (OQ-32); a pause vote may come later.
 

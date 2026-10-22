@@ -8,7 +8,7 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 
 | ID | Feature | Priority | Status | Built | Milestone | Type | Pillar | Depends On | Audit Flag | Owner |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [RS-001](#rs-001-resource-tiers) | Resource tiers | Must | Done | Yes | MVP | Functional | P7 |  |  |  |
+| [RS-001](#rs-001-resource-tiers) | Resource tiers | Must | Approved | No | MVP | Functional | P7 |  | Updated |  |
 | [RS-002](#rs-002-recipe-graph) | Recipe graph | Must | Done | Yes | MVP | Non-Functional | P7 | RS-001 |  |  |
 | [RS-003](#rs-003-regional-scarcity) | Regional scarcity | Must | Done | Yes | MVP | Functional | P1 | WM-002, RS-001 | Review |  |
 | [RS-004](#rs-004-deposit-depletion) | Deposit depletion | Should | Done | Yes | Alpha | Functional | P2 | FB-003, WM-009, FB-012 | Updated |  |
@@ -21,11 +21,11 @@ Where it stands (2026-10-17): Eight items over three tiers; coal is regional. Th
 
 ### RS-001 Resource tiers
 
-**Requirement:** Resources shall be organised into tiers (raw → refined → advanced → exotic), each tier requiring the previous tier to produce.
+**Requirement:** Resources shall be organised into five tiers (basic elements → basic refined → basic manufactured and advanced elements → advanced manufactured and composites → theoretical and relic, CD-001). Raw items may be any tier: the advanced elements are tier 3, relic salvage tier 5.
 
-**Acceptance criteria:** Resource catalogue lists tier for each item; no tier N item is craftable without tier N-1 inputs.
+**Acceptance criteria:** Resource catalogue lists tier for each item; a made item's tier is at least the highest input tier of its cheapest recipe. Extraction may yield an item of any tier.
 
-**As built:** Tier 1-4 per item in items.json; content validation rejects a recipe whose output is more than one tier above its best input. Items: copper/iron ore, coal (1); copper/iron plate, shell, fuel (2); steel (3). Nothing is tier 4 yet.
+**As built:** Tier 1-4 per item in items.json; content validation rejects a recipe whose output is more than one tier above its best input, and extraction only yields tier 1. Items: copper/iron ore, coal (1); copper/iron plate, shell, fuel (2); steel (3). Nothing is tier 4 yet. Owner, 2026-10-21: five tiers and raw items of any tier (OQ-64); the catalogue is in specs/content/catalogue.md §1.
 
 ### RS-002 Recipe graph
 

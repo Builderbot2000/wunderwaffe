@@ -55,6 +55,15 @@ public sealed partial class GameQuery
     /// <summary>One prefab by id, or null.</summary>
     public PrefabView? Prefab(string id) => Prefabs().FirstOrDefault(p => p.Id == id);
 
+    /// <summary>Whether <see cref="TestDesign"/> can run a blueprint (UD-008): a unit design of known blocks.</summary>
+    public TestRangeResult CheckTestDesign(Blueprint design) => TestRange.Check(Content, design);
+
+    /// <summary>
+    /// Flies a design on the test range (UD-008): a sandbox apart from the match, free, deterministic; reports measured
+    /// DPS against dummy targets and how it survived a turret. Takes a moment: call it on request, not every frame.
+    /// </summary>
+    public TestRangeReport TestDesign(Blueprint design) => TestRange.Run(Content, design);
+
     /// <summary>What <see cref="Core.SetFactoryModeCommand"/> would do (UD-006).</summary>
     public FactoryControlResult CheckFactoryMode(int tileId, int x, int y) =>
         Sim.TryGetTile(tileId) is { } t ? UnitFactory.CheckSetMode(t, Player, x, y) : FactoryControlResult.NoFactory;

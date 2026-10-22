@@ -121,7 +121,7 @@ public partial class UiTour : Node
         Step(30, "scout sent", () =>
         {
             // WM-006: the scout flies to the coal tile's victory circle; landing there and holding it claims the tile.
-            var scout = _host.Sim.Units.FirstOrDefault(u => u.Owner == _host.LocalPlayer);
+            var scout = _host.Sim.Units.LastOrDefault(u => u.Owner == _host.LocalPlayer); // the skiff (WM-005) came first
             Log(scout is { Moving: true } ? "scout on its way to the coal tile's circle" : "FAIL: the scout didn't take the order");
             Shot("07b_scout_sent");
         });

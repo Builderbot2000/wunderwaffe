@@ -2,7 +2,7 @@
 
 P5 · Players command units and squads that act as a team.
 
-Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol, retreat, control groups, squads with formations and stances, rally points, terrain-aware pathing and abstract travel are built. To do from playtesting: units switch to abstract travel at the border and keep it until they stop; aggressive stance seeks out enemies across the tile and a new passive stance keeps course.
+Where it stands (2026-10-21): Selection, move, attack, attack-move, hold, patrol, retreat, control groups, squads with formations and stances, rally points, terrain-aware pathing and abstract travel, and follow cursor mode are built. To do from playtesting: units switch to abstract travel at the border and keep it until they stop; aggressive stance seeks out enemies across the tile and a new passive stance keeps course.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 | [UC-007](#uc-007-pathfinding) | Pathfinding | Must | Done | Yes | MVP | Non-Functional | P5 | UD-004 |  |  |
 | [UC-008](#uc-008-unit-collisions) | Unit collisions | Should | Done | Yes | MVP | Functional | P5 | UD-012 | New |  |
 | [UC-009](#uc-009-abstract-travel) | Abstract travel | Must | Done | Yes | MVP | Functional | P3 | UC-001, UD-004, FB-013 | Updated |  |
-| [UC-010](#uc-010-follow-cursor-mode) | Follow cursor mode | Should | Approved | No | Alpha | Functional | P5 | UC-001, UC-003, NF-004 | New |  |
+| [UC-010](#uc-010-follow-cursor-mode) | Follow cursor mode | Should | Done | Yes | Alpha | Functional | P5 | UC-001, UC-003, NF-004 | New |  |
 
 ### UC-001 Unit selection & orders
 
@@ -107,7 +107,7 @@ Where it stands (2026-10-17): Selection, move, attack, attack-move, hold, patrol
 
 **Acceptance criteria:** A key (rebindable, UI-005) toggles the mode for the selection; while it is on, the selection heads for the cell under the cursor and follows it as it moves, and squads keep their formation (UC-003). It ends on the key again, on any other order, or when the selection is cleared. Target updates are ordinary commands, sent only when the cursor has moved and at most a few times a second, so lockstep and replays work (NF-004) and the command log stays small. Works on the tile view and the world map.
 
-**As built:** Not built.
+**As built:** UnitTool: U (InputActions.UnitFollow, rebindable) toggles follow cursor for the selection on the tile view and the world map. While on, a plain move_units command goes to the cell under the cursor whenever the cursor is over another cell, at most every 250 ms, so lockstep, replays and the log need nothing new; squads move in formation as with any move. U again, any other order (move, attack, hold, patrol, stance, land, ...), Esc or an empty selection ends it. No automated test (game/ side).
 
 **Notes:** Owner, 2026-10-20.
 

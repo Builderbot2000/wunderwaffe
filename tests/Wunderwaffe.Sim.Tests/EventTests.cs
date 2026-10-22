@@ -39,7 +39,7 @@ public class EventTests
         sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
         sim.Step();
         var e = Assert.Single(Of(sim, GameEventKind.UnitCompleted));
-        Assert.Equal((Me, home.Id, Assert.Single(sim.Units).Id), (e.Player, e.TileId, e.UnitId));
+        Assert.Equal((Me, home.Id, Assert.Single(Lifted(sim)).Id), (e.Player, e.TileId, e.UnitId));
     }
 
     [Fact]

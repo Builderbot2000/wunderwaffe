@@ -1,0 +1,4 @@
+// NF-006 example mod. Copy this folder into the game's user data "mods" folder (Windows:
+// %APPDATA%\Godot\app_userdata\Wunderwaffe 3037\mods\example) and restart. Each JSON file beside this one has the
+// shape of the game/data file of the same name: entries with a new id are added, entries with a taken id replace it.
+{ "id": "example", "name": "Example: Bastion Wall" }

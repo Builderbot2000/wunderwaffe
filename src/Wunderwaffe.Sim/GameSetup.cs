@@ -14,7 +14,8 @@ namespace Wunderwaffe.Sim;
 /// <param name="RichnessPercent">Deposit richness relative to normal (MP-005); 100 is the content as written.</param>
 /// <param name="StartPrefabs">
 /// Prefab ids stamped on each seat's starting tile (FB-021), indexed by player: the first nearest the victory circle
-/// centre, the rest beside it (an AI head start, OQ-47). A missing or empty entry gets <see cref="DefaultStart"/>.
+/// centre, the rest beside it (an AI head start, OQ-47); <see cref="PrefabDef.Flying"/> ones hover beside it as units.
+/// A missing or empty entry gets the faction's, else <see cref="DefaultStart"/> and <see cref="DefaultVehicle"/>.
 /// </param>
 /// <param name="Scenario">
 /// The scenario the world comes from (WM-017), or null to generate it from <see cref="Seed"/>. With a scenario,
@@ -62,14 +63,20 @@ public sealed record GameSetup(
         return id is { Length: > 0 } && content.Factions.TryGetValue(id, out var f) ? f : content.DefaultFaction;
     }
 
-    /// <summary>The prefabs <paramref name="player"/> starts with, the first in the victory circle: the setup's, else their faction's, else <see cref="DefaultStart"/>.</summary>
+    /// <summary>
+    /// The prefabs <paramref name="player"/> starts with, the first in the victory circle: the setup's, else their
+    /// faction's, else <see cref="DefaultStart"/> landed and <see cref="DefaultVehicle"/> beside it (WM-005).
+    /// </summary>
     public IReadOnlyList<string> PrefabsFor(int player, ContentDb content) =>
         StartPrefabs is { } s && player < s.Length && s[player] is { Length: > 0 } p ? p
         : FactionFor(player, content).StartPrefabs is { Length: > 0 } fp ? fp
-        : [DefaultStart];
+        : [DefaultStart, DefaultVehicle];
 
     /// <summary>The prefab every seat starts with unless the setup names others: the landed scout (WM-005).</summary>
     public const string DefaultStart = "scout";
+
+    /// <summary>The default small starting vehicle (WM-005): a flying prefab spawned beside the landed start.</summary>
+    public const string DefaultVehicle = "skiff";
 
     public const int MinSize = 3;
     public const int MaxSize = 7;

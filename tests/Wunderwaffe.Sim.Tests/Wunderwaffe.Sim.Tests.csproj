@@ -26,6 +26,7 @@
     <None Include="..\..\game\data\*.json" LinkBase="data" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\game\data\prefabs\*.json" LinkBase="data\prefabs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\game\data\scenarios\*.json" LinkBase="data\scenarios" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\mods\example\*.json" LinkBase="mods\example" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

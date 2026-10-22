@@ -51,8 +51,9 @@ Audited against the codebase on 2026-10-10, and again on 2026-10-17 (Built colum
 ## Content design principles (2026-10-21)
 
 - Principles for all content, agreed with the owner, in a new file (Content Design, CD-001..008): each tier adds a verb; one role per item; every item a hub or a consumable; lower tiers stay relevant; a material's identity lives in its blocks' physical properties, not unit stats; solids and fluids differ only in state and transport infrastructure; where resources appear is map design; no fixed content budget.
-- Names say what things are (CD-009): real engineering or serious science fiction, no buzzwords or made-up terms. The draft's failing names were replaced (OQ-62: rare-earth ore, superconductor, reactor core, relic components, particle beam, composite...).
-- Open: per-item mass (OQ-59), the role table (OQ-60), how units carry fluids (OQ-61), whether a raw resource with one refined product passes CD-003 (OQ-63).
+- Names say what things are (CD-009): real engineering or serious science fiction, no buzzwords or made-up terms. The draft's failing names were replaced (OQ-62: superconductor, keystone, eldertech, particle beam, composite...).
+- Five tiers (OQ-64): basic elements (carbon, iron, copper, lead, quartz, water; usable but weak) → basic refined (steel, silicon, solder, fuel) → basic manufactured and advanced elements (component, circuit, ammo, polymer; oil, titanium, aluminium, lithium, uranium, rare earths) → advanced categories (composite, alloy, processor, actuator, power cell, ordnance) → theoretical and relic (eldertech, superconductor, keystone, isotope). One item per element (CD-010); raw items may be any tier (RS-001).
+- Open: per-item mass (OQ-59), how units carry fluids (OQ-61).
 
 ## Mechanics
 
@@ -77,26 +78,26 @@ See also the [glossary](glossary.md).
 
 | Mechanic | Must | Should | Could | Won't | Total | Done | In Progress | % Done | Conflict | Review |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [World Map](world-map.md) | 11 | 6 | 1 | 1 | 19 | 17 | 1 | 89% | 0 | 1 |
+| [World Map](world-map.md) | 11 | 6 | 1 | 1 | 19 | 18 | 0 | 95% | 0 | 1 |
 | [Factory & Logistics](factory-logistics.md) | 17 | 5 | 1 | 0 | 23 | 21 | 0 | 91% | 0 | 2 |
-| [Resources & Tech](resources-tech.md) | 7 | 2 | 1 | 0 | 10 | 5 | 0 | 50% | 0 | 2 |
+| [Resources & Tech](resources-tech.md) | 7 | 2 | 1 | 0 | 10 | 4 | 0 | 40% | 0 | 2 |
 | [Inter-Tile Links](inter-tile-links.md) | 3 | 3 | 0 | 0 | 6 | 5 | 0 | 83% | 0 | 0 |
-| [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 14 | 0 | 74% | 0 | 2 |
-| [Unit Command](unit-command.md) | 5 | 5 | 0 | 0 | 10 | 9 | 0 | 90% | 0 | 0 |
+| [Units & Wunderwaffe](units-wunderwaffe.md) | 12 | 4 | 3 | 0 | 19 | 15 | 0 | 79% | 0 | 2 |
+| [Unit Command](unit-command.md) | 5 | 5 | 0 | 0 | 10 | 10 | 0 | 100% | 0 | 0 |
 | [Combat & Protection](combat-protection.md) | 7 | 5 | 1 | 0 | 13 | 7 | 0 | 54% | 0 | 0 |
-| [Multiplayer & Victory](multiplayer-victory.md) | 4 | 5 | 1 | 0 | 10 | 8 | 1 | 80% | 0 | 0 |
-| [Content Design](content-design.md) | 9 | 0 | 0 | 0 | 9 | 0 | 0 | 0% | 0 | 0 |
-| [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 13 | 1 | 87% | 0 | 2 |
-| **Total** | 84 | 40 | 9 | 1 | 134 | 99 | 3 | 74% | 0 | 9 |
+| [Multiplayer & Victory](multiplayer-victory.md) | 4 | 5 | 1 | 0 | 10 | 9 | 0 | 90% | 0 | 0 |
+| [Content Design](content-design.md) | 10 | 0 | 0 | 0 | 10 | 0 | 0 | 0% | 0 | 0 |
+| [Misc](misc.md) | 9 | 5 | 1 | 0 | 15 | 14 | 1 | 93% | 0 | 2 |
+| **Total** | 85 | 40 | 9 | 1 | 135 | 103 | 1 | 76% | 0 | 9 |
 
 ### Requirements by status
 
 | Status | Count | % of Total |
 |---|---|---|
-| Done | 99 | 74% |
-| In Progress | 3 | 2% |
-| Approved | 10 | 7% |
-| Proposed | 7 | 5% |
+| Done | 103 | 76% |
+| In Progress | 1 | 1% |
+| Approved | 11 | 8% |
+| Proposed | 5 | 4% |
 | Deferred | 2 | 1% |
 | Rejected | 13 | 10% |
 
@@ -106,21 +107,21 @@ See also the [glossary](glossary.md).
 |---|---|
 | Conflict | 0 |
 | Review | 9 |
-| Updated | 28 |
+| Updated | 30 |
 | New | 37 |
 
 ### Design pillar coverage
 
 | Pillar | Name | Reqs | Must | Done |
 |---|---|---|---|---|
-| P1 | World map of tiles | 21 | 14 | 18 |
+| P1 | World map of tiles | 21 | 14 | 19 |
 | P2 | Tile = RTS factory map | 24 | 18 | 21 |
 | P3 | Inter-tile I/O | 10 | 5 | 8 |
-| P4 | Block-by-block unit design | 16 | 11 | 13 |
-| P5 | Squad command | 11 | 5 | 10 |
+| P4 | Block-by-block unit design | 16 | 11 | 14 |
+| P5 | Squad command | 11 | 5 | 11 |
 | P6 | No Rush | 6 | 4 | 0 |
-| P7 | Resource-gated tech | 14 | 12 | 3 |
-| P8 | World domination | 21 | 10 | 17 |
+| P7 | Resource-gated tech | 15 | 13 | 2 |
+| P8 | World domination | 21 | 10 | 18 |
 
 <!-- END generated summary -->
 

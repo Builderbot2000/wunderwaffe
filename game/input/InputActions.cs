@@ -49,6 +49,8 @@ public static class InputActions
     public const string UnitTargeting = "unit_targeting";
     /// <summary>Over a unit core or factory: arms its rally point, set by the next right-click.</summary>
     public const string UnitRally = "unit_rally";
+    /// <summary>U: toggles follow cursor, the selection heading for the mouse until it ends (UC-010).</summary>
+    public const string UnitFollow = "unit_follow";
     /// <summary>I: steps the hovered sorter's filter to the next item (FB-004).</summary>
     public const string CycleFilter = "build_filter";
     /// <summary>O: the viewed tile's production statistics (FB-011).</summary>
@@ -93,6 +95,7 @@ public static class InputActions
         Add(UnitStance, Key.V);
         Add(UnitTargeting, Key.E);
         Add(UnitRally, Key.Y);
+        Add(UnitFollow, Key.U);
         Add(CycleFilter, Key.I);
         Add(StatsToggle, Key.O);
         Add(LogisticsToggle, Key.L);
@@ -115,7 +118,7 @@ public static class InputActions
         [WorldClaim] = "Send units to circle", [UnitToggle] = "Lift off / land", [AttackMove] = "Attack-move",
         [BlueprintLibrary] = "Blueprint library", [BlueprintFlip] = "Mirror blueprint", [BlueprintRecord] = "Record unit design",
         [UnitHold] = "Hold position", [UnitPatrol] = "Patrol", [UnitRetreat] = "Retreat", [UnitSquad] = "Make squad",
-        [UnitFormation] = "Next formation", [UnitStance] = "Next stance", [UnitTargeting] = "Next targeting mode", [UnitRally] = "Set rally point",
+        [UnitFormation] = "Next formation", [UnitStance] = "Next stance", [UnitTargeting] = "Next targeting mode", [UnitRally] = "Set rally point", [UnitFollow] = "Follow cursor",
         [CycleFilter] = "Sorter filter", [StatsToggle] = "Production stats", [LogisticsToggle] = "Logistics overlay",
         [Relocate] = "Move building",
     };

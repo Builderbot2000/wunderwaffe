@@ -16,6 +16,14 @@ public sealed record PrefabDef(
     SortedDictionary<string, int>? Items = null, string[]? Tags = null)
 {
     public Blueprint Blueprint => new(Blocks, Frames);
+
+    /// <summary>
+    /// Tagged <see cref="FlyingTag"/>: a start spawns it as a hovering unit beside the seat's first core instead of
+    /// stamping it landed (WM-005's small starting vehicle).
+    /// </summary>
+    public bool Flying => Tags?.Contains(FlyingTag) == true;
+
+    public const string FlyingTag = "flying";
 }
 
 /// <summary>Prefab validation and blueprint text codes (FB-021, UD-009).</summary>
@@ -104,6 +112,8 @@ public static class Prefabs
         if (string.IsNullOrWhiteSpace(p.Name))
             errors.Add($"{owner}: no name");
         errors.AddRange(Problems(content, owner, p.Blueprint, p.Items));
+        if (p.Flying && (p.Frames.Length == 0 || p.Blocks.Count(b => content.Buildings.TryGetValue(b.DefId ?? "", out var d) && d.Kind == BuildingKind.Core) != 1))
+            errors.Add($"{owner}: a flying prefab is a unit: a frame and exactly one core");
     }
 
     /// <summary>

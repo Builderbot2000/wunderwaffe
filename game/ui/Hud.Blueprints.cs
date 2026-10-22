@@ -23,6 +23,9 @@ public partial class Hud
     VBoxContainer _libraryList = null!;
     LineEdit _libraryFilter = null!;
     readonly List<Button> _factoryButtons = [];
+
+    /// <summary>Test range reports (UD-008) by library entry id, kept while the library is open across rebuilds.</summary>
+    readonly Dictionary<string, TestRangeReport> _testReports = [];
     int _libraryRevision = -1;
     PanelContainer _factoryPanel = null!;
     VBoxContainer _factoryInfo = null!;
@@ -164,6 +167,8 @@ public partial class Hud
             if (stats.Upkeep.Count > 0)
                 line += $" · upkeep {GameText.Cost(Content, stats.Upkeep)}/min";
             col.AddChild(Ui.Label(line, Ui.SmallFont, Ui.Muted, LibraryWidth - 40));
+            if (_testReports.TryGetValue(e.Id, out var r))
+                col.AddChild(Ui.Label(TestLine(r), Ui.SmallFont, r.Survived ? Ui.Good : Ui.Warn, LibraryWidth - 40));
         }
 
         if (e.IsPrefab)
@@ -186,6 +191,12 @@ public partial class Hud
         factory.Disabled = BlueprintTool.SelectedFactory == null;
         _factoryButtons.Add(factory);
         buttons.AddChild(factory);
+        if (unit && Query.CheckTestDesign(bp) == TestRangeResult.Ok)
+        {
+            var test = Ui.Button("Test", () => { _testReports[e.Id] = Query.TestDesign(bp); _libraryRevision = -1; });
+            test.TooltipText = $"Fly it free on a test range for {TestRange.Seconds} s against dummy walls and a turret that shoots back (UD-008)";
+            buttons.AddChild(test);
+        }
         buttons.AddChild(Ui.Button("Duplicate", () => BlueprintLibrary.Duplicate(e.Id)));
         var copy = Ui.Button("Copy code", () => { DisplayServer.ClipboardSet(BlueprintLibrary.Export(e)); Toast("Blueprint code copied", Ui.Good); });
         copy.TooltipText = "Copy this blueprint as a text code another player can import";
@@ -195,6 +206,11 @@ public partial class Hud
         col.AddChild(buttons);
         return Ui.Panel(col);
     }
+
+    /// <summary>One line of a test range report: what it dealt and how it held up.</summary>
+    static string TestLine(TestRangeReport r) =>
+        $"Test range: {r.MeasuredDps} DPS measured (paper {r.StatDps}), {r.DamageDealt} damage, {r.TargetsDestroyed}/{r.Targets} targets · "
+        + (r.Survived ? $"survived {r.Seconds} s with {r.HpLeft}/{r.MaxHp} HP" : $"destroyed after {r.SecondsAlive} s");
 
     void RefreshFactory(PlacedBuilding factory)
     {

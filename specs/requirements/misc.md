@@ -2,7 +2,7 @@
 
 Cross-cutting UI/UX and non-functional requirements, project-wide open questions, and the glossary.
 
-Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HUD with alerts, armies and production panels; guided objectives; integer deterministic sim; saves as command logs with snapshots; JSON content; observation API, JSON driver and AI; automated tests and scripted runs. No packaged build or modding.
+Where it stands (2026-10-21): Title, pause, settings and key-rebinding menus; HUD with alerts, armies and production panels; guided objectives; integer deterministic sim; saves as command logs with snapshots; JSON content; observation API, JSON driver and AI; automated tests and scripted runs. Content mods load from the player's mods folder. No packaged build.
 
 ## Requirements
 
@@ -18,7 +18,7 @@ Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HU
 | [NF-003](#nf-003-data-driven-content) | Data-driven content | Should | Done | Yes | Alpha | Non-Functional |  | RS-002 |  |  |
 | [NF-004](#nf-004-deterministic-simulation) | Deterministic simulation | Must | Done | Yes | MVP | Non-Functional |  |  | Review |  |
 | [NF-005](#nf-005-target-platform) | Target platform | Must | Done | Yes | MVP | Non-Functional |  |  |  |  |
-| [NF-006](#nf-006-modding-support) | Modding support | Could | Proposed | No | Beta | Non-Functional |  | NF-003 |  |  |
+| [NF-006](#nf-006-modding-support) | Modding support | Could | Done | Yes | Beta | Non-Functional |  | NF-003 |  |  |
 | [UI-006](#ui-006-title-pause--settings-menus) | Title, pause & settings menus | Must | Done | Yes | MVP | Functional |  |  | New |  |
 | [NF-007](#nf-007-automated-verification) | Automated verification | Should | Done | Yes | MVP | Non-Functional |  |  | New |  |
 | [NF-008](#nf-008-save-snapshots) | Save snapshots | Should | Done | Yes | Alpha | Non-Functional |  | NF-002, NF-004 | New |  |
@@ -120,7 +120,7 @@ Where it stands (2026-10-17): Title, pause, settings and key-rebinding menus; HU
 
 **Acceptance criteria:** Example mod adding a new block loads successfully.
 
-**As built:** Not built.
+**As built:** Content mods (Content/Mods.cs): a folder in user://mods with mod.json (id, name) and any game/data list file, prefabs/, scenarios/ and sprites/. A mod's list entries replace the shipped entries with the same id in place and add the rest after them; mods apply in folder order and are validated together; a broken mod is skipped with a warning (SimHost.LoadMods). Mod sprites come before shipped ones (Sprites.AddDir). Example mod mods/example adds a 2x2 Bastion Wall; ModTests loads it and places the block, retunes by id and refuses broken mods. No scripting API, and saves and online matches don't record which mods were loaded (a mismatch shows up as a replay divergence or desync).
 
 ### UI-006 Title, pause & settings menus
 

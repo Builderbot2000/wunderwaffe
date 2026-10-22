@@ -49,7 +49,10 @@ public sealed class ExpansionModule : IAiModule
         if (units.Any(u => u.Moving && u.DestTileId >= 0 && tiles[u.DestTileId].Owner != c.Player && c.Q.InCircle(u.DestTileId, u.DestX, u.DestY))
             || tiles.Any(t => t.Owner != c.Player && c.Q.ClaimProgress(t.Id) > 0))
             yield break;
-        if (units.Where(u => !u.Moving).OrderBy(u => u.Id).FirstOrDefault() is not { } scout)
+        // The first claim funds the outposts' lines, and an empty unit's landing pays for nothing (FB-019): until then
+        // only a unit with cargo goes (an empty start vehicle serves as a vehicle for reach instead, WM-005).
+        bool first = tiles.Count(t => t.Owner == c.Player) <= 1;
+        if (units.Where(u => !u.Moving && (u.Cargo > 0 || !first)).OrderBy(u => u.Id).FirstOrDefault() is not { } scout)
             yield break;
 
         // Missing deposits first; with none next to home, any tile rather than none.

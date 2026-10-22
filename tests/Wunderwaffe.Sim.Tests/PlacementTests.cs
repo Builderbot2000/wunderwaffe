@@ -112,6 +112,7 @@ public class PlacementTests
     {
         var sim = new Simulation(TestContent.Load());
         var tile = sim.AddStartingTile(0, 0, Player, seed: 1);
+        Combat.DestroyUnit(sim, StartVehicle(sim, Player)); // its core counts too (WM-016)
         var core = tile.Grid.Buildings.Single(b => b.DefId == "core");
         int count = tile.Grid.BuildingCount;
         sim.Enqueue(new RemoveBuildingCommand(Player, 0, core.X, core.Y));

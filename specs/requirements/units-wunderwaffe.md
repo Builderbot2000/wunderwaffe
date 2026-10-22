@@ -2,7 +2,7 @@
 
 P4 · Units, up to mega 'Wunderwaffe' units, are built block by block.
 
-Where it stands (2026-10-17): Units are built on frame by hand or by boosted factories from library blueprints, validated at lift-off, with derived stats, locomotion classes, per-block damage, upkeep and a Wunderwaffe class. A unit lifts off on the one core kind (WM-016), taking the core's stock as cargo. Factories run manual or continuous and stop on a failed lift-off; blueprints share as text codes. No test range.
+Where it stands (2026-10-21): Units are built on frame by hand or by boosted factories from library blueprints, validated at lift-off, with derived stats, locomotion classes, per-block damage, upkeep and a Wunderwaffe class. A unit lifts off on the one core kind (WM-016), taking the core's stock as cargo. Factories run manual or continuous and stop on a failed lift-off; blueprints share as text codes. A test range tries designs for free in a sandbox.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 | [UD-005](#ud-005-design-library) | Design library | Must | Rejected | No | MVP | Functional | P4 | UD-003 |  |  |
 | [UD-006](#ud-006-unit-factory) | Unit factory | Must | Done | Yes | MVP | Functional | P4 | FB-009, FB-016, UD-010 | Updated |  |
 | [UD-007](#ud-007-block-damage-model) | Block damage model | Must | Done | Yes | MVP | Functional | P4 | UD-002, CB-001 |  |  |
-| [UD-008](#ud-008-test-range--simulator) | Test range / simulator | Could | Proposed | No | Beta | Functional | P4 | UD-003 |  |  |
+| [UD-008](#ud-008-test-range--simulator) | Test range / simulator | Could | Done | Yes | Beta | Functional | P4 | UD-003 |  |  |
 | [UD-009](#ud-009-design-sharing) | Design sharing | Could | Done | Yes | Beta | Functional | P4 | UD-005 |  |  |
 | [WW-001](#ww-001-mega-unit-class) | Mega unit class | Must | Done | Yes | MVP | Functional | P4 | UD-001 | Updated |  |
 | [WW-002](#ww-002-megafactory-requirement) | Megafactory requirement | Must | Done | Yes | MVP | Functional | P2 | UD-006, FB-016 | Updated |  |
@@ -104,7 +104,7 @@ Where it stands (2026-10-17): Units are built on frame by hand or by boosted fac
 
 **Acceptance criteria:** Simulator spawns the design at no cost in a sandbox and reports DPS/survival.
 
-**As built:** Not built.
+**As built:** World/TestRange.cs: Run(content, blueprint) spawns the design for free in its own throwaway Simulation (64-cell tile, the match untouched, ammo in its cargo), attack-moving for 60 s at a 4x4 block of dummy walls behind a gun turret fed from a core; TestRangeReport gives measured DPS beside paper DPS, damage dealt, targets destroyed, survival time, HP left and blocks lost. Deterministic. GameQuery.CheckTestDesign/TestDesign; a Test button on unit entries in the blueprint library shows the report. TestRangeTests: a gunship deals damage, an unarmed scout deals none and is shot down, the match hash is unchanged, same report every time, non-units refused.
 
 **Notes:** Designs are edited by re-recording on a debug map (OQ-16); one sandbox map could serve both.
 

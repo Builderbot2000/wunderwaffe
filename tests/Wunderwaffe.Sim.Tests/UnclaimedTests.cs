@@ -132,7 +132,8 @@ public class UnclaimedTests
     [Fact]
     public void UnclaimedStateIsHashedSnapshottedAndReplayed()
     {
-        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default with { Players = 2 });
+        // The scout alone: a start vehicle's core would keep them in (WM-016).
+        var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default with { Players = 2, StartPrefabs = [["scout"], ["scout"]] });
         var theirs = sim.Tiles[sim.StartTileIds[Them]];
         var core = theirs.Grid.Cores.Single(c => c.Owner == Them);
         Run(sim, 10);

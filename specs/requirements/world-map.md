@@ -2,7 +2,7 @@
 
 P1 · The world is split into tiles; you start on one and expand.
 
-Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut into irregular 256-cell tiles (3, 5 or 7 a side), each with a victory circle. Any number of players get fair starts; tiles are claimed by holding a building in the circle, and you build wherever you have presence. Tab switches instantly between the world map and a tile. One core kind: each player starts with a landed unit whose core holds the starting items. To do from playtesting: continuous zoom.
+Where it stands (2026-10-21): A seeded world (terrain with rivers and lakes) cut into irregular 256-cell tiles (3, 5 or 7 a side), each with a victory circle. Any number of players get fair starts; tiles are claimed by holding a building in the circle, and you build wherever you have presence. Tab switches instantly between the world map and a tile. One core kind: each player starts with a landed unit whose core holds the starting items, and a small vehicle hovering beside it. To do from playtesting: continuous zoom.
 
 ## Requirements
 
@@ -12,7 +12,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 | [WM-002](#wm-002-tile-attributes) | Tile attributes | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
 | [WM-003](#wm-003-tile-adjacency) | Tile adjacency | Must | Done | Yes | MVP | Functional | P1 | WM-001 |  |  |
 | [WM-004](#wm-004-tile-ownership) | Tile ownership | Must | Done | Yes | MVP | Functional | P1 | WM-001 | Updated |  |
-| [WM-005](#wm-005-starting-tile) | Starting tile | Must | In Progress | Partial | MVP | Functional | P1 | WM-004, FB-021 | Updated |  |
+| [WM-005](#wm-005-starting-tile) | Starting tile | Must | Done | Yes | MVP | Functional | P1 | WM-004, FB-021 | Updated |  |
 | [WM-006](#wm-006-tile-claim-by-victory-circle) | Tile claim by victory circle | Must | Done | Yes | MVP | Functional | P1 | WM-014, WM-015 | Updated |  |
 | [WM-007](#wm-007-zoom-between-layers) | Zoom between layers | Must | Done | Yes | MVP | Functional | P1 | WM-001, FB-001, FB-013 | Updated |  |
 | [WM-008](#wm-008-fog-of-war-world) | Fog of war (world) | Won't | Rejected | No | Alpha | Functional | P1 | WM-004 |  |  |
@@ -70,7 +70,7 @@ Where it stands (2026-10-17): A seeded world (terrain with rivers and lakes) cut
 
 **Acceptance criteria:** On new game each player owns 1 tile; their big vehicle stands landed with its core inside the victory circle, holding the starting items, and can lift off like any unit; their small vehicle is a unit beside it with its own core (so it counts for elimination, WM-016) and a build radius of its own (WM-015). Both come from start prefabs named in content (FB-021), set per faction (MP-009) and by scenarios (WM-017). With several players, starts are spread fairly (OQ-22).
 
-**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets a landed starting unit nearest the circle centre (the setup's start prefabs, FB-021; default game/data/prefabs/scout.json: thruster, 2x2 core, thruster on a 4x2 frame), whose core holds the prefab's items, 600 copper ore + 300 iron ore (doubled for 256-cell tiles, OQ-35); it passes lift-off validation. Tested (SimulationTests, TerritoryTests). No small starting vehicle yet.
+**As built:** Fair starts for every player of the setup (ChooseStarts, OQ-22). No free core: each start gets the setup's start prefabs (GameSetup.PrefabsFor: the setup's, else the faction's, else scout + skiff). The first is stamped landed nearest the circle centre (default game/data/prefabs/scout.json: thruster, 2x2 core, thruster on a 4x2 frame, its core holding 600 copper ore + 300 iron ore); prefabs tagged "flying" (default skiff.json: a 2x2 core and a thruster on a 3x2 frame, empty cargo) spawn as hovering units beside the first core (Simulation.SpawnPrefab, shared with site guards), with their own core (counts for elimination) and build radius. The AI never picks a flying prefab as its design, and only a unit carrying cargo makes its first claim. Tested (SimulationTests, TerritoryTests).
 
 **Notes:** Was: 'Each player shall start owning exactly one tile, with a starting unit already deployed (landed) inside that tile's victory circle (WM-014). Its core is the player's first core (WM-016): it is given at the start, not built.' / 'On new game each player owns 1 tile and has a landed starting unit whose core stands inside the victory circle and holds the starting items; it can lift off like any unit; with several players, starts are spread fairly (OQ-22).'. Was: 'Each player shall start owning exactly one tile, with a tile core as the first building inside that tile's victory circle'. Core placement changed by OQ-3 (2026-10-10). Fair starts: farthest-point selection with fairness scoring (OQ-22). Start as a deployed unit instead of a free core, 2026-10-17 (OQ-37). Owner, 2026-10-20: add a small starting vehicle for every player beside the landed big one.
 

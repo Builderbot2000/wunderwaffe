@@ -355,11 +355,12 @@ public partial class SimHost : Node
     public bool TryAutoStart()
     {
         var args = OS.GetCmdlineUserArgs();
-        // `-- --net-smoke host|join`: two local instances play a short online match (MP-003).
+        // `-- --net-smoke host [people]|join`: local instances play a short online match (MP-003).
         int smoke = Array.IndexOf(args, "--net-smoke");
         if (smoke >= 0)
         {
-            NetSmoke.Attach(this, smoke + 1 < args.Length ? args[smoke + 1] : "host");
+            int people = smoke + 2 < args.Length && int.TryParse(args[smoke + 2], out int n) ? Math.Clamp(n, 2, GameSetup.MaxPlayers) : 2;
+            NetSmoke.Attach(this, smoke + 1 < args.Length ? args[smoke + 1] : "host", people);
             return true;
         }
         int drive = Array.IndexOf(args, "--drive");
@@ -462,12 +463,12 @@ public partial class SimHost : Node
 
     static ContentDb LoadContent()
     {
-        static string Read(string name) => FileAccess.GetFileAsString($"res://data/{name}");
         static IEnumerable<string> Files(string dir) =>
             DirAccess.GetFilesAt(dir).Where(f => f.EndsWith(".json")).Order(StringComparer.Ordinal).Select(f => FileAccess.GetFileAsString($"{dir}/{f}"));
-        var content = ContentDb.FromJson(Read("items.json"), Read("recipes.json"), Read("buildings.json"), Read("goals.json"), Read("terrain.json"),
-            Read("layers.json"), Files("res://data/prefabs"), Read("head_starts.json"), Files("res://data/scenarios"), Read("factions.json"),
-            Read("sites.json"));
+        var shipped = new ContentSources(
+            ContentSources.ListFiles.ToDictionary(f => f, f => FileAccess.GetFileAsString($"res://data/{f}")),
+            [.. Files("res://data/prefabs")], [.. Files("res://data/scenarios")]);
+        var content = LoadMods(shipped);
         // The player's own scenarios: one that no longer fits the content is skipped, not fatal.
         if (DirAccess.DirExistsAbsolute(ScenarioDir))
         {
@@ -485,6 +486,47 @@ public partial class SimHost : Node
         }
         return content;
     }
+
+    /// <summary>
+    /// The shipped content with the player's mods (NF-006) from <see cref="ModDir"/> applied in folder-name order. A mod
+    /// that can't be read or breaks the content is skipped with a warning; the rest load.
+    /// </summary>
+    static ContentDb LoadMods(ContentSources shipped)
+    {
+        static IEnumerable<string> Files(string dir) => DirAccess.DirExistsAbsolute(dir)
+            ? DirAccess.GetFilesAt(dir).Where(f => f.EndsWith(".json")).Order(StringComparer.Ordinal).Select(f => FileAccess.GetFileAsString($"{dir}/{f}"))
+            : [];
+        var content = shipped.Load();
+        if (!DirAccess.DirExistsAbsolute(ModDir))
+            return content;
+        var mods = new List<ModDef>();
+        foreach (var folder in DirAccess.GetDirectoriesAt(ModDir).Order(StringComparer.Ordinal))
+        {
+            string dir = $"{ModDir}/{folder}";
+            try
+            {
+                var lists = DirAccess.GetFilesAt(dir).Where(f => f.EndsWith(".json") && f != "mod.json")
+                    .ToDictionary(f => f, f => FileAccess.GetFileAsString($"{dir}/{f}"));
+                var mod = ModDef.Parse(FileAccess.GetFileAsString($"{dir}/mod.json"), lists, [.. Files($"{dir}/prefabs")], [.. Files($"{dir}/scenarios")]);
+                content = Mods.Apply(shipped, [.. mods, mod]).Load();
+                mods.Add(mod);
+                Sprites.AddDir($"{dir}/sprites");
+                GD.Print($"mod loaded: {mod.Name}");
+            }
+            catch (Exception e) when (e is ContentException or System.Text.Json.JsonException)
+            {
+                GD.PushWarning($"skipping the mod in {dir}: {(e is ContentException c ? c.Errors.FirstOrDefault() : e.Message)}");
+            }
+        }
+        LoadedMods = [.. mods];
+        return content;
+    }
+
+    /// <summary>Where the player's content mods live (NF-006), one folder each; see <c>mods/example</c> in the repo.</summary>
+    public const string ModDir = "user://mods";
+
+    /// <summary>The mods loaded with the content, in the order applied (NF-006).</summary>
+    public static IReadOnlyList<ModDef> LoadedMods { get; private set; } = [];
 
     /// <summary>Where <see cref="SaveScenario"/> writes the player's scenarios (WM-017); loaded with the content.</summary>
     public const string ScenarioDir = "user://scenarios";

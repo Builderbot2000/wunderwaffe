@@ -6,9 +6,10 @@ using Wunderwaffe.Sim.Core;
 namespace Wunderwaffe.Game.Debug;
 
 /// <summary>
-/// Debug (`-- --net-smoke host` and `-- --net-smoke join`, headless is fine): a host and a client on this machine
-/// play the first <see cref="Ticks"/> ticks of a match with an AI seat over real ENet, the client issuing a command
-/// on the way, then each prints its tick, hash and whether lockstep's hash checks found a desync, and quits.
+/// Debug (`-- --net-smoke host [people]` and `-- --net-smoke join`, headless is fine): a host and clients on this
+/// machine play the first <see cref="Ticks"/> ticks of a match over real ENet, every client issuing a command on the
+/// way, then each prints its tick, hash and whether lockstep's hash checks found a desync, and quits. The host waits
+/// for <c>people</c> players in all (default 2, up to 8, MP-003's 2-8) and fills one more seat with an AI if there's room.
 /// </summary>
 public partial class NetSmoke : Node
 {
@@ -17,14 +18,15 @@ public partial class NetSmoke : Node
 
     SimHost _host = null!;
     bool _isHost, _sent, _done;
+    int _people = 2;
     double _time;
 
-    public static void Attach(SimHost host, string role)
+    public static void Attach(SimHost host, string role, int people = 2)
     {
-        var smoke = new NetSmoke { _host = host, _isHost = role == "host", ProcessMode = ProcessModeEnum.Always };
+        var smoke = new NetSmoke { _host = host, _isHost = role == "host", _people = people, ProcessMode = ProcessModeEnum.Always };
         host.AddChild(smoke);
         string? error = smoke._isHost
-            ? host.Net.Host("smoke-host", NetSession.DefaultPort, new GameSetup(4, 4, 77, AiPlayers: 1))
+            ? host.Net.Host("smoke-host", NetSession.DefaultPort, new GameSetup(5, 5, 77, AiPlayers: people < GameSetup.MaxPlayers ? 1 : 0))
             : host.Net.Join("smoke-client", "127.0.0.1", NetSession.DefaultPort);
         if (error != null)
             Finish(smoke, $"FAIL {error}");
@@ -41,7 +43,7 @@ public partial class NetSmoke : Node
             return;
         }
         var net = _host.Net;
-        if (_isHost && net.State == NetState.Hosting && net.Lobby?.Names.Count == 2)
+        if (_isHost && net.State == NetState.Hosting && net.Lobby?.Names.Count == _people)
             net.Start();
         if (!_host.HasGame || _host.Lockstep == null)
             return;

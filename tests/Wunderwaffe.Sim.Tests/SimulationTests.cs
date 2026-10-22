@@ -53,14 +53,23 @@ public class SimulationTests
     }
 
     [Fact]
-    public void EachStartIsALandedUnitWhoseCoreHoldsTheStartingItems()
+    public void EachStartIsALandedUnitWhoseCoreHoldsTheStartingItemsWithASmallVehicleBesideIt()
     {
         // WM-005, OQ-37: no free core; each player starts with a landed unit (thruster, core, thruster on frame) whose
-        // core stands in the circle and holds the starting items, and nothing else holds anything.
+        // core stands in the circle and holds the starting items, and a small vehicle hovering beside it with a core and
+        // a build radius of its own; nothing else holds anything.
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default with { Players = 2 });
-        Assert.Empty(sim.Units);
+        Assert.Equal(2, sim.Units.Count);
         for (int p = 0; p < 2; p++)
         {
+            var skiff = StartVehicle(sim, p);
+            Assert.Equal((sim.StartTileIds[p], 1), (skiff.TileId, skiff.Blocks.Count(b => sim.Content.Buildings[b.DefId].Kind == BuildingKind.Core)));
+            Assert.True(skiff.MaxSpeed > 0);
+            Assert.True(UnitStats.BuildRadius(skiff) > 0);
+            Assert.Equal(0, skiff.Cargo.Entries.Sum(e => e.Value));
+            Assert.Equal(2, sim.CoreCount(p));
+            Assert.Equal(MoveResult.Ok, UnitSim.Order(sim, p, [skiff.Id], skiff.TileId, sim.Tiles[skiff.TileId].CircleX + 10, sim.Tiles[skiff.TileId].CircleY));
+
             var home = sim.Tiles[sim.StartTileIds[p]];
             Assert.Equal(p, home.Owner);
             var core = Assert.Single(home.Grid.Cores);

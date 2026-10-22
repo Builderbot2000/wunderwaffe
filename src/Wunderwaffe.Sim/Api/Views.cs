@@ -83,9 +83,10 @@ public sealed record BuildingView(
 /// <summary>A unit.</summary>
 /// <param name="CellX">World cell under the unit's centre of mass.</param>
 /// <param name="DestTileId">Where it is headed, or -1 when not moving.</param>
+/// <param name="Cargo">Items it carries, all kinds together (UD-010): what it pays with once landed.</param>
 public sealed record UnitInfo(
     int Id, int Owner, int TileId, int CellX, int CellY, int Blocks, int Hp, int MaxHp, int Mass, int MaxSpeed,
-    bool Moving, int DestTileId, int DestX, int DestY);
+    bool Moving, int DestTileId, int DestX, int DestY, long Cargo);
 
 /// <summary>The goal a player is working on.</summary>
 /// <param name="Index">Its place in the chain, from 0; <paramref name="Count"/> goals in all.</param>

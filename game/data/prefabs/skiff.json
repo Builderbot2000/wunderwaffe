@@ -1,0 +1,15 @@
+// The small starting vehicle (WM-005): a 2x2 core and a thruster on a 3x2 frame. "flying" makes a start spawn it
+// hovering beside the landed scout, ready for orders, instead of stamping it landed. Its cargo holds no items.
+{
+  "id": "skiff",
+  "name": "Skiff",
+  "tags": ["unit", "start", "flying"],
+  "blocks": [
+    { "defId": "thruster", "x": 0, "y": 0, "rotation": 0 },
+    { "defId": "core", "x": 1, "y": 0, "rotation": 0 }
+  ],
+  "frames": [
+    { "x": 0, "y": 0 }, { "x": 1, "y": 0 }, { "x": 2, "y": 0 },
+    { "x": 0, "y": 1 }, { "x": 1, "y": 1 }, { "x": 2, "y": 1 }
+  ]
+}

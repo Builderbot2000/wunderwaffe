@@ -251,7 +251,8 @@ public sealed partial class GameQuery(Simulation sim, int player)
         }
         return new UnitInfo(
             u.Id, u.Owner, u.TileId, (int)IntMath.FloorDiv(u.X, World.Unit.CellScale), (int)IntMath.FloorDiv(u.Y, World.Unit.CellScale),
-            u.Blocks.Count, hp, max, u.Mass, u.MaxSpeed, u.Moving, u.Moving ? u.DestTileId : -1, u.DestX, u.DestY);
+            u.Blocks.Count, hp, max, u.Mass, u.MaxSpeed, u.Moving, u.Moving ? u.DestTileId : -1, u.DestX, u.DestY,
+            u.Cargo.Entries.Sum(e => e.Value));
     }
 
     // ---- Alerts ----

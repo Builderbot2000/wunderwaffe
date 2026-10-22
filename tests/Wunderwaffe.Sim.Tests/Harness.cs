@@ -126,6 +126,20 @@ static class Harness
         }
     }
 
+    /// <summary>
+    /// Whether a unit is a start vehicle (WM-005): one spawned from a flying start prefab (the skiff by default), not
+    /// lifted off or built. Matched by its blocks.
+    /// </summary>
+    public static bool IsStartVehicle(Simulation sim, Unit u) =>
+        sim.Content.PrefabList.Any(p => p.Flying && p.Blocks.Select(b => b.DefId).Order().SequenceEqual(u.Blocks.Select(b => b.DefId).Order()));
+
+    /// <summary>The units that aren't start vehicles: lifted off or built (<paramref name="player"/>'s, or everyone's).</summary>
+    public static List<Unit> Lifted(Simulation sim, int? player = null) =>
+        [.. sim.Units.Where(u => (player == null || u.Owner == player) && !IsStartVehicle(sim, u))];
+
+    /// <summary><paramref name="player"/>'s start vehicle (WM-005).</summary>
+    public static Unit StartVehicle(Simulation sim, int player = Me) => sim.Units.Single(u => u.Owner == player && IsStartVehicle(sim, u));
+
     /// <summary>A core of <paramref name="player"/>'s at (x, y), put down unpaid and empty (see <see cref="Stock"/>).</summary>
 
     public static PlacedBuilding PutCore(Simulation sim, TileState tile, int player, int x, int y, string? defId = null) =>

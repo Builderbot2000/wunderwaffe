@@ -247,27 +247,10 @@ public sealed partial class Simulation
             {
                 int sx = x + (i % 2 == 0 ? -gw - 2 : site.Width + 2), sy = y + (i / 2) * (gh + 2);
                 if (FreeSpot(tile, gw, gh, sx, sy) is { } spot)
-                    SpawnGuard(site, tile, guard, spot.X, spot.Y);
+                    SpawnPrefab(tile, site.Player, guard, spot.X, spot.Y).Stance = Stance.Defensive;
             }
         }
         return site;
-    }
-
-    /// <summary>A guard unit from a unit prefab with its top-left at local (x, y), its cargo the prefab's items, defending where it stands.</summary>
-    void SpawnGuard(NeutralSite site, TileState tile, PrefabDef guard, int x, int y)
-    {
-        var core = guard.Blocks.First(b => Content.Buildings[b.DefId].Kind == BuildingKind.Core);
-        var blocks = guard.Blocks.Select(b =>
-        {
-            var def = Content.Buildings[b.DefId];
-            var (bw, bh) = def.Footprint(b.Rotation);
-            return new UnitBlock(b.DefId, b.X - core.X, b.Y - core.Y, bw, bh, b.Rotation, b.RecipeId, def.Hp);
-        }).ToList();
-        var unit = UnitAssembly.Spawn(this, tile, site.Player, x + core.X, y + core.Y,
-            [.. guard.Frames.Select(f => (f.X - core.X, f.Y - core.Y))], blocks);
-        if (guard.Items is { Count: > 0 } items)
-            unit.Cargo.Add(items);
-        unit.Stance = Stance.Defensive;
     }
 
     static long Sq(long v) => v * v;

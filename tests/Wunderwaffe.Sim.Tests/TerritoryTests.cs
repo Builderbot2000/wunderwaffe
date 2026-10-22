@@ -244,7 +244,7 @@ public class TerritoryTests
 
         sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
         sim.Step();
-        var scout = Assert.Single(sim.Units);
+        var scout = Assert.Single(Lifted(sim));
         sim.Enqueue(new MoveUnitsCommand(Me, [scout.Id], east.Id, east.CircleX, east.CircleY));
         sim.Step();
         for (int i = 0; i < 60 * 60 && scout.Moving; i++)
@@ -338,6 +338,7 @@ public class TerritoryTests
         var sim = Simulation.NewGame(TestContent.Load(), GameSetup.Default with { Players = 2 });
         var home = sim.Tiles[sim.StartTileId];
         var core = home.Grid.Cores.Single(c => c.Owner == Me);
+        Combat.DestroyUnit(sim, StartVehicle(sim));
         sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
         Run(sim, Victory.CheckEvery * 2);
         Assert.Single(sim.Units, u => u.Owner == Me);
@@ -504,7 +505,7 @@ public class TerritoryTests
         var core = home.Grid.Cores.Single();
         sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
         sim.Step();
-        var scout = Assert.Single(sim.Units);
+        var scout = Assert.Single(Lifted(sim));
         // Land outside the circle, so the tile stays unowned.
         sim.Enqueue(new MoveUnitsCommand(Me, [scout.Id], east.Id, 3, 3));
         sim.Step();
@@ -513,7 +514,7 @@ public class TerritoryTests
         Assert.Equal(east.Id, scout.TileId);
         sim.Enqueue(new DeployUnitCommand(Me, scout.Id));
         sim.Step();
-        Assert.Empty(sim.Units);
+        Assert.Empty(Lifted(sim));
         Assert.Equal(TileState.Unowned, east.Owner);
 
         var landed = east.Grid.Cores.Single();
@@ -521,7 +522,7 @@ public class TerritoryTests
         Assert.Equal(AssembleResult.NotOwner, UnitAssembly.CheckActivate(sim, east, Them, landed.X, landed.Y, out _));
         sim.Enqueue(new ActivateUnitCommand(Me, east.Id, landed.X, landed.Y));
         sim.Step();
-        var again = Assert.Single(sim.Units);
+        var again = Assert.Single(Lifted(sim));
         sim.Enqueue(new MoveUnitsCommand(Me, [again.Id], north.Id, north.CircleX, north.CircleY));
         sim.Step();
         for (int i = 0; i < 3 * 60 * 60 && again.Moving; i++)
@@ -580,7 +581,7 @@ public class TerritoryTests
         Assert.Equal(AssembleResult.Ok, UnitAssembly.CheckActivate(sim, home, Me, core.X, core.Y, out _));
         sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
         sim.Step();
-        Assert.Equal(LocomotionClass.Ground, Assert.Single(sim.Units).Locomotion);
+        Assert.Equal(LocomotionClass.Ground, Assert.Single(Lifted(sim)).Locomotion);
     }
 
     [Fact]
@@ -595,7 +596,7 @@ public class TerritoryTests
             var core = home.Grid.Cores.Single();
             sim.Enqueue(new ActivateUnitCommand(Me, home.Id, core.X, core.Y));
             sim.Step();
-            var scout = Assert.Single(sim.Units);
+            var scout = Assert.Single(Lifted(sim));
             if (sim.Tiles.FirstOrDefault(t => UnitNav.Plan(sim, scout, t.Id, t.CircleX, t.CircleY) == null) is not { } sea)
                 continue;
             Assert.Equal(MoveResult.Unreachable, UnitSim.Order(sim, Me, [scout.Id], sea.Id, sea.CircleX, sea.CircleY));

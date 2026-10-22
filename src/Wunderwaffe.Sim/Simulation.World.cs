@@ -277,11 +277,43 @@ public sealed partial class Simulation
         GiveHeadStart(tile, owner);
     }
 
-    /// <summary>The seat's start prefabs on its tile, nearest the victory circle centre in order.</summary>
+    /// <summary>
+    /// The seat's start prefabs on its tile, nearest the victory circle centre in order; flying ones (WM-005's small
+    /// vehicle) hover beside the seat's first core once the landed ones are down.
+    /// </summary>
     void StampStart(TileState tile, int owner)
     {
-        foreach (var id in StartPrefabsOf(owner))
-            StampNear(tile, owner, Content.Prefabs[id], tile.CircleX, tile.CircleY);
+        var prefabs = StartPrefabsOf(owner).Select(id => Content.Prefabs[id]).ToList();
+        foreach (var p in prefabs.Where(p => !p.Flying))
+            StampNear(tile, owner, p, tile.CircleX, tile.CircleY);
+        var core = tile.Grid.Cores.FirstOrDefault(c => c.Owner == owner);
+        var (ax, ay) = core is { } c ? (c.X + c.Width / 2, c.Y + c.Height / 2) : (tile.CircleX, tile.CircleY);
+        foreach (var p in prefabs.Where(p => p.Flying))
+        {
+            var (w, h) = p.Blueprint.Size(Content.Buildings);
+            if (FreeSpot(tile, w + 2, h + 2, ax - w / 2 - 1, ay - h / 2 - 1) is { } spot)
+                SpawnPrefab(tile, owner, p, spot.X + 1, spot.Y + 1);
+        }
+    }
+
+    /// <summary>
+    /// A hovering unit from a unit prefab (one core) with its top-left at local (x, y), its cargo the prefab's items:
+    /// WM-005's small starting vehicle and WM-010's site guards.
+    /// </summary>
+    internal Unit SpawnPrefab(TileState tile, int owner, PrefabDef prefab, int x, int y)
+    {
+        var core = prefab.Blocks.First(b => Content.Buildings[b.DefId].Kind == BuildingKind.Core);
+        var blocks = prefab.Blocks.Select(b =>
+        {
+            var def = Content.Buildings[b.DefId];
+            var (bw, bh) = def.Footprint(b.Rotation);
+            return new UnitBlock(b.DefId, b.X - core.X, b.Y - core.Y, bw, bh, b.Rotation, b.RecipeId, def.Hp);
+        }).ToList();
+        var unit = UnitAssembly.Spawn(this, tile, owner, x + core.X, y + core.Y,
+            [.. prefab.Frames.Select(f => (f.X - core.X, f.Y - core.Y))], blocks);
+        if (prefab.Items is { Count: > 0 } items)
+            unit.Cargo.Add(items);
+        return unit;
     }
 
     /// <summary>Stamps a prefab as near local (x, y) as it fits, if it fits anywhere on the tile.</summary>

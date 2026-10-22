@@ -159,7 +159,7 @@ public class ScenarioTests
 
         var def = content.AddScenario(Scenarios.ToJson(sim.ToScenario("units", "Units")));
         var b = Simulation.NewGame(content, GameSetup.ForScenario(def));
-        var copy = Assert.Single(b.Units);
+        var copy = Assert.Single(Lifted(b));
         Assert.Equal((unit.Owner, unit.TileId, unit.X, unit.Y, unit.Mass), (copy.Owner, copy.TileId, copy.X, copy.Y, copy.Mass));
         Assert.Equal(unit.Blocks.Select(x => (x.DefId, x.GX, x.GY)), copy.Blocks.Select(x => (x.DefId, x.GX, x.GY)));
         Assert.Equal(ore, copy.Cargo.Get("copper_ore"));

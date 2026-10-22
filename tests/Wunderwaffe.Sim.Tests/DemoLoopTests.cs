@@ -74,7 +74,7 @@ public class DemoLoopTests(ITestOutputHelper output)
         // Goal 3: lift the starting unit off; its core's stock goes with it as cargo.
         Do(new ActivateUnitCommand(Me, home.Id, 46, 46));
         sim.Step();
-        var scout = Assert.Single(sim.Units);
+        var scout = Assert.Single(Lifted(sim));
         Assert.Equal(carried, scout.Cargo.Get("copper_ore"));
         Assert.Equal([baseCore], Funds.Cores(home, Me));
 
@@ -85,7 +85,7 @@ public class DemoLoopTests(ITestOutputHelper output)
         Assert.Equal(coal.Id, scout.TileId);
         Do(new DeployUnitCommand(Me, scout.Id));
         sim.Step();
-        Assert.Empty(sim.Units);
+        Assert.Empty(Lifted(sim));
         Assert.Equal(3, coal.Grid.BuildingCount);
         var landed = Assert.Single(coal.Grid.Cores);
         Assert.Equal(carried, landed.Stock!.Get("copper_ore"));

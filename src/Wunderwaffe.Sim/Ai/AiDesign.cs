@@ -11,7 +11,8 @@ public sealed record AiDesign(string Name, Blueprint Blueprint, IReadOnlyDiction
 
 /// <summary>
 /// Where the AI's designs come from (MP-006 initialisation): the prefab library (FB-021) through
-/// <see cref="GameQuery.Prefabs"/>. The seat builds the cheapest unit prefab that can move (UD-004), ties by id.
+/// <see cref="GameQuery.Prefabs"/>. The seat builds the cheapest unit prefab that can move (UD-004), ties by id. Flying
+/// prefabs are start vehicles (WM-005), given at the start rather than built, so they're never picked.
 /// </summary>
 public static class AiDesigns
 {
@@ -19,6 +20,7 @@ public static class AiDesigns
     /// <remarks>Only prefabs its faction can build, with its variants in (MP-009).</remarks>
     public static AiDesign? Pick(GameQuery q) =>
         q.Prefabs()
+            .Where(p => !p.Tags.Contains(Content.PrefabDef.FlyingTag))
             .Select(p => (p.Id, p.IsUnit, Blueprint: q.ForFaction(p.Blueprint)))
             .Where(p => p.IsUnit && q.CheckBlueprintFaction(p.Blueprint) == FactionResult.Ok
                 && q.BlueprintLocomotion(p.Blueprint).Result == LocomotionResult.Ok)

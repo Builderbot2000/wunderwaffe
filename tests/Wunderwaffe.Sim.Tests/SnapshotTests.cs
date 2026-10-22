@@ -108,7 +108,7 @@ public class SnapshotTests(ITestOutputHelper output)
             }
             Assert.Equal(sim.StateHash(), restored.StateHash());
         }
-        Assert.Single(sim.Units);
+        Assert.Single(Lifted(sim));
         Assert.True(sim.PlayerOrNull(Me)!.ProducedOf("iron_plate") > 20);
     }
 
@@ -204,7 +204,8 @@ public class SnapshotTests(ITestOutputHelper output)
     {
         // NF-008 against factory and combat state: power networks with a battery and a fuel generator, storage, relays,
         // a sorter, a laser turret firing at an enemy scout (projectiles, block damage, wrecks).
-        var sim = Simulation.NewGame(TestContent.Load(), new GameSetup(3, 3, 7, Players: 2));
+        // The scout alone: a start vehicle on the turret's tile would interrupt the enemy scout's travel (UC-009).
+        var sim = Simulation.NewGame(TestContent.Load(), new GameSetup(3, 3, 7, Players: 2, StartPrefabs: [["scout"], ["scout"]]));
         var home = sim.Tiles[sim.StartTileIds[0]];
         var away = sim.Tiles[sim.StartTileIds[1]];
         foreach (var item in new[] { "copper_ore", "iron_ore", "copper_plate", "iron_plate", "steel", "fuel" })

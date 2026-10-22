@@ -112,7 +112,8 @@ public class JsonDriverTests(ITestOutputHelper output)
         Assert.Equal(3, goal());
 
         // Goal 4: fly it to the victory circle of a neighbour with coal, land it there and hold the circle.
-        int scout = (int)c.Query("Units", new { owner = 0 })!.AsArray().Single()!["Id"]!;
+        // The newest unit: the small start vehicle (WM-005) has the lower id.
+        int scout = c.Query("Units", new { owner = 0 })!.AsArray().Max(u => (int)u!["Id"]!);
         var neighbours = c.Query("Tile", new { tileId = home })!["Neighbors"]!.AsArray().Select(n => (int)n!);
         var coalTile = neighbours.Select(n => c.Query("Tile", new { tileId = n })!)
             .First(t => t["Deposits"]!.AsObject().ContainsKey("coal")

@@ -95,7 +95,7 @@ public class PrefabTests
         // The AI picks designs through the same queries as everyone else.
         var sim = Simulation.NewGame(TestContent.WithPrefabs(Walls), GameSetup.Default with { Width = GameSetup.MinSize, Height = GameSetup.MinSize });
         var q = new GameQuery(sim, Me);
-        Assert.Equal(["depot", "scout", "walls"], q.Prefabs().Select(p => p.Id));
+        Assert.Equal(["depot", "scout", "skiff", "walls"], q.Prefabs().Select(p => p.Id));
         var scout = q.Prefab("scout")!;
         Assert.True(scout.IsUnit);
         Assert.Equal(300, scout.Items["iron_ore"]);
